@@ -1,0 +1,65 @@
+import {
+  Settings,
+  Layers,
+  Shuffle,
+  Send,
+  UserPlus,
+  CreditCard,
+  FileText,
+  DollarSign,
+  Globe,
+  Tag,
+  ChevronRight,
+  Home,
+  Server,
+  Users,
+  UserCheck,
+  Map,
+  Grid,
+  Wifi,
+  Box,
+  LifeBuoy,
+  MessageCircle,
+  Circle,
+  Ticket,
+  Wrench,
+  UserCog,
+  Info,
+  MapPin,
+} from "lucide-react";
+export const icons = {
+  home: Home,
+  server: Server,
+  users: Users,
+  map: Map,
+  "map-pin": MapPin,
+  shuffle: Shuffle,
+
+  settings: Settings,
+  "settings-2": Settings, // alias supaya aman
+
+  ticket: Ticket,
+  tool: Wrench,
+  "user-cog": UserCog,
+  info: Info,
+
+  send: Send,
+  "user-plus": UserPlus,
+  "user-check": UserCheck,
+
+  "credit-card": CreditCard,
+  "file-text": FileText,
+  "dollar-sign": DollarSign,
+
+  globe: Globe,
+  tag: Tag,
+  grid: Grid,
+  wifi: Wifi,
+  box: Box,
+
+  "life-buoy": LifeBuoy,
+  "message-circle": MessageCircle,
+
+  chevron: ChevronRight,
+  dot: Circle,
+};
