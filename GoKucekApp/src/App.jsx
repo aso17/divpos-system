@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import AppRoutes from "./routes/Index";
-import CenterToast from "./components/common/CenterToast"; // Pastikan path benar
-
+import CenterToast from "./components/common/CenterToast";
 export default function App() {
   const [toast, setToast] = useState({
     message: "",

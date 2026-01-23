@@ -26,40 +26,58 @@ import {
   UserCog,
   Info,
   MapPin,
+  // Tambahkan import baru di bawah ini sesuai log console
+  ClipboardList,
+  History,
+  Database,
+  BarChart2,
 } from "lucide-react";
+
 export const icons = {
+  // Navigation / General
   home: Home,
   server: Server,
   users: Users,
   map: Map,
   "map-pin": MapPin,
+  grid: Grid,
+  layers: Layers,
+
+  // Actions
   shuffle: Shuffle,
+  send: Send,
 
+  // Settings & Tools
   settings: Settings,
-  "settings-2": Settings, // alias supaya aman
-
-  ticket: Ticket,
   tool: Wrench,
   "user-cog": UserCog,
-  info: Info,
 
-  send: Send,
+  // Users
   "user-plus": UserPlus,
   "user-check": UserCheck,
 
+  // Finance / Transaction
   "credit-card": CreditCard,
-  "file-text": FileText,
   "dollar-sign": DollarSign,
+  ticket: Ticket,
 
-  globe: Globe,
+  // Content / Report
+  "file-text": FileText,
+  info: Info,
   tag: Tag,
-  grid: Grid,
+  globe: Globe,
   wifi: Wifi,
   box: Box,
 
+  // UI Helpers
+  chevron: ChevronRight,
+  dot: Circle,
   "life-buoy": LifeBuoy,
   "message-circle": MessageCircle,
 
-  chevron: ChevronRight,
-  dot: Circle,
+  // Fix Ikon Undefined (Sesuai Log Console Anda)
+  "clipboard-list": ClipboardList, // Untuk Transaksi
+  history: History, // Untuk Riwayat Transaksi
+  database: Database, // Untuk Master Data
+  "bar-chart-2": BarChart2, // Untuk Laporan
 };

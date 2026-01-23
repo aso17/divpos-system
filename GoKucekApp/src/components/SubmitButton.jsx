@@ -3,7 +3,7 @@ export default function SubmitButton({
   label = "Submit",
   loadingLabel = "Processing...",
   onClick,
-  color = "#2563eb", // default blue
+  color = "#244E87", // default blue
   fullWidth = true,
   type = "submit",
   className = "", // 👈 tambahan

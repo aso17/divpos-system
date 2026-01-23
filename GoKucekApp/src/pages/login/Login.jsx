@@ -4,27 +4,40 @@ import { ProjectContext } from "../../context/ProjectContext";
 import { useAuth } from "../../context/AuthContext";
 import LoadingDots from "../../components/common/LoadingDots";
 import AppHead from "../../components/common/AppHead";
-import Toast from "../../components/common/CenterToast";
+// Import Toast dihapus karena sudah ada di App.jsx
 import LoginForm from "./LoginForm";
 
 export default function Login() {
   const { project, loading } = useContext(ProjectContext);
   const { login: loginFromContext } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const [toastType, setToastType] = useState("success");
+  // State toastMessage dan toastType dihapus
   const navigate = useNavigate();
 
   const handleLogin = async (values) => {
     setIsSubmitting(true);
     try {
       await loginFromContext(values);
+
+      // // Kirim event sukses ke App.jsx
+      // window.dispatchEvent(
+      //   new CustomEvent("global-toast", {
+      //     detail: { message: "Selamat Datang!", type: "success" },
+      //   }),
+      // );
+
       navigate("/dashboard");
     } catch (error) {
+      console.error("Login error:", error);
       const message =
         error.response?.data?.message || error.message || "Login gagal";
-      setToastType("error");
-      setToastMessage(message);
+
+      // Kirim event error ke App.jsx
+      window.dispatchEvent(
+        new CustomEvent("global-toast", {
+          detail: { message: message, type: "error" },
+        }),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -34,31 +47,27 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-emerald-50 px-4">
-      <AppHead title={`Login | ${project?.name}`} />
+      <AppHead title={`Login`} />
 
-      <Toast
-        message={toastMessage}
-        type={toastType}
-        onClose={() => setToastMessage("")}
-      />
+      {/* Komponen <Toast /> lokal sudah dihapus dari sini */}
 
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-8 md:p-10">
+      <div className="w-full max-w-sm">
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-6 md:p-7">
           {/* Logo */}
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-4">
             <img
               src={project?.logo_path}
               alt={project?.name}
-              className="h-20 md:h-24 w-auto object-contain"
+              className="h-14 md:h-16 w-auto object-contain"
             />
           </div>
 
           {/* Heading */}
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-slate-800">
+          <div className="text-center mb-5">
+            <h1 className="text-xl font-bold text-slate-800">
               Selamat Datang 👋
             </h1>
-            <p className="text-sm text-slate-500 mt-2">
+            <p className="text-xs text-slate-500 mt-1">
               Masuk ke sistem{" "}
               <span className="font-semibold">{project?.name}</span>
             </p>
@@ -72,7 +81,7 @@ export default function Login() {
           />
 
           {/* Links */}
-          <div className="mt-8 pt-6 border-t border-slate-100 flex justify-between text-sm">
+          <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between text-xs">
             <Link
               to="/forgot-password"
               className="text-slate-400 hover:text-slate-600 transition"
@@ -89,11 +98,6 @@ export default function Login() {
             </Link>
           </div>
         </div>
-
-        <footer className="mt-10 text-center text-xs text-slate-400">
-          © {new Date().getFullYear()} {project?.name} • Powered by{" "}
-          <b>GoKucek</b>
-        </footer>
       </div>
     </div>
   );

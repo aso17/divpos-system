@@ -8,6 +8,8 @@ export default {
         text: "#0F172A",
         border: "#E2E8F0",
         app: "#F8FAFC",
+        gokucekBlue: "#244E87",
+        gokucekGreen: "#8BC34A",
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui"],

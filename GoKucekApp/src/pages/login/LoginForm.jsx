@@ -79,9 +79,9 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
       {/* Submit */}
       <SubmitButton
         isSubmitting={isSubmitting}
-        label="Login"
+        label="LOGIN"
         loadingLabel="Logging in..."
-        color={project?.primary_color || "#2563eb"}
+        className="bg-gokucekBlue"
       />
     </form>
   );

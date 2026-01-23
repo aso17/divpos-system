@@ -29,15 +29,6 @@ export default function AppRoutes() {
               }
             />
 
-            {/* <Route
-              path="/servernas"
-              element={
-                <RequirePermission permission="view">
-                 
-                </RequirePermission>
-              }
-            /> */}
-
             {/*
               Contoh route lain:
               <Route

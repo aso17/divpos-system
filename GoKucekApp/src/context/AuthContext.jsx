@@ -91,7 +91,6 @@ export const AuthProvider = ({ children }) => {
     const initAuth = async () => {
       try {
         isInitialized.current = true;
-        // Ambil data secara paralel saat reload/buka pertama kali
         await Promise.all([loadUser(), loadMenus()]);
       } catch (err) {
         console.error("Initialization failed", err);
