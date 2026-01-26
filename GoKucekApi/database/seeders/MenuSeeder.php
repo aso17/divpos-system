@@ -21,9 +21,15 @@ class MenuSeeder extends Seeder
 
             // MASTER DATA (PARENT)
             ['module'=>'MASTER','menu_name'=>'Master Data','code'=>'MST_PARENT','route_name'=>null,'icon'=>'database','order_no'=>4,'parent'=>null],
-            ['module'=>'MASTER','menu_name'=>'Pelanggan','code'=>'MST_PELANGGAN','route_name'=>'/master/pelanggan','icon'=>'users','order_no'=>1,'parent'=>'MST_PARENT'],
-            ['module'=>'MASTER','menu_name'=>'Layanan','code'=>'MST_LAYANAN','route_name'=>'/master/layanan','icon'=>'package','order_no'=>2,'parent'=>'MST_PARENT'],
-            ['module'=>'MASTER','menu_name'=>'Paket / Harga','code'=>'MST_PAKET','route_name'=>'/master/paket','icon'=>'tag','order_no'=>3,'parent'=>'MST_PARENT'],
+
+            ['module'=>'MASTER','menu_name'=>'Outlet / Cabang','code'=>'MST_OUTLET','route_name'=>'/outlet','icon'=>'map-pin','order_no'=>1,'parent'=>'MST_PARENT'],
+            ['module'=>'MASTER','menu_name'=>'Pelanggan','code'=>'MST_PELANGGAN','route_name'=>'/pelanggan','icon'=>'users','order_no'=>2,'parent'=>'MST_PARENT'],
+            ['module'=>'MASTER','menu_name'=>'Layanan','code'=>'MST_LAYANAN','route_name'=>'layanan','icon'=>'package','order_no'=>3,'parent'=>'MST_PARENT'],
+            ['module'=>'MASTER','menu_name'=>'Paket / Harga','code'=>'MST_PAKET','route_name'=>'/paket','icon'=>'tag','order_no'=>4,'parent'=>'MST_PARENT'],
+
+            // OPSIONAL TAMBAHAN
+            ['module'=>'MASTER','menu_name'=>'Karyawan / User','code'=>'MST_KARYAWAN','route_name'=>'/master/karyawan','icon'=>'user-cog','order_no'=>5,'parent'=>'MST_PARENT'],
+            ['module'=>'MASTER','menu_name'=>'Metode Pembayaran','code'=>'MST_PEMBAYARAN','route_name'=>'/master/pembayaran','icon'=>'credit-card','order_no'=>6,'parent'=>'MST_PARENT'],
 
             // LAPORAN
             ['module'=>'REPORT','menu_name'=>'Laporan','code'=>'RPT_PARENT','route_name'=>null,'icon'=>'bar-chart-2','order_no'=>5,'parent'=>null],
@@ -32,8 +38,8 @@ class MenuSeeder extends Seeder
 
             // SETTING
             ['module'=>'SETTING','menu_name'=>'Pengaturan','code'=>'SET_PARENT','route_name'=>null,'icon'=>'settings','order_no'=>6,'parent'=>null],
-            ['module'=>'SETTING','menu_name'=>'User & Role','code'=>'SET_USER_ROLE','route_name'=>'/setting/user-role','icon'=>'shield','order_no'=>1,'parent'=>'SET_PARENT'],
-            ['module'=>'SETTING','menu_name'=>'Aplikasi','code'=>'SET_APP','route_name'=>'/setting/app','icon'=>'sliders','order_no'=>2,'parent'=>'SET_PARENT'],
+            ['module'=>'SETTING','menu_name'=>'User & Role','code'=>'SET_USER_ROLE','route_name'=>'/userlist','icon'=>'shield','order_no'=>1,'parent'=>'SET_PARENT'],
+            ['module'=>'SETTING','menu_name'=>'Aplikasi','code'=>'SET_APP','route_name'=>'/settingapp','icon'=>'sliders','order_no'=>2,'parent'=>'SET_PARENT'],
         ];
 
         $menuMap = [];

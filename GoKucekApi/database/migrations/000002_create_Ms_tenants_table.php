@@ -31,6 +31,9 @@ return new class extends Migration
 
             // Subscription & Status (Kritis untuk SaaS)
             $table->boolean('is_active')->default(true)->index();
+            // Default Tenant Flag
+            $table->boolean('is_default')->default(false)->index();
+
             $table->timestamp('subscription_ends_at')->nullable(); 
         
             // Audit

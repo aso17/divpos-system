@@ -23,7 +23,7 @@ class AuthController extends Controller
             'tenant_id'
             ) 
             ->with([
-                    'tenant:id,slug,logo_path'
+                    'tenant:id,slug,logo_path,code'
                 ])
             ->where('email', $request->email)
             ->where('is_active', true)
@@ -51,6 +51,7 @@ class AuthController extends Controller
                 'tenant_id' => $user->tenant_id,
                 'tenant' => [
                     'slug' => $user->tenant->slug ?? null,
+                    'code' => $user->tenant->code ?? null,
                      'logo_path'      => $user->tenant->logo_path
                         ? asset("storage{$user->tenant->logo_path}")
                         : null,

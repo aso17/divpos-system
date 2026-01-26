@@ -5,16 +5,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens; 
-
 class Ms_user extends Authenticatable
 {
     use HasFactory, Notifiable, HasApiTokens; 
 
     protected $table = 'Ms_users';
+
     protected $fillable = [
         'full_name',
         'email',
         'username',
+        'phone',
+        'avatar',
         'password',
         'is_active',
         'role_id',
@@ -23,9 +25,7 @@ class Ms_user extends Authenticatable
         'last_login_ip',
     ];
 
-    protected $hidden = [
-        'password',
-    ];
+    protected $hidden = ['password'];
 
     protected function casts(): array
     {
@@ -33,7 +33,7 @@ class Ms_user extends Authenticatable
             'email_verified_at' => 'datetime',
             'last_login_at'     => 'datetime',
             'is_active'         => 'boolean',
-            'password'          => 'hashed',
+            'password'          => 'hashed', // biar auto-hash
         ];
     }
 

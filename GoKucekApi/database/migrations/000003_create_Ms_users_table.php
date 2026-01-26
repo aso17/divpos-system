@@ -19,11 +19,10 @@ return new class extends Migration
             $table->string('password', 255); // bcrypt / argon2
 
             $table->string('phone', 20)->nullable();       // E.164 format
-            $table->string('avatar', 150)->nullable();     // path file saja
+            $table->string('avatar', 225)->nullable();     // path file saja
 
             // Status & security
-            $table->boolean('is_active')->default(true);
-            $table->enum('status', ['active','suspend'])->default('active');
+            $table->boolean('is_active')->default(true);       
             $table->timestampTz('email_verified_at')->nullable();
             $table->timestampTz('last_login_at')->nullable();
             $table->string('last_login_ip', 45)->nullable(); 
