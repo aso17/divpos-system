@@ -20,25 +20,28 @@ const UsersService = {
 
   createUser: (payload) => {
     const tenantId = getTenantId();
+
+    if (payload instanceof FormData) {
+      if (tenantId && !payload.has("tenant_id")) {
+        payload.append("tenant_id", tenantId);
+      }
+
+      return api.post("/user", payload, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+    }
+
+    // Fallback jika payload masih berupa Object biasa (opsional)
     const formData = new FormData();
-    formData.append("full_name", payload.full_name);
-    formData.append("email", payload.email);
-    formData.append("username", payload.username);
-    formData.append("phone", payload.phone);
-    formData.append("role_id", payload.role_id);
-    formData.append("is_active", payload.is_active);
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] !== null && payload[key] !== undefined) {
+        formData.append(key, payload[key]);
+      }
+    });
 
-    if (payload.password) {
-      formData.append("password", payload.password);
-    }
-
-    if (tenantId) {
-      formData.append("tenant_id", tenantId);
-    }
-
-    if (payload.avatar instanceof File) {
-      formData.append("avatar", payload.avatar);
-    }
+    if (tenantId) formData.append("tenant_id", tenantId);
 
     return api.post("/user", formData, {
       headers: {
@@ -48,24 +51,66 @@ const UsersService = {
   },
 
   updateUser: (id, payload) => {
-    const formData = new FormData();
+    let finalData;
 
-    formData.append("_method", "PUT");
+    if (payload instanceof FormData) {
+      finalData = payload;
 
-    Object.entries(payload).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        if (value instanceof File) {
-          formData.append(key, value);
-        } else if (typeof value === "object") {
-          formData.append(key, JSON.stringify(value));
-        } else {
-          formData.append(key, value);
-        }
+      // Pastikan _method PUT ada untuk Laravel/Backend spoofing
+      if (!finalData.has("_method")) {
+        finalData.append("_method", "PUT");
       }
-    });
+    }
+    // Jika payload masih berupa Object biasa (fallback)
+    else {
+      finalData = new FormData();
+      finalData.append("_method", "PUT");
 
-    return api.post(`/user/${id}`, formData);
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value === null || value === undefined) return;
+
+        if (value instanceof File) {
+          finalData.append(key, value);
+        } else if (typeof value === "boolean") {
+          finalData.append(key, value ? 1 : 0);
+        } else {
+          finalData.append(key, value);
+        }
+      });
+    }
+
+    // Tambahkan tenant_id jika belum ada
+    const tenantId = getTenantId(); // Pastikan fungsi ini tersedia
+    if (tenantId && !finalData.has("tenant_id")) {
+      finalData.append("tenant_id", tenantId);
+    }
+
+    return api.post(`/user/${id}`, finalData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
   },
+
+  // updateUser: (id, payload) => {
+  //   const formData = new FormData();
+
+  //   formData.append("_method", "PUT");
+
+  //   Object.entries(payload).forEach(([key, value]) => {
+  //     if (value !== null && value !== undefined) {
+  //       if (value instanceof File) {
+  //         formData.append(key, value);
+  //       } else if (typeof value === "object") {
+  //         formData.append(key, JSON.stringify(value));
+  //       } else {
+  //         formData.append(key, value);
+  //       }
+  //     }
+  //   });
+
+  //   return api.post(`/user/${id}`, formData);
+  // },
 
   deleteUser: (id) => {
     const tenantId = getTenantId();

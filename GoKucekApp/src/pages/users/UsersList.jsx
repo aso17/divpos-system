@@ -1,22 +1,13 @@
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState, useCallback } from "react";
 import {
   useReactTable,
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import {
-  Pencil,
-  Trash2,
-  PlusSquare,
-  Users,
-  Menu,
-  Settings,
-} from "lucide-react";
-
+import { Pencil, Trash2, PlusSquare, Users, Settings, X } from "lucide-react";
 import LoadingDots from "../../components/common/LoadingDots";
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
-
 import UsersService from "../../services/UsersService";
 import UserForm from "./UserForm";
 
@@ -33,6 +24,31 @@ export default function UsersList() {
   // ========================
   // Handlers
   // ========================
+
+  // Gunakan useCallback agar fungsi tidak dibuat ulang di setiap render
+  const fetchUsers = useCallback(
+    async (isMounted = true) => {
+      setLoading(true);
+      try {
+        const res = await UsersService.getUsers({
+          page: pagination.pageIndex + 1,
+          per_page: pagination.pageSize,
+          keyword: debouncedSearch,
+        });
+
+        if (isMounted) {
+          setData(res.data?.data || res.data || []);
+          setTotalCount(Number(res.data?.total || 0));
+        }
+      } catch (error) {
+        console.error("Error fetching users:", error);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    },
+    [pagination.pageIndex, pagination.pageSize, debouncedSearch],
+  );
+
   const handleEdit = (user) => {
     setSelectedUser(user);
     setOpenModal(true);
@@ -40,13 +56,12 @@ export default function UsersList() {
 
   const handleDelete = async (user) => {
     if (!confirm(`Hapus user ${user.full_name}?`)) return;
-    await UsersService.deleteUser(user.id);
-    setPagination((p) => ({ ...p }));
-  };
-
-  const handleOpenModuleSetting = (user) => {
-    console.log("Setting module for:", user);
-    // nanti bisa arahkan ke /users/:id/modules
+    try {
+      await UsersService.deleteUser(user.id);
+      fetchUsers(); // Refresh data setelah hapus
+    } catch (err) {
+      alert("Gagal menghapus user");
+    }
   };
 
   const columns = useMemo(
@@ -54,11 +69,15 @@ export default function UsersList() {
       {
         id: "no",
         header: "NO",
-        cell: ({ row }) => (
-          <span className="text-slate-600 text-xxs font-semibold">
-            {pagination.pageIndex * pagination.pageSize + row.index + 1}
-          </span>
-        ),
+        // Mengambil pagination langsung dari table state agar columns tidak perlu dependency [pagination]
+        cell: ({ row, table }) => {
+          const { pageIndex, pageSize } = table.getState().pagination;
+          return (
+            <span className="text-slate-600 text-xxs font-semibold">
+              {pageIndex * pageSize + row.index + 1}
+            </span>
+          );
+        },
       },
       {
         accessorKey: "full_name",
@@ -95,23 +114,22 @@ export default function UsersList() {
         header: "STATUS",
         cell: ({ getValue }) => (
           <span
-            className={`px-2 py-0.5 rounded text-xxs text-white inline-block text-center ${
-              getValue() ? "bg-green-600" : "bg-rose-500"
+            className={`px-1.5 py-0.5 rounded-sm text-[10px] text-xxs text-white inline-block text-center ${
+              getValue() ? "bg-emerald-500" : "bg-rose-500"
             }`}
           >
-            {getValue() ? "ACTIVE" : "SUSPEND"}
+            {getValue() ? "active" : "inactive"}
           </span>
         ),
       },
 
-      // ✏️ ACTION
       {
         id: "actions",
         header: () => <div className="text-center text-xxs">ACTION</div>,
         cell: ({ row }) => (
           <div className="flex gap-1 justify-center">
             <button
-              onClick={() => handleOpenModuleSetting(row.original)}
+              onClick={() => console.log("Setting modules", row.original)}
               className="p-1 bg-slate-100 text-slate-600 rounded hover:bg-slate-600 hover:text-white transition-all"
             >
               <Settings size={12} />
@@ -132,49 +150,39 @@ export default function UsersList() {
         ),
       },
     ],
-    [pagination],
+    [], // Dependency kosong: columns hanya dibuat 1x saat mount
   );
 
   const table = useReactTable({
     data,
     columns,
-    pageCount: Math.ceil(totalCount / pagination.pageSize),
-    state: { pagination },
+    state: {
+      pagination,
+    },
     onPaginationChange: setPagination,
     manualPagination: true,
+    rowCount: totalCount,
     getCoreRowModel: getCoreRowModel(),
   });
-
-  // Debounce Search
+  // 1. Efek Debounce Search
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(searchTerm);
       setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, 400);
+    }, 500);
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  // Fetch Users
+  // 2. Efek Fetch Data (Hanya SATU trigger)
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-
-    UsersService.getUsers({
-      page: pagination.pageIndex + 1,
-      per_page: pagination.pageSize,
-      keyword: debouncedSearch,
-    }).then((res) => {
-      if (!mounted) return;
-      setData(res.data?.data || res.data || []);
-      setTotalCount(res.data?.total || 0);
-      setLoading(false);
-    });
-
-    return () => (mounted = false);
-  }, [pagination.pageIndex, pagination.pageSize, debouncedSearch]);
+    let isMounted = true;
+    fetchUsers(isMounted);
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchUsers]);
 
   if (loading) return <LoadingDots />;
-
   return (
     <div className="p-4 space-y-4 bg-slate-50 min-h-screen text-xxs">
       <AppHead title="User Management" />
@@ -192,20 +200,33 @@ export default function UsersList() {
             setSelectedUser(null);
             setOpenModal(true);
           }}
-          className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded text-xxs font-bold"
+          className="flex items-center gap-1 px-2.5 py-1.5 bg-gokucekBlue text-white rounded text-xxs font-bold"
         >
           <PlusSquare size={12} /> Tambah
         </button>
 
-        <input
-          className="border border-slate-300 rounded px-3 py-1.5 w-60 text-xxs focus:ring-1 focus:ring-blue-400 outline-none bg-white"
-          placeholder="Search name / email / username..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        <div className="relative flex items-center">
+          <input
+            className="border border-slate-300 rounded px-3 py-1.5 w-60 text-xxs focus:ring-1 focus:ring-blue-400 outline-none bg-white pr-8"
+            placeholder="Search name / email / username..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+
+          {/* Munculkan tombol hanya jika ada teks */}
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+              type="button"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="bg-white border-t-2 border-blue-500 rounded-sm shadow-sm overflow-hidden">
+      <div className="bg-white border-t-2 border-blue-500 rounded-sm shadow-sm overflow-hidden relative">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-white border-b border-slate-100 text-slate-500 uppercase">
@@ -227,30 +248,41 @@ export default function UsersList() {
             </thead>
 
             <tbody className="divide-y divide-slate-50">
-              {table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="hover:bg-slate-50 transition-colors"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className="px-3 py-2 align-middle border-r border-slate-50 last:border-0"
+              {table.getRowModel().rows.length > 0
+                ? table.getRowModel().rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="hover:bg-slate-50 transition-colors"
                     >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+                      {row.getVisibleCells().map((cell) => (
+                        <td
+                          key={cell.id}
+                          className="px-3 py-2 align-middle border-r border-slate-50 last:border-0"
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                : !loading && (
+                    <tr>
+                      <td
+                        colSpan={columns.length}
+                        className="p-10 text-center text-slate-400"
+                      >
+                        Data tidak ditemukan
+                      </td>
+                    </tr>
+                  )}
             </tbody>
           </table>
         </div>
 
         <div className="border-t border-slate-100 bg-white">
-          <TablePagination table={table} totalCount={totalCount} />
+          <TablePagination table={table} />
         </div>
       </div>
 
@@ -258,6 +290,7 @@ export default function UsersList() {
         open={openModal}
         initialData={selectedUser}
         onClose={() => setOpenModal(false)}
+        onSuccess={() => fetchUsers()}
       />
     </div>
   );

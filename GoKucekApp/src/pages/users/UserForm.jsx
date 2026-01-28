@@ -2,11 +2,17 @@ import { useEffect, useState } from "react";
 import SubmitButton from "../../components/SubmitButton";
 import { rules } from "../../utils/validators/rules";
 import { inputClasses } from "../../utils/validators/inputClasses";
+import { assetUrl } from "../../utils/Url";
 import { useFormValidation } from "../../hooks/useFormValidation";
 import UsersService from "../../services/UsersService";
 import RoleService from "../../services/RoleService";
 
-export default function UserForm({ open, onClose, initialData = null }) {
+export default function UserForm({
+  open,
+  onClose,
+  initialData = null,
+  onSuccess,
+}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [roles, setRoles] = useState([]);
   const [avatarFile, setAvatarFile] = useState(null);
@@ -26,35 +32,42 @@ export default function UserForm({ open, onClose, initialData = null }) {
       },
       {
         full_name: [(v) => rules.required(v, "Nama wajib diisi")],
-
         email: [
           (v) => rules.required(v, "Email wajib diisi"),
           (v) => rules.email(v, "Format email tidak valid"),
         ],
-
         username: [
           (v) => rules.required(v, "Username wajib diisi"),
           (v) => rules.minLength(v, 4, "Username minimal 4 karakter"),
         ],
-
         phone: [
           (v) => rules.required(v, "No HP wajib diisi"),
           (v) => rules.noLetters(v, "No HP tidak boleh mengandung huruf"),
         ],
-
         avatar: [
-          (file) =>
-            rules.fileType(
+          (file) => {
+            // Jika file tidak ada, langsung keluar dan kembalikan null (berarti VALID)
+            if (!file) return null;
+
+            // Jika ada file, baru jalankan aturan fileType
+            return rules.fileType(
               file,
               ["image/jpeg", "image/png", "image/webp"],
               "Avatar harus JPG / PNG / WEBP",
-            ),
-          (file) =>
-            rules.fileSize(file, 2 * 1024 * 1024, "Ukuran avatar max 2MB"),
+            );
+          },
+          (file) => {
+            if (!file) return null;
+
+            // Jika ada file, baru jalankan aturan fileSize
+            return rules.fileSize(
+              file,
+              2 * 1024 * 1024,
+              "Ukuran avatar max 2MB",
+            );
+          },
         ],
-
         role_id: [(v) => rules.required(v, "Role wajib dipilih")],
-
         password: [
           (v) =>
             !initialData
@@ -71,6 +84,15 @@ export default function UserForm({ open, onClose, initialData = null }) {
     });
   }, []);
 
+  // Cleanup Preview Memory (Mencegah Lag/Memory Leak)
+  useEffect(() => {
+    return () => {
+      if (avatarPreview && avatarPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
+
   // Reset form
   useEffect(() => {
     if (!open) return;
@@ -85,8 +107,9 @@ export default function UserForm({ open, onClose, initialData = null }) {
         role_id: initialData.role_id || "",
         is_active: initialData.is_active ?? true,
       });
-
-      setAvatarPreview(initialData.avatar_url || null); // kalau backend kirim url
+      setAvatarPreview(
+        initialData.avatar ? assetUrl(initialData.avatar) : null,
+      );
     } else {
       setValues({
         full_name: "",
@@ -97,7 +120,6 @@ export default function UserForm({ open, onClose, initialData = null }) {
         role_id: "",
         is_active: true,
       });
-
       setAvatarPreview(null);
     }
 
@@ -105,48 +127,48 @@ export default function UserForm({ open, onClose, initialData = null }) {
     setErrors({});
   }, [open, initialData, setValues, setErrors]);
 
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
-  };
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
     if (!validate()) return;
 
-    const payload = {
-      full_name: values.full_name.trim(),
-      email: values.email.trim(),
-      username: values.username?.trim() || "",
-      phone: values.phone?.trim() || "",
-      role_id: values.role_id,
-      is_active: values.is_active ? 1 : 0,
-    };
+    // OPTIMASI: Gunakan FormData karena mengirim File
+    const formData = new FormData();
+    formData.append("full_name", values.full_name.trim());
+    formData.append("email", values.email.trim());
+    formData.append("username", values.username?.trim() || "");
+    formData.append("phone", values.phone?.trim() || "");
+    formData.append("role_id", values.role_id);
+    formData.append("is_active", values.is_active ? 1 : 0);
 
     if (avatarFile instanceof File) {
-      payload.avatar = avatarFile;
+      formData.append("avatar", avatarFile);
     }
 
-    if (values.password && values.password.length > 0) {
-      payload.password = values.password;
+    if (values.password) {
+      formData.append("password", values.password);
+    }
+
+    // Method Spoofing jika backend butuh PUT via FormData
+    if (initialData?.id) {
+      formData.append("_method", "PUT");
     }
 
     try {
       setIsSubmitting(true);
       if (initialData?.id) {
-        await UsersService.updateUser(initialData.id, payload);
+        await UsersService.updateUser(initialData.id, formData);
         triggerToast("User berhasil diupdate", "success");
       } else {
-        await UsersService.createUser(payload);
+        await UsersService.createUser(formData);
         triggerToast("User berhasil ditambahkan", "success");
       }
+      onSuccess?.(); // Panggil onSuccess SEBELUM onClose agar data table refresh
       onClose();
     } catch (err) {
       console.error("Submit failed", err);
-      triggerToast("Gagal menyimpan user", "error");
+      const errorMsg = err.response?.data?.message || "Gagal menyimpan user";
+      triggerToast(errorMsg, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -159,7 +181,7 @@ export default function UserForm({ open, onClose, initialData = null }) {
       }),
     );
   };
-
+  console.log(errors.avatar);
   if (!open) return null;
 
   return (
@@ -201,14 +223,8 @@ export default function UserForm({ open, onClose, initialData = null }) {
                 onChange={(e) => {
                   const file = e.target.files[0];
                   if (!file) return;
-
-                  // 1. Update state internal form (untuk validasi jika perlu)
                   setValues((v) => ({ ...v, avatar: file }));
-
-                  // 2. Update state yang dipakai saat handleSubmit (PENTING!)
                   setAvatarFile(file);
-
-                  // 3. Update preview
                   setAvatarPreview(URL.createObjectURL(file));
                 }}
                 className="border rounded px-2 py-1 w-full"

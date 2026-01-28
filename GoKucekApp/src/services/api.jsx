@@ -1,9 +1,9 @@
 import axios from "axios";
 import { showToast } from "../utils/Toast";
 import { GetWithExpiry } from "../utils/SetWithExpiry";
-
+import { apiUrl } from "../utils/Url";
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000/api",
+  baseURL: apiUrl(),
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",

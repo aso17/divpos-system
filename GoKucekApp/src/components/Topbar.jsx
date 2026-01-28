@@ -2,18 +2,30 @@ import { Menu, LogOut, User, Settings, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { assetUrl } from "../utils/Url";
+import { GetWithExpiry } from "../utils/SetWithExpiry";
 
 export default function Topbar({ onToggleSidebar }) {
   const [open, setOpen] = useState(false);
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
+  const [avatar, setAvatar] = useState(null);
 
   const handleLogout = async () => {
     await logout();
     setOpen(false);
     navigate("/login");
   };
+
+  useEffect(() => {
+    const storedUser = GetWithExpiry("user");
+    if (storedUser?.avatar) {
+      setAvatar(assetUrl(`${storedUser.avatar}`));
+    } else {
+      setAvatar(assetUrl("default-avatar.png"));
+    }
+  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -45,11 +57,7 @@ export default function Topbar({ onToggleSidebar }) {
           className="flex items-center gap-2 cursor-pointer select-none"
         >
           <img
-            src={
-              user?.avatar
-                ? `${import.meta.env.VITE_API_URL}/storage/${user.avatar}`
-                : "/default-avatar.png"
-            }
+            src={avatar}
             className="w-8 h-8 rounded-full object-cover"
             alt="avatar"
           />

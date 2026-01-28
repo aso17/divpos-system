@@ -44,7 +44,7 @@ export default function CenterToast({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-      {/* Backdrop lebih gelap sedikit agar fokus */}
+      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
         onClick={onClose}
@@ -53,7 +53,7 @@ export default function CenterToast({
       {/* Toast Card */}
       <div className="relative w-full max-w-[340px] animate-center-toast">
         <div className="bg-white rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden border border-slate-100">
-          {/* Progress Bar (Optional tapi Keren) */}
+          {/* Progress Bar */}
           <div className={`h-1.5 w-full ${config.bgColor}`}>
             <div
               className={`h-full ${config.accent} animate-progress-bar`}
@@ -85,10 +85,12 @@ export default function CenterToast({
         </div>
       </div>
 
-      <style jsx>{`
+      {/* PERBAIKAN DI SINI: Menghapus atribut 'jsx' dan gunakan dangerouslySetInnerHTML */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         .animate-center-toast {
-          animation: toastIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)
-            forwards;
+          animation: toastIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
         .animate-progress-bar {
@@ -107,14 +109,12 @@ export default function CenterToast({
         }
 
         @keyframes progress {
-          from {
-            width: 100%;
-          }
-          to {
-            width: 0%;
-          }
+          from { width: 100%; }
+          to { width: 0%; }
         }
-      `}</style>
+      `,
+        }}
+      />
     </div>
   );
 }
