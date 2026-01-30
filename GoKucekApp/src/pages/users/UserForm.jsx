@@ -79,7 +79,7 @@ export default function UserForm({
 
   // Load roles
   useEffect(() => {
-    RoleService.getRoles().then((res) => {
+    RoleService.GetRolesByTenant().then((res) => {
       setRoles(res.data || []);
     });
   }, []);

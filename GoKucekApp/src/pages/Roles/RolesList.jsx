@@ -1,58 +1,48 @@
 import { useMemo, useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   useReactTable,
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import {
-  Pencil,
-  Trash2,
-  PlusSquare,
-  Users,
-  Settings,
-  X,
-  Search,
-} from "lucide-react";
+import { Pencil, Trash2, PlusSquare, Shield, X, Search } from "lucide-react";
 import LoadingDots from "../../components/common/LoadingDots";
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
-import UsersService from "../../services/UsersService";
-import UserForm from "./UserForm";
+import RolesService from "../../services/RoleService";
+import { encrypt } from "../../utils/Encryptions";
 
-export default function UsersList() {
+export default function RolesList() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
-  // searchTerm untuk menampung ketikan user
+  // searchTerm: untuk menampung ketikan user (real-time)
   const [searchTerm, setSearchTerm] = useState("");
-  // activeSearch adalah keyword yang benar-benar dikirim ke API
+  // activeSearch: kata kunci yang benar-benar digunakan untuk filter API
   const [activeSearch, setActiveSearch] = useState("");
 
   const [openModal, setOpenModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedRole, setSelectedRole] = useState(null);
+  const navigate = useNavigate();
 
-  // ========================
-  // Handlers
-  // ========================
-
-  const fetchUsers = useCallback(
+  const fetchRoles = useCallback(
     async (isMounted = true) => {
       setLoading(true);
       try {
-        const res = await UsersService.getUsers({
+        const res = await RolesService.getRoles({
           page: pagination.pageIndex + 1,
           per_page: pagination.pageSize,
-          keyword: activeSearch, // Menggunakan activeSearch (hanya berubah saat tombol diklik)
+          keyword: activeSearch, // Gunakan activeSearch, bukan searchTerm
         });
 
         if (isMounted) {
-          setData(res.data?.data || res.data || []);
+          setData(res.data?.data || []);
           setTotalCount(Number(res.data?.total || 0));
         }
       } catch (error) {
-        console.error("Error fetching users:", error);
+        console.error("Error fetching roles:", error);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -60,33 +50,26 @@ export default function UsersList() {
     [pagination.pageIndex, pagination.pageSize, activeSearch],
   );
 
-  // Jalankan pencarian
+  useEffect(() => {
+    let isMounted = true;
+    fetchRoles(isMounted);
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchRoles]);
+
+  // Handler saat tombol cari diklik atau tekan Enter
   const handleSearch = (e) => {
-    e.preventDefault(); // Mencegah reload halaman
+    e.preventDefault();
     setActiveSearch(searchTerm);
-    setPagination((p) => ({ ...p, pageIndex: 0 })); // Reset ke halaman pertama
+    setPagination((p) => ({ ...p, pageIndex: 0 })); // Reset ke hal 1
   };
 
-  // Reset pencarian
-  const handleResetSearch = () => {
+  // Handler Reset Pencarian
+  const handleReset = () => {
     setSearchTerm("");
     setActiveSearch("");
     setPagination((p) => ({ ...p, pageIndex: 0 }));
-  };
-
-  const handleEdit = (user) => {
-    setSelectedUser(user);
-    setOpenModal(true);
-  };
-
-  const handleDelete = async (user) => {
-    if (!confirm(`Hapus user ${user.full_name}?`)) return;
-    try {
-      await UsersService.deleteUser(user.id);
-      fetchUsers();
-    } catch (err) {
-      alert("Gagal menghapus user");
-    }
   };
 
   const columns = useMemo(
@@ -94,42 +77,35 @@ export default function UsersList() {
       {
         id: "no",
         header: "NO",
-        cell: ({ row, table }) => {
-          const { pageIndex, pageSize } = table.getState().pagination;
-          return (
-            <span className="text-slate-600 text-xxs font-semibold">
-              {pageIndex * pageSize + row.index + 1}
-            </span>
-          );
-        },
-      },
-      {
-        accessorKey: "full_name",
-        header: "NAMA",
-        cell: ({ getValue }) => (
-          <span className="text-gray-600 uppercase text-xxs">{getValue()}</span>
+        cell: ({ row, table }) => (
+          <span className="text-slate-600 text-xxs font-semibold">
+            {table.getState().pagination.pageIndex *
+              table.getState().pagination.pageSize +
+              row.index +
+              1}
+          </span>
         ),
       },
       {
-        accessorKey: "email",
-        header: "EMAIL",
-        cell: ({ getValue }) => (
-          <span className="text-gray-600 text-xxs">{getValue()}</span>
-        ),
-      },
-      {
-        accessorKey: "username",
-        header: "USERNAME",
-        cell: ({ getValue }) => (
-          <span className="text-gray-600 text-xxs">{getValue() || "-"}</span>
-        ),
-      },
-      {
-        id: "role",
-        header: "ROLE",
+        accessorKey: "role_name",
+        header: "NAMA ROLE",
         cell: ({ row }) => (
-          <span className="text-slate-600 text-xxs">
-            {row.original.role?.role_name || "-"}
+          <div className="flex flex-col">
+            <span className="text-gray-800 font-bold text-xxs uppercase">
+              {row.original.role_name}
+            </span>
+            <span className="text-indigo-500 font-mono text-[9px]">
+              {row.original.code}
+            </span>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "description",
+        header: "DESKRIPSI",
+        cell: ({ getValue }) => (
+          <span className="text-gray-500 text-xxs italic truncate max-w-[200px] inline-block">
+            {getValue() || "Tidak ada deskripsi"}
           </span>
         ),
       },
@@ -138,9 +114,7 @@ export default function UsersList() {
         header: "STATUS",
         cell: ({ getValue }) => (
           <span
-            className={`px-1.5 py-0.5 rounded-sm text-[10px] text-xxs text-white inline-block text-center ${
-              getValue() ? "bg-emerald-500" : "bg-rose-500"
-            }`}
+            className={`px-1.5 py-0.5 rounded-sm text-[10px] text-white inline-block ${getValue() ? "bg-emerald-500" : "bg-rose-500"}`}
           >
             {getValue() ? "active" : "inactive"}
           </span>
@@ -152,19 +126,31 @@ export default function UsersList() {
         cell: ({ row }) => (
           <div className="flex gap-1 justify-center">
             <button
-              onClick={() => console.log("Setting modules", row.original)}
-              className="p-1 bg-slate-100 text-slate-600 rounded hover:bg-slate-600 hover:text-white transition-all"
+              title="Setting Module Permissions"
+              onClick={() => {
+                const hashedId = encrypt(row.original.id);
+                navigate(`/roles/permission/${hashedId}`);
+              }}
+              className="p-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-600 hover:text-white transition-all"
             >
-              <Settings size={12} />
+              <Shield size={12} />
             </button>
             <button
-              onClick={() => handleEdit(row.original)}
+              onClick={() => {
+                setSelectedRole(row.original);
+                setOpenModal(true);
+              }}
               className="p-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-600 hover:text-white transition-all"
             >
               <Pencil size={12} />
             </button>
             <button
-              onClick={() => handleDelete(row.original)}
+              onClick={async () => {
+                if (confirm(`Hapus role ${row.original.role_name}?`)) {
+                  await RolesService.deleteRole(row.original.id);
+                  fetchRoles();
+                }
+              }}
               className="p-1 bg-red-50 text-red-600 rounded hover:bg-red-600 hover:text-white transition-all"
             >
               <Trash2 size={12} />
@@ -173,7 +159,7 @@ export default function UsersList() {
         ),
       },
     ],
-    [],
+    [fetchRoles, navigate],
   );
 
   const table = useReactTable({
@@ -186,53 +172,42 @@ export default function UsersList() {
     getCoreRowModel: getCoreRowModel(),
   });
 
-  // Efek Fetch Data (Hanya SATU trigger saat pagination atau activeSearch berubah)
-  useEffect(() => {
-    let isMounted = true;
-    fetchUsers(isMounted);
-    return () => {
-      isMounted = false;
-    };
-  }, [fetchUsers]);
-
-  if (loading) return <LoadingDots />;
-
   return (
     <div className="p-4 space-y-4 bg-slate-50 min-h-screen text-xxs">
-      <AppHead title="User Management" />
+      <AppHead title="Role Management" />
 
       <div className="flex items-center gap-2 text-slate-700 border-b border-slate-200 pb-2">
-        <Users size={18} className="text-slate-600" />
+        <Shield size={18} className="text-slate-600" />
         <p className="text-xs font-bold uppercase tracking-tight">
-          User Management
+          Role & Permission
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2 items-center justify-between">
         <button
           onClick={() => {
-            setSelectedUser(null);
+            setSelectedRole(null);
             setOpenModal(true);
           }}
           className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded text-xxs font-bold uppercase"
         >
-          <PlusSquare size={12} /> Tambah
+          <PlusSquare size={12} /> Tambah Role
         </button>
 
-        {/* INPUT PENCARIAN DENGAN TOMBOL CLICK */}
-        <form onSubmit={handleSearch} className="flex items-center">
+        {/* INPUT PENCARIAN DENGAN TOMBOL */}
+        <form onSubmit={handleSearch} className="flex items-center gap-1">
           <div className="relative">
             <input
               className="border border-slate-300 rounded-l px-3 py-1.5 w-60 text-xxs focus:ring-1 focus:ring-blue-400 outline-none bg-white pr-8"
-              placeholder="Search name / email / username..."
+              placeholder="Search role name / code..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             {searchTerm && (
               <button
                 type="button"
-                onClick={handleResetSearch}
-                className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-600"
+                onClick={handleReset}
+                className="absolute right-2 top-1.5 text-slate-400 hover:text-rose-500"
               >
                 <X size={14} />
               </button>
@@ -242,22 +217,22 @@ export default function UsersList() {
             type="submit"
             className="bg-emerald-700 text-white px-3 py-1.5 rounded-r hover:bg-emerald-800 transition-colors flex items-center gap-1"
           >
-            <Search size={12} strokeWidth={3} />
+            <Search size={12} />
             CARI
           </button>
         </form>
       </div>
 
-      <div className="bg-white border-t-2 border-blue-500 rounded-sm shadow-sm overflow-hidden relative">
+      <div className="bg-white border-t-2 border-indigo-500 rounded-sm shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-white border-b border-slate-100 text-slate-500 uppercase">
+            <thead className="bg-white border-b border-slate-100 text-slate-500 uppercase text-[10px]">
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id}>
                   {hg.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-3 py-3 font-bold text-left border-r border-slate-50 last:border-0 text-[10px] tracking-wider"
+                      className="px-3 py-3 font-bold text-left tracking-wider border-r border-slate-50"
                     >
                       {flexRender(
                         header.column.columnDef.header,
@@ -269,7 +244,13 @@ export default function UsersList() {
               ))}
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {table.getRowModel().rows.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={columns.length} className="p-10 text-center">
+                    <LoadingDots />
+                  </td>
+                </tr>
+              ) : data.length > 0 ? (
                 table.getRowModel().rows.map((row) => (
                   <tr
                     key={row.id}
@@ -278,7 +259,7 @@ export default function UsersList() {
                     {row.getVisibleCells().map((cell) => (
                       <td
                         key={cell.id}
-                        className="px-3 py-2 align-middle border-r border-slate-50 last:border-0"
+                        className="px-3 py-2 border-r border-slate-50 last:border-0"
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
@@ -301,17 +282,8 @@ export default function UsersList() {
             </tbody>
           </table>
         </div>
-        <div className="border-t border-slate-100 bg-white">
-          <TablePagination table={table} />
-        </div>
+        <TablePagination table={table} />
       </div>
-
-      <UserForm
-        open={openModal}
-        initialData={selectedUser}
-        onClose={() => setOpenModal(false)}
-        onSuccess={() => fetchUsers()}
-      />
     </div>
   );
 }
