@@ -3,42 +3,38 @@
 namespace App\Http\Controllers;
 
 use App\Models\Ms_role;
+use App\Services\RoleService;
+use App\Http\Resources\RoleResource;
 use Illuminate\Http\Request;
 
 class RoleController extends Controller
 {
-    /**
-     * GET /api/roles
-     */
-    public function GetRolesByTenantId(Request $request)
-    {
-         $tenantId = $request->tenant_id;
-        $roles = Ms_role::select('id', 'role_name', 'code')
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->orderBy('role_name')
-            ->get();
 
-        return response()->json($roles);
+protected $roleService;
+
+    public function __construct(RoleService $roleService)
+    {
+        $this->roleService = $roleService;
     }
 
+    public function GetRolesByTenantId(Request $request)
+    {
+        $roles = $this->roleService->getRolesForDropdown($request->tenant_id);
+        return RoleResource::collection($roles);
+    }
+    
     public function index(Request $request)
-        {
-            $tenantId = $request->tenant_id; 
-            $keyword = $request->keyword;
-            $perPage = $request->per_page ?? 10;
-            $roles = Ms_role::where('tenant_id', $tenantId)
-                ->when($keyword, function ($query) use ($keyword) {
-                    $query->where(function ($q) use ($keyword) {
-                        $q->where('role_name', 'like', "%{$keyword}%")
-                        ->orWhere('code', 'like', "%{$keyword}%");
-                    });
-                })
-                ->orderBy('created_at', 'desc')
-                ->paginate($perPage);
+    {
+        $query = $this->roleService->getPaginatedRoles($request->all());
 
-            return response()->json($roles);
+        if (!$query) {
+            return response()->json(['message' => 'Invalid Tenant'], 403);
         }
+
+        $perPage = $request->per_page ?? 10;
+        $roles = $query->paginate($perPage);
+        return RoleResource::collection($roles)->response()->getData(true);
+    }
 
 
 }

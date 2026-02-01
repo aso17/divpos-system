@@ -7,6 +7,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\RolePermissionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -34,14 +35,20 @@ Route::middleware('api')->group(function () {
         Route::get('/menus', [MenuController::class, 'menus']);
 
         // 👇 USER MODULE
-        Route::get('/user', [UserController::class, 'index']);      // getUsers
-        Route::get('/user/{id}', [UserController::class, 'show']);  // getUserById
-        Route::post('/user', [UserController::class, 'store']);     // createUser
-        Route::put('/user/{id}', [UserController::class, 'update']); // updateUser
-        Route::delete('/user/{id}', [UserController::class, 'destroy']); // deleteUser
+        Route::get('/user', [UserController::class, 'index']);      
+        Route::get('/user/{id}', [UserController::class, 'show']); 
+        Route::post('/user', [UserController::class, 'store']);     
+        Route::put('/user/{id}', [UserController::class, 'update']); 
+        Route::delete('/user/{id}', [UserController::class, 'destroy']); 
 
          // 👇 ROLE MODULE
         Route::get('/GetRolesByTenant', [RoleController::class, 'GetRolesByTenantId']); 
         Route::get('/roles', [RoleController::class, 'index']); 
+
+         // 👇 ROLE MODULE PERMISSION       
+        Route::get('/rolespermission', [RolePermissionController::class, 'index']); 
+
+
+
     });
 });

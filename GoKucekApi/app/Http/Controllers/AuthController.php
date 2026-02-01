@@ -1,34 +1,29 @@
 <?php
 namespace App\Http\Controllers;
 use App\Models\Ms_user;
+use App\Repositories\UserRepository;
+use App\Http\Resources\LoginResource;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 
 class AuthController extends Controller
 {
-   public function login(Request $request)
+    protected $userRepo;
+
+    public function __construct(UserRepository $userRepo)
+    {
+        $this->userRepo = $userRepo;
+    }
+    public function login(Request $request)
     {
         $request->validate([
             'email'    => 'required|email',
             'password' => 'required|string',
         ]);
 
-       $user = Ms_user::select(
-            'id',
-            'full_name',
-            'email',
-            'password',
-            'role_id',
-            'avatar',
-            'tenant_id'
-            ) 
-            ->with([
-                    'tenant:id,slug,logo_path,code'
-                ])
-            ->where('email', $request->email)
-            ->where('is_active', true)
-            ->first();
+        // 2. Gunakan instance repository
+        $user = $this->userRepo->findActiveUserByEmail($request->email);
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
@@ -36,32 +31,20 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // 3. Update info login
         $user->update([
             'last_login_at' => now(),
             'last_login_ip' => $request->ip(),
         ]);
 
+        $token = $user->createToken('auth_token')->plainTextToken;
+
         return response()->json([
             'token' => $token,
-            'user'  => [
-                'id'        => $user->id,
-                'full_name' => $user->full_name,
-                'email'     => $user->email,
-                'role_id'   => $user->role_id,
-                'tenant_id' => $user->tenant_id,
-                'avatar'   => $user->avatar,
-                'tenant' => [
-                    'slug' => $user->tenant->slug ?? null,
-                    'code' => $user->tenant->code ?? null,
-                     'logo_path'      => $user->tenant->logo_path
-                        ? asset("storage{$user->tenant->logo_path}")
-                        : null,
-                ],
-            ],
+            'user'  => new LoginResource($user)
         ]);
-
     }
+    
 
     public function logout(Request $request)
     {
