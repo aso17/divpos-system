@@ -50,7 +50,7 @@ export default function AppRoutes() {
             />
 
             <Route
-              path="/roles/permission/:roleId"
+              path="/rolespermission/:roleId"
               element={
                 <RequirePermission permission="update" useRoute="/rolelist">
                   <RolePermissionsPage />

@@ -1,6 +1,6 @@
 import api from "./api";
 import { GetWithExpiry } from "../utils/SetWithExpiry";
-
+import { encrypt } from "../utils/Encryptions";
 const getTenantId = () => {
   const user = GetWithExpiry("user");
   return user?.tenant_id || null;
@@ -9,10 +9,9 @@ const getTenantId = () => {
 const UsersService = {
   getUsers: (params = {}) => {
     const tenantId = getTenantId();
-
     return api.get("/user", {
       params: {
-        tenant_id: tenantId,
+        tenant_id: encrypt(tenantId),
         ...params, // page, per_page, keyword, dll
       },
     });
@@ -52,6 +51,7 @@ const UsersService = {
 
   updateUser: (id, payload) => {
     let finalData;
+    console.log("Payload sebelum diupdate:", payload);
 
     if (payload instanceof FormData) {
       finalData = payload;
@@ -85,7 +85,7 @@ const UsersService = {
       finalData.append("tenant_id", tenantId);
     }
 
-    return api.post(`/user/${id}`, finalData, {
+    return api.put(`/user/${id}`, finalData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },

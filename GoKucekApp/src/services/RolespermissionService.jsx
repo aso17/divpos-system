@@ -6,25 +6,26 @@ const getTenantId = () => {
   return user?.tenant_id || null;
 };
 
-const RoleService = {
-  GetRolesByTenant: () => {
+const RolespermissionService = {
+  getRolePermissions: (roleId) => {
     const tenantId = getTenantId();
-    return api.get("/GetRolesByTenant", {
+    return api.get("/rolespermission", {
       params: {
-        tenant_id: encrypt(tenantId),
+        tenantid: encrypt(tenantId),
+        roleid: encrypt(roleId),
       },
     });
   },
 
-  getRoles: (params = {}) => {
+  updatePermissions: (roleId, payload) => {
     const tenantId = getTenantId();
-    return api.get("/roles", {
+    return api.post("/rolespermission/update", payload, {
       params: {
-        tenant_id: encrypt(tenantId),
-        ...params,
+        tenantid: tenantId,
+        roleid: roleId,
       },
     });
   },
 };
 
-export default RoleService;
+export default RolespermissionService;

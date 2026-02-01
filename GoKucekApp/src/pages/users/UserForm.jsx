@@ -46,10 +46,7 @@ export default function UserForm({
         ],
         avatar: [
           (file) => {
-            // Jika file tidak ada, langsung keluar dan kembalikan null (berarti VALID)
             if (!file) return null;
-
-            // Jika ada file, baru jalankan aturan fileType
             return rules.fileType(
               file,
               ["image/jpeg", "image/png", "image/webp"],
@@ -58,8 +55,6 @@ export default function UserForm({
           },
           (file) => {
             if (!file) return null;
-
-            // Jika ada file, baru jalankan aturan fileSize
             return rules.fileSize(
               file,
               2 * 1024 * 1024,
@@ -69,22 +64,32 @@ export default function UserForm({
         ],
         role_id: [(v) => rules.required(v, "Role wajib dipilih")],
         password: [
-          (v) =>
-            !initialData
-              ? rules.strongPassword(v, 8, "Password harus kuat (Aa1@...)")
-              : null,
+          (v) => {
+            // Password wajib hanya untuk user baru
+            if (!initialData && !v) return "Password wajib diisi";
+            // Jika diisi (baik baru/edit), harus kuat
+            if (v)
+              return rules.strongPassword(
+                v,
+                8,
+                "Password harus kuat (Aa1@...)",
+              );
+            return null;
+          },
         ],
       },
     );
 
-  // Load roles
+  // Load roles saat modal dibuka
   useEffect(() => {
-    RoleService.GetRolesByTenant().then((res) => {
-      setRoles(res.data || []);
-    });
-  }, []);
+    if (open) {
+      RoleService.GetRolesByTenant().then((res) => {
+        setRoles(res.data?.data || []);
+      });
+    }
+  }, [open]);
 
-  // Cleanup Preview Memory (Mencegah Lag/Memory Leak)
+  // Cleanup Preview Memory
   useEffect(() => {
     return () => {
       if (avatarPreview && avatarPreview.startsWith("blob:")) {
@@ -93,7 +98,7 @@ export default function UserForm({
     };
   }, [avatarPreview]);
 
-  // Reset form
+  // Inisialisasi data saat Edit atau Tambah
   useEffect(() => {
     if (!open) return;
 
@@ -103,9 +108,10 @@ export default function UserForm({
         email: initialData.email || "",
         username: initialData.username || "",
         phone: initialData.phone || "",
-        password: "",
-        role_id: initialData.role_id || "",
-        is_active: initialData.is_active ?? true,
+        password: "", // Selalu kosongkan field password saat edit
+        // PENTING: Ambil ID dari objek role jika backend menggunakan Resource
+        role_id: initialData.role?.id || initialData.role_id || "",
+        is_active: initialData.is_active == 1 || initialData.is_active === true,
       });
       setAvatarPreview(
         initialData.avatar ? assetUrl(initialData.avatar) : null,
@@ -132,7 +138,6 @@ export default function UserForm({
     if (isSubmitting) return;
     if (!validate()) return;
 
-    // OPTIMASI: Gunakan FormData karena mengirim File
     const formData = new FormData();
     formData.append("full_name", values.full_name.trim());
     formData.append("email", values.email.trim());
@@ -149,7 +154,7 @@ export default function UserForm({
       formData.append("password", values.password);
     }
 
-    // Method Spoofing jika backend butuh PUT via FormData
+    // Spoofing method karena multipart/form-data via PUT tidak dibaca Laravel secara native
     if (initialData?.id) {
       formData.append("_method", "PUT");
     }
@@ -163,7 +168,7 @@ export default function UserForm({
         await UsersService.createUser(formData);
         triggerToast("User berhasil ditambahkan", "success");
       }
-      onSuccess?.(); // Panggil onSuccess SEBELUM onClose agar data table refresh
+      onSuccess?.();
       onClose();
     } catch (err) {
       console.error("Submit failed", err);
@@ -181,64 +186,60 @@ export default function UserForm({
       }),
     );
   };
-  console.log(errors.avatar);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
-      <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-lg">
-        <h2 className="text-xxs font-bold mb-4 text-slate-700 uppercase tracking-wide">
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-lg overflow-y-auto max-h-[95vh]">
+        <h2 className="text-xs font-bold mb-4 text-slate-700 uppercase tracking-wide border-b pb-2">
           {initialData ? "Edit User" : "Add User"}
         </h2>
 
         <form
           onSubmit={handleSubmit}
           className="grid grid-cols-2 gap-4 text-xxs"
-          encType="multipart/form-data"
         >
           {/* Avatar Upload */}
-          <div className="col-span-2 flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-slate-100 overflow-hidden border">
+          <div className="col-span-2 flex items-center gap-4 bg-slate-50 p-3 rounded-lg border border-dashed">
+            <div className="w-16 h-16 rounded-full bg-white overflow-hidden border-2 border-white shadow-sm shrink-0">
               {avatarPreview ? (
                 <img
                   src={avatarPreview}
-                  alt="Avatar Preview"
+                  alt="Preview"
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-400 text-[10px]">
+                <div className="w-full h-full flex items-center justify-center text-slate-300">
                   No Image
                 </div>
               )}
             </div>
 
-            <div>
-              <label className="block mb-1 text-slate-600 font-medium">
+            <div className="flex-1">
+              <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
                 Foto / Avatar
               </label>
               <input
                 type="file"
-                name="avatar"
                 accept="image/*"
                 onChange={(e) => {
                   const file = e.target.files[0];
                   if (!file) return;
-                  setValues((v) => ({ ...v, avatar: file }));
                   setAvatarFile(file);
                   setAvatarPreview(URL.createObjectURL(file));
+                  setErrors((prev) => ({ ...prev, avatar: null }));
                 }}
-                className="border rounded px-2 py-1 w-full"
+                className="text-[10px] w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xxs file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer"
               />
-
               {errors.avatar && (
                 <p className="text-[10px] text-red-500 mt-1">{errors.avatar}</p>
               )}
             </div>
           </div>
 
-          {/* Full Name */}
-          <div>
-            <label className="block mb-1 text-slate-600 font-medium">
+          <div className="col-span-1">
+            <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
               Nama
             </label>
             <input
@@ -253,9 +254,8 @@ export default function UserForm({
             )}
           </div>
 
-          {/* Email */}
-          <div>
-            <label className="block mb-1 text-slate-600 font-medium">
+          <div className="col-span-1">
+            <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
               Email
             </label>
             <input
@@ -269,9 +269,8 @@ export default function UserForm({
             )}
           </div>
 
-          {/* Username */}
-          <div>
-            <label className="block mb-1 text-slate-600 font-medium">
+          <div className="col-span-1">
+            <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
               Username
             </label>
             <input
@@ -284,25 +283,23 @@ export default function UserForm({
             )}
           </div>
 
-          {/* Phone */}
-          <div>
-            <label className="block mb-1 text-slate-600 font-medium">
+          <div className="col-span-1">
+            <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
               Phone
             </label>
             <input
               value={values.phone}
               onChange={(e) => handleChange("phone", e.target.value)}
               className={inputClasses({ error: !!errors.phone })}
-              placeholder="6281xxxxxxxx"
+              placeholder="628..."
             />
             {errors.phone && (
               <p className="text-[10px] text-red-500 mt-1">{errors.phone}</p>
             )}
           </div>
 
-          {/* Password */}
           <div className="col-span-2">
-            <label className="block mb-1 text-slate-600 font-medium">
+            <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
               Password
             </label>
             <input
@@ -310,16 +307,19 @@ export default function UserForm({
               value={values.password}
               onChange={(e) => handleChange("password", e.target.value)}
               className={inputClasses({ error: !!errors.password })}
-              placeholder={initialData ? "Kosongkan jika tidak diubah" : ""}
+              placeholder={
+                initialData
+                  ? "Kosongkan jika tidak diubah"
+                  : "Minimal 8 karakter"
+              }
             />
             {errors.password && (
               <p className="text-[10px] text-red-500 mt-1">{errors.password}</p>
             )}
           </div>
 
-          {/* Role */}
-          <div>
-            <label className="block mb-1 text-slate-600 font-medium">
+          <div className="col-span-1">
+            <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
               Role
             </label>
             <select
@@ -327,10 +327,10 @@ export default function UserForm({
               onChange={(e) => handleChange("role_id", e.target.value)}
               className={inputClasses({ error: !!errors.role_id })}
             >
-              <option value="">-- Pilih Role --</option>
+              <option value="">-- Pilih --</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.role_name}
+                  {r.name}
                 </option>
               ))}
             </select>
@@ -339,32 +339,34 @@ export default function UserForm({
             )}
           </div>
 
-          {/* Status */}
-          <div className="flex items-center gap-2 mt-6">
-            <input
-              type="checkbox"
-              checked={values.is_active}
-              onChange={(e) => handleChange("is_active", e.target.checked)}
-            />
-            <span className="text-slate-600">Active</span>
+          <div className="col-span-1 flex items-end pb-2">
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={values.is_active}
+                onChange={(e) => handleChange("is_active", e.target.checked)}
+                className="w-3 h-3 rounded text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-slate-600 font-bold uppercase text-[9px] group-hover:text-blue-600 transition-colors">
+                User Active
+              </span>
+            </label>
           </div>
 
-          {/* Footer */}
-          <div className="col-span-2 flex justify-end gap-2 pt-4 border-t border-slate-100">
+          <div className="col-span-2 flex justify-end gap-2 pt-4 border-t mt-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 border border-slate-300 rounded-md text-xs text-slate-600 hover:bg-slate-100"
+              className="px-4 py-1.5 border border-slate-300 rounded text-[10px] font-bold uppercase text-slate-500 hover:bg-slate-50"
             >
               Cancel
             </button>
-
             <SubmitButton
               isSubmitting={isSubmitting}
-              label={initialData ? "Update" : "Save"}
+              label={initialData ? "Update User" : "Save User"}
               loadingLabel="Saving..."
               fullWidth={false}
-              className="text-xs py-1.5 rounded-md bg-gokucekBlue"
+              className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200"
             />
           </div>
         </form>

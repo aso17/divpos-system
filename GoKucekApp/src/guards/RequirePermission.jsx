@@ -12,15 +12,9 @@ export default function RequirePermission({
   if (loading) return null;
 
   const flatMenus = menus.flatMap((m) => [m, ...(m.children || [])]);
-
-  // JIKA useRoute diisi (misal: "/rolelist"), gunakan itu.
-  // JIKA TIDAK, gunakan URL asli (location.pathname).
   const pathToMatch = useRoute || location.pathname;
-
   const current = flatMenus.find((m) => m.route === pathToMatch);
   const allowedMenus = flatMenus.filter((m) => m.permissions?.view);
-
-  // Simpan route terakhir yang valid ke localStorage (Hanya untuk menu utama/statis)
   if (current && current.permissions?.view && !useRoute) {
     localStorage.setItem("last_allowed_route", current.route);
   }

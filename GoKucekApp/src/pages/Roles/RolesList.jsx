@@ -34,12 +34,13 @@ export default function RolesList() {
         const res = await RolesService.getRoles({
           page: pagination.pageIndex + 1,
           per_page: pagination.pageSize,
-          keyword: activeSearch, // Gunakan activeSearch, bukan searchTerm
+          keyword: activeSearch,
         });
 
         if (isMounted) {
+          // console.log("Fetched roles:", res.data.meta.total);
           setData(res.data?.data || []);
-          setTotalCount(Number(res.data?.total || 0));
+          setTotalCount(Number(res.data.meta.total || 0));
         }
       } catch (error) {
         console.error("Error fetching roles:", error);
@@ -129,7 +130,12 @@ export default function RolesList() {
               title="Setting Module Permissions"
               onClick={() => {
                 const hashedId = encrypt(row.original.id);
-                navigate(`/roles/permission/${hashedId}`);
+                navigate(`/rolespermission/${hashedId}`, {
+                  state: {
+                    role_name: row.original.role_name,
+                    code: row.original.code,
+                  },
+                });
               }}
               className="p-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-600 hover:text-white transition-all"
             >

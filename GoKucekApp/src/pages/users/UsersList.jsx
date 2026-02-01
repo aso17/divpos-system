@@ -44,12 +44,13 @@ export default function UsersList() {
         const res = await UsersService.getUsers({
           page: pagination.pageIndex + 1,
           per_page: pagination.pageSize,
-          keyword: activeSearch, // Menggunakan activeSearch (hanya berubah saat tombol diklik)
+          keyword: activeSearch,
         });
 
         if (isMounted) {
+          console.log("Fetched users:", res.data);
           setData(res.data?.data || res.data || []);
-          setTotalCount(Number(res.data?.total || 0));
+          setTotalCount(Number(res.data.meta?.total || 0));
         }
       } catch (error) {
         console.error("Error fetching users:", error);
@@ -129,7 +130,7 @@ export default function UsersList() {
         header: "ROLE",
         cell: ({ row }) => (
           <span className="text-slate-600 text-xxs">
-            {row.original.role?.role_name || "-"}
+            {row.original.role?.name || "-"}
           </span>
         ),
       },
