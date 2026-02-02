@@ -5,6 +5,7 @@ import {
   flexRender,
 } from "@tanstack/react-table";
 import {
+  Eye,
   Pencil,
   Trash2,
   PlusSquare,
@@ -18,13 +19,13 @@ import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
 import UsersService from "../../services/UsersService";
 import UserForm from "./UserForm";
+import UserDetail from "./UserDetail";
 
 export default function UsersList() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-
   // searchTerm untuk menampung ketikan user
   const [searchTerm, setSearchTerm] = useState("");
   // activeSearch adalah keyword yang benar-benar dikirim ke API
@@ -32,7 +33,7 @@ export default function UsersList() {
 
   const [openModal, setOpenModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-
+  const [openDetail, setOpenDetail] = useState(false);
   // ========================
   // Handlers
   // ========================
@@ -48,7 +49,6 @@ export default function UsersList() {
         });
 
         if (isMounted) {
-          console.log("Fetched users:", res.data);
           setData(res.data?.data || res.data || []);
           setTotalCount(Number(res.data.meta?.total || 0));
         }
@@ -80,13 +80,32 @@ export default function UsersList() {
     setOpenModal(true);
   };
 
+  const handleViewDetail = (user) => {
+    setSelectedUser(user);
+    setOpenDetail(true);
+  };
+
   const handleDelete = async (user) => {
-    if (!confirm(`Hapus user ${user.full_name}?`)) return;
+    const setuju = await showConfirm(
+      `Apakah anda yakin ingin menghapus ${user.full_name}?`,
+      "Konfirmasi Hapus",
+      "warning",
+      { confirmText: "Ya, Hapus", cancelText: "Batal" },
+    );
+
+    if (!setuju) return;
+
     try {
-      await UsersService.deleteUser(user.id);
-      fetchUsers();
+      const res = await UsersService.deleteUser(user.id);
+      const successMsg =
+        res.data?.message || "Data user telah berhasil dihapus.";
+      await showConfirm(successMsg, "Hapus Berhasil", "success");
+      setData((prevData) => prevData.filter((item) => item.id !== user.id));
+      setTotalCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
-      alert("Gagal menghapus user");
+      const errorMsg =
+        err.response?.data?.message || "Terjadi kesalahan server";
+      showConfirm(errorMsg, "Gagal Hapus", "error");
     }
   };
 
@@ -130,22 +149,34 @@ export default function UsersList() {
         header: "ROLE",
         cell: ({ row }) => (
           <span className="text-slate-600 text-xxs">
-            {row.original.role?.name || "-"}
+            {row.original.role?.role_name || "-"}
           </span>
         ),
       },
       {
         accessorKey: "is_active",
         header: "STATUS",
-        cell: ({ getValue }) => (
-          <span
-            className={`px-1.5 py-0.5 rounded-sm text-[10px] text-xxs text-white inline-block text-center ${
-              getValue() ? "bg-emerald-500" : "bg-rose-500"
-            }`}
-          >
-            {getValue() ? "active" : "inactive"}
-          </span>
-        ),
+        cell: ({ getValue }) => {
+          const isActive = getValue();
+          return (
+            <div className="flex items-center">
+              <span
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[8px] font-bold uppercase tracking-wider ${
+                  isActive
+                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                    : "bg-rose-50 text-rose-600 border border-rose-100"
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                  }`}
+                />
+                {isActive ? "Active" : "Inactive"}
+              </span>
+            </div>
+          );
+        },
       },
       {
         id: "actions",
@@ -153,10 +184,10 @@ export default function UsersList() {
         cell: ({ row }) => (
           <div className="flex gap-1 justify-center">
             <button
-              onClick={() => console.log("Setting modules", row.original)}
+              onClick={() => handleViewDetail(row.original)}
               className="p-1 bg-slate-100 text-slate-600 rounded hover:bg-slate-600 hover:text-white transition-all"
             >
-              <Settings size={12} />
+              <Eye size={12} />
             </button>
             <button
               onClick={() => handleEdit(row.original)}
@@ -187,7 +218,6 @@ export default function UsersList() {
     getCoreRowModel: getCoreRowModel(),
   });
 
-  // Efek Fetch Data (Hanya SATU trigger saat pagination atau activeSearch berubah)
   useEffect(() => {
     let isMounted = true;
     fetchUsers(isMounted);
@@ -196,26 +226,23 @@ export default function UsersList() {
     };
   }, [fetchUsers]);
 
-  if (loading) return <LoadingDots />;
-
+  if (loading) return <LoadingDots fullscreen={false} />;
   return (
     <div className="p-4 space-y-4 bg-slate-50 min-h-screen text-xxs">
       <AppHead title="User Management" />
-
       <div className="flex items-center gap-2 text-slate-700 border-b border-slate-200 pb-2">
         <Users size={18} className="text-slate-600" />
         <p className="text-xs font-bold uppercase tracking-tight">
           User Management
         </p>
       </div>
-
       <div className="flex flex-wrap gap-2 items-center justify-between">
         <button
           onClick={() => {
             setSelectedUser(null);
             setOpenModal(true);
           }}
-          className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded text-xxs font-bold uppercase"
+          className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded text-xxs bg-gokucekBlue font-bold uppercase"
         >
           <PlusSquare size={12} /> Tambah
         </button>
@@ -248,11 +275,15 @@ export default function UsersList() {
           </button>
         </form>
       </div>
-
-      <div className="bg-white border-t-2 border-blue-500 rounded-sm shadow-sm overflow-hidden relative">
-        <div className="overflow-x-auto">
+      <div className="bg-white border-t-2 border-blue-500 rounded-sm shadow-sm overflow-hidden relative min-h-[420px] flex flex-col">
+        <div className="overflow-x-auto grow relative">
+          {loading && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-sm pt-[40px]">
+              <LoadingDots fullscreen={false} />
+            </div>
+          )}
           <table className="w-full">
-            <thead className="bg-white border-b border-slate-100 text-slate-500 uppercase">
+            <thead className="bg-white border-b border-slate-100 text-slate-500 uppercase sticky top-0 z-10">
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id}>
                   {hg.headers.map((header) => (
@@ -269,49 +300,71 @@ export default function UsersList() {
                 </tr>
               ))}
             </thead>
+
             <tbody className="divide-y divide-slate-50">
-              {table.getRowModel().rows.length > 0 ? (
-                table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="hover:bg-slate-50 transition-colors"
-                  >
-                    {row.getVisibleCells().map((cell) => (
+              {table.getRowModel().rows.length > 0
+                ? table.getRowModel().rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="hover:bg-slate-50 transition-colors"
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <td
+                          key={cell.id}
+                          className="px-3 py-2 align-middle border-r border-slate-50 last:border-0"
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                : !loading && (
+                    <tr>
                       <td
-                        key={cell.id}
-                        className="px-3 py-2 align-middle border-r border-slate-50 last:border-0"
+                        colSpan={columns.length}
+                        className="p-10 text-center text-slate-400"
                       >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
+                        Data tidak ditemukan
                       </td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
+                    </tr>
+                  )}
+
+              {loading && table.getRowModel().rows.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={columns.length}
-                    className="p-10 text-center text-slate-400"
-                  >
-                    Data tidak ditemukan
-                  </td>
+                  <td colSpan={columns.length} className="py-40"></td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
         <div className="border-t border-slate-100 bg-white">
           <TablePagination table={table} />
         </div>
       </div>
-
       <UserForm
         open={openModal}
         initialData={selectedUser}
         onClose={() => setOpenModal(false)}
-        onSuccess={() => fetchUsers()}
+        onSuccess={(datauser) => {
+          if (selectedUser) {
+            setData((prevUsers) =>
+              prevUsers.map((u) => (u.id === datauser.id ? datauser : u)),
+            );
+          } else {
+            setData((prevUsers) => [datauser, ...prevUsers]);
+            setTotalCount((prev) => prev + 1);
+          }
+        }}
+      />
+
+      <UserDetail
+        open={openDetail}
+        user={selectedUser}
+        onClose={() => setOpenDetail(false)}
       />
     </div>
   );

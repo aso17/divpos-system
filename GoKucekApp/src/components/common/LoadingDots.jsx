@@ -1,29 +1,29 @@
 export default function LoadingDots({
   fullscreen = false,
-  size = "w-3 h-3",
-  colors = ["bg-blue-500", "bg-green-500", "bg-purple-500"],
+  size = "w-2.5 h-2.5",
+  color = "bg-blue-600",
 }) {
-  // 1. Optimasi: Gunakan class kondisional daripada membuat sub-komponen Wrapper
-  // Ini mencegah remount yang bikin berat/lambat.
   const containerClasses = fullscreen
-    ? "fixed inset-0 z-[9999] flex items-center justify-center bg-slate-100/80 backdrop-blur-sm"
-    : "flex items-center justify-center w-full h-full p-4 pointer-events-none";
-  // pointer-events-none: Agar klik 'menembus' loading dan tidak menghalangi tombol
+    ? "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/70 backdrop-blur-md"
+    : "flex flex-col items-center justify-center w-full h-full min-h-[300px] pointer-events-none";
 
   return (
     <div className={containerClasses}>
       <div className="flex space-x-2">
-        {colors.map((color, index) => (
+        {[0, 1, 2].map((index) => (
           <div
             key={index}
-            className={`${size} ${color} rounded-full animate-bounce`}
+            className={`${size} ${color} rounded-full animate-pulse`}
             style={{
-              // 2. Gunakan delay positif agar sinkronisasi GPU lebih ringan
-              animationDelay: `${index * 0.1}s`,
+              animationDelay: `${index * 0.15}s`,
+              animationDuration: "1.2s",
             }}
           />
         ))}
       </div>
+      <p className="mt-4 text-[7px] font-bold text-slate-400 uppercase tracking-[0.3em] animate-pulse">
+        {fullscreen ? "System Loading" : "Fetching Data"}
+      </p>
     </div>
   );
 }

@@ -51,7 +51,6 @@ const UsersService = {
 
   updateUser: (id, payload) => {
     let finalData;
-    console.log("Payload sebelum diupdate:", payload);
 
     if (payload instanceof FormData) {
       finalData = payload;
@@ -85,32 +84,12 @@ const UsersService = {
       finalData.append("tenant_id", tenantId);
     }
 
-    return api.put(`/user/${id}`, finalData, {
+    return api.post(`/user/${id}`, finalData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
     });
   },
-
-  // updateUser: (id, payload) => {
-  //   const formData = new FormData();
-
-  //   formData.append("_method", "PUT");
-
-  //   Object.entries(payload).forEach(([key, value]) => {
-  //     if (value !== null && value !== undefined) {
-  //       if (value instanceof File) {
-  //         formData.append(key, value);
-  //       } else if (typeof value === "object") {
-  //         formData.append(key, JSON.stringify(value));
-  //       } else {
-  //         formData.append(key, value);
-  //       }
-  //     }
-  //   });
-
-  //   return api.post(`/user/${id}`, formData);
-  // },
 
   deleteUser: (id) => {
     const tenantId = getTenantId();

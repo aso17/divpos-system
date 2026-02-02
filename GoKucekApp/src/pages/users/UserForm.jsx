@@ -31,18 +31,29 @@ export default function UserForm({
         is_active: true,
       },
       {
-        full_name: [(v) => rules.required(v, "Nama wajib diisi")],
+        full_name: [
+          (v) => rules.required(v, "Nama wajib diisi"),
+          (v) => rules.noHtml(v, "Nama tidak boleh mengandung tag HTML"),
+          (v) => rules.safeString(v, "Nama mengandung karakter ilegal"),
+        ],
         email: [
           (v) => rules.required(v, "Email wajib diisi"),
           (v) => rules.email(v, "Format email tidak valid"),
+          (v) => rules.noHtml(v, "Email tidak boleh mengandung tag HTML"),
         ],
         username: [
           (v) => rules.required(v, "Username wajib diisi"),
           (v) => rules.minLength(v, 4, "Username minimal 4 karakter"),
+          (v) =>
+            rules.username(
+              v,
+              "Username hanya boleh huruf, angka, titik, dan underscore",
+            ),
+          (v) => rules.noHtml(v, "Username tidak boleh mengandung tag HTML"),
         ],
         phone: [
           (v) => rules.required(v, "No HP wajib diisi"),
-          (v) => rules.noLetters(v, "No HP tidak boleh mengandung huruf"),
+          (v) => rules.phoneID(v, "Format No HP tidak valid (Gunakan 08/628)"),
         ],
         avatar: [
           (file) => {
@@ -65,15 +76,16 @@ export default function UserForm({
         role_id: [(v) => rules.required(v, "Role wajib dipilih")],
         password: [
           (v) => {
-            // Password wajib hanya untuk user baru
+            // Wajib jika data baru, opsional jika sedang edit
             if (!initialData && !v) return "Password wajib diisi";
-            // Jika diisi (baik baru/edit), harus kuat
-            if (v)
+            // Jika user mengetikkan sesuatu (ingin ganti password), cek kekuatannya
+            if (v) {
               return rules.strongPassword(
                 v,
                 8,
-                "Password harus kuat (Aa1@...)",
+                "Password minimal 8 karakter, mengandung Huruf Besar, Kecil, Angka, dan Simbol",
               );
+            }
             return null;
           },
         ],
@@ -85,6 +97,7 @@ export default function UserForm({
     if (open) {
       RoleService.GetRolesByTenant().then((res) => {
         setRoles(res.data?.data || []);
+        // console.log("Loaded roles for UserForm:", res.data?.data || []);
       });
     }
   }, [open]);
@@ -108,9 +121,8 @@ export default function UserForm({
         email: initialData.email || "",
         username: initialData.username || "",
         phone: initialData.phone || "",
-        password: "", // Selalu kosongkan field password saat edit
-        // PENTING: Ambil ID dari objek role jika backend menggunakan Resource
-        role_id: initialData.role?.id || initialData.role_id || "",
+        password: "",
+        role_id: initialData.role.role_id || "",
         is_active: initialData.is_active == 1 || initialData.is_active === true,
       });
       setAvatarPreview(
@@ -132,7 +144,7 @@ export default function UserForm({
     setAvatarFile(null);
     setErrors({});
   }, [open, initialData, setValues, setErrors]);
-
+  // console.log(initialData);
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -154,25 +166,31 @@ export default function UserForm({
       formData.append("password", values.password);
     }
 
-    // Spoofing method karena multipart/form-data via PUT tidak dibaca Laravel secara native
     if (initialData?.id) {
       formData.append("_method", "PUT");
     }
 
     try {
       setIsSubmitting(true);
+      let response;
+
       if (initialData?.id) {
-        await UsersService.updateUser(initialData.id, formData);
-        triggerToast("User berhasil diupdate", "success");
+        response = await UsersService.updateUser(initialData.id, formData);
       } else {
-        await UsersService.createUser(formData);
-        triggerToast("User berhasil ditambahkan", "success");
+        response = await UsersService.createUser(formData);
       }
-      onSuccess?.();
+      const successMsg = response.data?.message;
+      triggerToast(successMsg, "success");
+      const newUser = response.data?.datauser;
+      if (newUser) {
+        onSuccess?.(newUser);
+      } else {
+        onSuccess?.();
+      }
+
       onClose();
     } catch (err) {
-      console.error("Submit failed", err);
-      const errorMsg = err.response?.data?.message || "Gagal menyimpan user";
+      const errorMsg = err.response?.data?.message;
       triggerToast(errorMsg, "error");
     } finally {
       setIsSubmitting(false);
@@ -330,7 +348,7 @@ export default function UserForm({
               <option value="">-- Pilih --</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name}
+                  {r.role_name}
                 </option>
               ))}
             </select>

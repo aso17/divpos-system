@@ -178,6 +178,8 @@ export default function RolesList() {
     getCoreRowModel: getCoreRowModel(),
   });
 
+  if (loading) return <LoadingDots fullscreen={false} />;
+
   return (
     <div className="p-4 space-y-4 bg-slate-50 min-h-screen text-xxs">
       <AppHead title="Role Management" />
@@ -250,13 +252,7 @@ export default function RolesList() {
               ))}
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {loading ? (
-                <tr>
-                  <td colSpan={columns.length} className="p-10 text-center">
-                    <LoadingDots />
-                  </td>
-                </tr>
-              ) : data.length > 0 ? (
+              {data.length > 0 ? (
                 table.getRowModel().rows.map((row) => (
                   <tr
                     key={row.id}

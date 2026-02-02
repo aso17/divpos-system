@@ -11,6 +11,28 @@ export const rules = {
     return null;
   },
 
+  noHtml: (
+    value,
+    message = "Karakter < > tidak diizinkan untuk alasan keamanan",
+  ) => {
+    if (!value) return null;
+    // Regex mendeteksi keberadaan tag <...>
+    const regex = /<[^>]*>/;
+    if (regex.test(value)) {
+      return message;
+    }
+    return null;
+  },
+
+  safeString: (value, message = "Input mengandung karakter yang dilarang") => {
+    if (!value) return null;
+    // Melarang karakter yang sering dipakai SQL Injection seperti: ; -- ' "
+    const forbidden = /[;'"\-\-]/;
+    if (forbidden.test(value)) {
+      return message;
+    }
+    return null;
+  },
   email: (value, message = "Invalid email format") => {
     if (!value) return null;
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
