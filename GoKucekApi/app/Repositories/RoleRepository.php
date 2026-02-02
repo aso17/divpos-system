@@ -14,7 +14,7 @@ class RoleRepository
     public function getActiveRoles(int $tenantId)
     {
         return $this->getBaseQuery($tenantId)
-            ->select('id', 'role_name', 'code')
+            ->select('id', 'role_name', 'code','description')
             ->where('is_active', true)
             ->orderBy('role_name')
             ->get();

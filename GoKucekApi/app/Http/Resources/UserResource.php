@@ -1,8 +1,6 @@
 <?php
 
     namespace App\Http\Resources;
-
-    use App\Helpers\CryptoHelper;
     use Illuminate\Http\Resources\Json\JsonResource;
 
    class UserResource extends JsonResource
@@ -10,7 +8,7 @@
     public function toArray($request)
     {
         return [
-            'id'         => CryptoHelper::encrypt($this->id),
+            'id'         => $this->id,
             'full_name'  => $this->full_name,
             'email'      => $this->email,
             'username'   => $this->username,
@@ -20,13 +18,13 @@
             'created_at' => optional($this->created_at)->format('Y-m-d H:i:s'),
 
             'role' => [
-                'id'   => CryptoHelper::encrypt($this->role_id),
-                'name' => optional($this->role)->role_name,
+                'role_id'   => $this->role_id,
+                'role_name' => optional($this->role)->role_name,
                 'code' => optional($this->role)->code,
             ],
 
             'tenant' => [
-                'id'   => CryptoHelper::encrypt($this->tenant_id),
+                'tenant_id'   => $this->tenant_id,
                 'slug' => optional($this->tenant)->slug,
                 'code' => optional($this->tenant)->code,
             ],

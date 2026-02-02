@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources;
 
-use App\Helpers\CryptoHelper;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class LoginResource extends JsonResource
@@ -10,11 +9,11 @@ class LoginResource extends JsonResource
     public function toArray($request)
     {
         return [
-            'id'        => CryptoHelper::encrypt($this->id),
+            'id'        => $this->id,
             'full_name' => $this->full_name,
             'email'     => $this->email,
-            'role_id'   => CryptoHelper::encrypt($this->role_id),
-            'tenant_id' => CryptoHelper::encrypt($this->tenant_id),
+            'role_id'   => $this->role_id,
+            'tenant_id' => $this->tenant_id,
             'avatar'    => $this->avatar,
             'tenant'    => [
                 'slug'      => $this->tenant->slug ?? null,

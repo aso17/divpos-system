@@ -23,6 +23,7 @@ class UserRepository
             'is_active','role_id','tenant_id','avatar','created_at'
         )
         ->with(['role:id,role_name,code', 'tenant:id,slug,code'])
+        ->where('is_active', true)
         ->where('tenant_id', $tenantId);
     }
 }
