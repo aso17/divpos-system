@@ -44,9 +44,14 @@ Route::middleware('api')->group(function () {
          // 👇 ROLE MODULE
         Route::get('/GetRolesByTenant', [RoleController::class, 'GetRolesByTenantId']); 
         Route::get('/roles', [RoleController::class, 'index']); 
+        Route::post('/roles', [RoleController::class, 'store']); 
+        Route::put('/roles/{id}', [RoleController::class, 'update']); 
+        Route::delete('/roles/{id}', [RoleController::class, 'destroy']); 
 
          // 👇 ROLE MODULE PERMISSION       
         Route::get('/rolespermission', [RolePermissionController::class, 'index']); 
+        Route::post('/rolespermission', [RolePermissionController::class, 'store']); 
+        
 
 
 

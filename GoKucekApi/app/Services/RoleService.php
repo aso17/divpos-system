@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Repositories\RoleRepository;
 use App\Helpers\CryptoHelper;
+use Exception;
 
 class RoleService
 {
@@ -38,5 +39,44 @@ class RoleService
         }
 
         return $query->orderBy('created_at', 'desc');
+    }
+
+    public function createRole(array $data)
+    {
+       
+        $exists = $this->roleRepo->checkCodeExists($data['tenant_id'], $data['code']);
+        
+        if ($exists) {
+            throw new Exception("Role code '{$data['code']}' already exists in this tenant.");
+        }
+
+        // 2. Simpan lewat Repo
+        return $this->roleRepo->create($data);
+    }
+
+    public function updateRole($id, array $data)
+    {
+        // Jika kode diupdate, cek duplikasi kecuali untuk ID ini sendiri
+        if (isset($data['code']) && isset($data['tenant_id'])) {
+            $exists = $this->roleRepo->checkCodeExists($data['tenant_id'], $data['code'], $id);
+            if ($exists) {
+                throw new Exception("Role code '{$data['code']}' already exists.");
+            }
+        }
+
+        return $this->roleRepo->update($id, $data);
+    }
+
+    public function deleteRole($id, $encryptedTenantId)
+    {
+        $tenantId = CryptoHelper::decrypt($encryptedTenantId);
+        if (!$tenantId) throw new Exception("Invalid Tenant Access.");
+
+        $role = $this->roleRepo->findByIdAndTenant($id, (int)$tenantId);
+        if (!$role) {
+            throw new Exception("Role not found or access denied.");
+        }
+
+        return $this->roleRepo->delete($id);
     }
 }

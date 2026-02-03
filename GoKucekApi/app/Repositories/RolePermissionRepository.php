@@ -31,4 +31,22 @@ class RolePermissionRepository
             ->orderBy('Ms_menus.id', 'asc')
             ->get();
     }
+
+    public static function updateRolePermissions($roleId, $tenantId, array $dataToInsert)
+    {
+        return DB::transaction(function () use ($roleId, $tenantId, $dataToInsert) {
+            
+            DB::table('Ms_role_menu_permissions')
+                ->where('tenant_id', $tenantId)
+                ->where('role_id', $roleId)
+                ->delete();
+
+            // 2. Insert yang baru (jika ada)
+            if (!empty($dataToInsert)) {
+                DB::table('Ms_role_menu_permissions')->insert($dataToInsert);
+            }
+            
+            return true;
+        });
+    }
 }

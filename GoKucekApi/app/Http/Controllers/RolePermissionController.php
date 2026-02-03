@@ -6,13 +6,16 @@ use Illuminate\Support\Facades\DB;
 use App\Helpers\CryptoHelper;
 use App\Http\Resources\RolePermissionResource;
 use App\Services\RolePermissionService; 
+use App\Repositories\RolePermissionRepository; 
 class RolePermissionController extends Controller
 {
    protected $permissionService;
+   protected $permissionRepository;
 
-    public function __construct(RolePermissionService $service)
+    public function __construct(RolePermissionService $service, RolePermissionRepository $repository)
     {
         $this->permissionService = $service;
+        $this->permissionRepository = $repository;
     }
     
     public function index(Request $request)
@@ -20,7 +23,7 @@ class RolePermissionController extends Controller
         // 1. Decrypt Input
         $roleId   = CryptoHelper::decrypt($request->query('roleid'));
         $tenantId = CryptoHelper::decrypt($request->query('tenantid'));
-
+        
         // 2. Ambil Info Role
         $role = DB::table('Ms_roles')
             ->where('id', $roleId)
@@ -42,62 +45,50 @@ class RolePermissionController extends Controller
     }
 
 
-
     public function store(Request $request)
     {
-        // Ambil params dari URL query string
-        $roleId = decrypt($request->query('role_id'));
-        $tenantId = decrypt($request->query('tenant_id'));
-        
-        // Ambil body dari React ( { permissions: [...] } )
-        $permissions = $request->input('permissions'); 
-
-        DB::beginTransaction();
         try {
-            // 1. Hapus data lama agar tidak terjadi 'Duplicate Key' pada unique constraint
-            DB::table('Ms_role_menu_permissions')
-                ->where('tenant_id', $tenantId)
-                ->where('role_id', $roleId)
-                ->delete();
 
-            // 2. Mapping data untuk Bulk Insert
-            $dataToInsert = collect($permissions)->map(function ($p) use ($roleId, $tenantId) {
-                return [
-                    'tenant_id'  => $tenantId,
-                    'role_id'    => $roleId,
-                    'module_id'  => $p['module_id'], 
-                    'menu_id'    => $p['menu_id'],
-                    // Pastikan dikonversi ke boolean agar Postgres tidak protes
-                    'can_view'   => filter_var($p['can_view'], FILTER_VALIDATE_BOOLEAN),
-                    'can_create' => filter_var($p['can_create'], FILTER_VALIDATE_BOOLEAN),
-                    'can_update' => filter_var($p['can_update'], FILTER_VALIDATE_BOOLEAN),
-                    'can_delete' => filter_var($p['can_delete'], FILTER_VALIDATE_BOOLEAN),
-                    'can_export' => filter_var($p['can_export'], FILTER_VALIDATE_BOOLEAN),
-                    'is_active'  => true,
-                    // 'created_by' => auth()->user()->username ?? 'system',
-                    'created_by' => 'system',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            })->toArray();
+            $roleId   = $request->input('role_id'); 
+            $tenantId = $request->input('tenant_id');
+            $userLog  = $request->input('created_by'); 
+            $dataToInsert = $request->input('permissions');
 
-            // 3. Eksekusi Insert Massal
-            if (!empty($dataToInsert)) {
-                DB::table('Ms_role_menu_permissions')->insert($dataToInsert);
+            $dataToInsert = collect($request->input('permissions'))
+                ->map(function ($p) use ($roleId, $tenantId, $userLog) {
+                    $view   = filter_var($p['can_view'], FILTER_VALIDATE_BOOLEAN);
+                    $create = filter_var($p['can_create'], FILTER_VALIDATE_BOOLEAN);
+                    $update = filter_var($p['can_update'], FILTER_VALIDATE_BOOLEAN);
+                    $delete = filter_var($p['can_delete'], FILTER_VALIDATE_BOOLEAN);
+                    $export = filter_var($p['can_export'], FILTER_VALIDATE_BOOLEAN);
+
+                    if (!$view && !$create && !$update && !$delete && !$export) return null;
+
+                    return [
+                        'tenant_id'  => $tenantId,
+                        'role_id'    => $roleId,
+                        'module_id'  => $p['module_id'], 
+                        'menu_id'    => $p['menu_id'],
+                        'can_view'   => $view,
+                        'can_create' => $create,
+                        'can_update' => $update,
+                        'can_delete' => $delete,
+                        'can_export' => $export,
+                        'is_active'  => true,
+                        'created_by' => $userLog,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                })
+                ->filter()
+                ->toArray();
+
+            // Panggil Repository
+            $permissions = $this->permissionRepository->updateRolePermissions($roleId, $tenantId, $dataToInsert);
+
+            return response()->json(['status' => 'success', 'message' => 'Permissions updated']);
+            } catch (\Exception $e) {
+                return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
             }
-
-            DB::commit();
-            return response()->json([
-                'status'  => 'success', 
-                'message' => 'Permissions saved successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status'  => 'error', 
-                'message' => 'Failed to save: ' . $e->getMessage()
-            ], 500);
         }
-    }
 }
