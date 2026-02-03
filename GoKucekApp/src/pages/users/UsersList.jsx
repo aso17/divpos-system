@@ -268,7 +268,7 @@ export default function UsersList() {
           </div>
           <button
             type="submit"
-            className="bg-emerald-700 text-white px-3 py-1.5 rounded-r hover:bg-emerald-800 transition-colors flex items-center gap-1"
+            className="bg-emerald-700 text-white px-3 py-1.5 rounded-r hover:bg-emerald-800 transition-colors text-xxs bg-gokucekBlue font-bold flex items-center gap-1"
           >
             <Search size={12} strokeWidth={3} />
             CARI

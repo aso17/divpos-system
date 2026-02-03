@@ -4,7 +4,7 @@ import { CheckCircle2, AlertCircle, Info, XCircle, X } from "lucide-react";
 export default function CenterToast({
   message,
   type = "success",
-  duration = 8000,
+  duration = 3000,
   onClose,
 }) {
   useEffect(() => {

@@ -12,6 +12,8 @@ import AppHead from "../../components/common/AppHead";
 import RolesService from "../../services/RoleService";
 import { encrypt } from "../../utils/Encryptions";
 
+import RoleForm from "./RoleForm";
+
 export default function RolesList() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +75,42 @@ export default function RolesList() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
+  const handleDelete = async (role) => {
+    // 1. Munculkan Konfirmasi
+    const setuju = await showConfirm(
+      `Apakah anda yakin ingin menghapus role ${role.role_name}?`,
+      "Konfirmasi Hapus",
+      "warning",
+      { confirmText: "Ya, Hapus", cancelText: "Batal" },
+    );
+
+    if (!setuju) return;
+
+    try {
+      const res = await RolesService.deleteRole(role.id);
+      console.log("Delete response:", res);
+      const successMsg =
+        res.data?.message || "Data role telah berhasil dihapus.";
+
+      // 3. Notifikasi Sukses
+      await showConfirm(successMsg, "Hapus Berhasil", "success");
+
+      // 4. Optimistic Update: Hapus dari state tabel secara instan
+      setData((prevData) => prevData.filter((item) => item.id !== role.id));
+
+      // 5. Kurangi Total Count (untuk sinkronisasi pagination label)
+      if (typeof setTotalCount === "function") {
+        setTotalCount((prev) => Math.max(0, prev - 1));
+      }
+    } catch (err) {
+      // 6. Penanganan Error (Misal: Role sedang digunakan atau masalah koneksi)
+      console.error("Error deleting role:", err);
+      const errorMsg =
+        err.response?.data?.message ||
+        "Terjadi kesalahan server saat menghapus role";
+      showConfirm(errorMsg, "Gagal Hapus", "error");
+    }
+  };
   const columns = useMemo(
     () => [
       {
@@ -113,13 +151,27 @@ export default function RolesList() {
       {
         accessorKey: "is_active",
         header: "STATUS",
-        cell: ({ getValue }) => (
-          <span
-            className={`px-1.5 py-0.5 rounded-sm text-[10px] text-white inline-block ${getValue() ? "bg-emerald-500" : "bg-rose-500"}`}
-          >
-            {getValue() ? "active" : "inactive"}
-          </span>
-        ),
+        cell: ({ getValue }) => {
+          const isActive = getValue();
+          return (
+            <div className="flex items-center">
+              <span
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[8px] font-bold uppercase tracking-wider ${
+                  isActive
+                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                    : "bg-rose-50 text-rose-600 border border-rose-100"
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                  }`}
+                />
+                {isActive ? "Active" : "Inactive"}
+              </span>
+            </div>
+          );
+        },
       },
       {
         id: "actions",
@@ -151,12 +203,7 @@ export default function RolesList() {
               <Pencil size={12} />
             </button>
             <button
-              onClick={async () => {
-                if (confirm(`Hapus role ${row.original.role_name}?`)) {
-                  await RolesService.deleteRole(row.original.id);
-                  fetchRoles();
-                }
-              }}
+              onClick={() => handleDelete(row.original)}
               className="p-1 bg-red-50 text-red-600 rounded hover:bg-red-600 hover:text-white transition-all"
             >
               <Trash2 size={12} />
@@ -197,9 +244,9 @@ export default function RolesList() {
             setSelectedRole(null);
             setOpenModal(true);
           }}
-          className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded text-xxs font-bold uppercase"
+          className="w-fit flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded text-xxs bg-gokucekBlue font-bold uppercase"
         >
-          <PlusSquare size={12} /> Tambah Role
+          <PlusSquare size={12} /> Tambah
         </button>
 
         {/* INPUT PENCARIAN DENGAN TOMBOL */}
@@ -223,7 +270,7 @@ export default function RolesList() {
           </div>
           <button
             type="submit"
-            className="bg-emerald-700 text-white px-3 py-1.5 rounded-r hover:bg-emerald-800 transition-colors flex items-center gap-1"
+            className="bg-emerald-700 text-white px-3 py-1.5 rounded-r hover:bg-emerald-800 transition-colors text-xxs bg-gokucekBlue font-bold flex items-center gap-1"
           >
             <Search size={12} />
             CARI
@@ -286,6 +333,30 @@ export default function RolesList() {
         </div>
         <TablePagination table={table} />
       </div>
+
+      {/* Modal Form Role */}
+      <RoleForm
+        open={openModal}
+        initialData={selectedRole}
+        onClose={() => setOpenModal(false)}
+        onSuccess={(newRole) => {
+          if (selectedRole) {
+            // Jika sedang EDIT: Update data di state
+            setData((prevRoles) =>
+              prevRoles.map((r) => (r.id === newRole.id ? newRole : r)),
+            );
+          } else {
+            // Jika sedang ADD: Tambahkan ke urutan paling atas
+            setData((prevRoles) => [newRole, ...prevRoles]);
+
+            // Update counter total data jika menampilkannya
+            if (typeof setTotalCount === "function") {
+              setTotalCount((prev) => prev + 1);
+            }
+          }
+          setOpenModal(false);
+        }}
+      />
     </div>
   );
 }

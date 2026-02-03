@@ -2,7 +2,6 @@ import { useContext, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ProjectContext } from "../../context/ProjectContext";
 import { useAuth } from "../../context/AuthContext";
-import LoadingDots from "../../components/common/LoadingDots";
 import AppHead from "../../components/common/AppHead";
 import LoginForm from "./LoginForm";
 
@@ -17,20 +16,11 @@ export default function Login() {
     try {
       await loginFromContext(values);
 
-      // // Kirim event sukses ke App.jsx
-      // window.dispatchEvent(
-      //   new CustomEvent("global-toast", {
-      //     detail: { message: "Selamat Datang!", type: "success" },
-      //   }),
-      // );
-
       navigate("/dashboard");
     } catch (error) {
       console.error("Login error:", error);
       const message =
         error.response?.data?.message || error.message || "Login gagal";
-
-      // Kirim event error ke App.jsx
       window.dispatchEvent(
         new CustomEvent("global-toast", {
           detail: { message: message, type: "error" },
@@ -40,8 +30,6 @@ export default function Login() {
       setIsSubmitting(false);
     }
   };
-
-  if (loading) return <LoadingDots />;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-emerald-50 px-4">

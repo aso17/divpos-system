@@ -5,7 +5,7 @@ import {
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import { ShieldCheck, ArrowLeft, CheckSquare, Package } from "lucide-react";
+import { ShieldCheck, ArrowLeft, CheckSquare, Layers } from "lucide-react";
 import LoadingDots from "../../components/common/LoadingDots";
 import AppHead from "../../components/common/AppHead";
 import RolesService from "../../services/RolespermissionService";
@@ -26,18 +26,23 @@ export default function RolePermissionList() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const triggerToast = (message, type) => {
+    window.dispatchEvent(
+      new CustomEvent("global-toast", { detail: { message, type } }),
+    );
+  };
+
   const fetchPermissions = useCallback(async () => {
     if (!decryptedId) return;
     setLoading(true);
     try {
       const res = await RolesService.getRolePermissions(decryptedId);
-      console.log("Raw response:", decryptedId);
-      console.log("Fetched permissions:", res.data);
       const responseData = res.data?.data || res.data;
       setData(responseData.permissions || []);
       if (responseData.role) setRoleInfo(responseData.role);
     } catch (error) {
       console.error("Error fetching permissions:", error);
+      triggerToast("Gagal mengambil data hak akses", "error");
     } finally {
       setLoading(false);
     }
@@ -52,9 +57,10 @@ export default function RolePermissionList() {
     setIsSubmitting(true);
     try {
       await RolesService.updatePermissions(decryptedId, { permissions: data });
-      triggerToast("Permissions updated successfully!", "success");
+
+      triggerToast("Hak akses berhasil diperbarui!", "success");
     } catch (err) {
-      triggerToast("Failed to save permissions", "error");
+      triggerToast("Gagal menyimpan perubahan", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -110,9 +116,10 @@ export default function RolePermissionList() {
         cell: ({ row }) => (
           <button
             onClick={() => toggleRow(row.original.menu_id)}
-            className="p-1 text-slate-300 hover:text-indigo-600"
+            className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+            title="Pilih Baris"
           >
-            <CheckSquare size={14} />
+            <CheckSquare size={16} />
           </button>
         ),
       },
@@ -120,12 +127,12 @@ export default function RolePermissionList() {
         accessorKey: "menu_name",
         header: "MENU / MODUL",
         cell: ({ row }) => (
-          <div className="flex flex-col ml-2 border-l-2 border-slate-100 pl-2">
-            <span className="text-gray-800 font-bold text-xxs uppercase">
+          <div className="flex flex-col py-1">
+            <span className="text-slate-800 font-bold text-[10px] uppercase tracking-wide">
               {row.original.menu_name}
             </span>
-            <span className="text-slate-400 text-[8px]">
-              ID: {row.original.menu_id}
+            <span className="text-slate-400 text-[9px] font-mono lowercase">
+              id: {row.original.menu_id}
             </span>
           </div>
         ),
@@ -136,41 +143,44 @@ export default function RolePermissionList() {
         "can_update",
         "can_delete",
         "can_export",
-      ].map((field) => ({
-        accessorKey: field,
-        header: () => (
-          <div
-            className="flex flex-col items-center gap-1 cursor-pointer group"
-            onClick={() => toggleColumn(field)}
-          >
-            <span className="group-hover:text-indigo-600">
-              {field.replace("can_", "").toUpperCase()}
-            </span>
-            <div className="text-[7px] text-slate-300 group-hover:text-indigo-400">
-              TOGGLE
+      ].map((field) => {
+        const labels = {
+          can_view: "view",
+          can_create: "create",
+          can_update: "update",
+          can_delete: "delete",
+          can_export: "export",
+        };
+        return {
+          accessorKey: field,
+          header: () => (
+            <div
+              className="flex flex-col items-center gap-1 cursor-pointer group select-none"
+              onClick={() => toggleColumn(field)}
+            >
+              <span className="group-hover:text-indigo-600 transition-colors">
+                {labels[field]}
+              </span>
+              <div className="text-[8px] text-slate-300 group-hover:text-indigo-400 font-bold tracking-tighter">
+                TOGGLE
+              </div>
             </div>
-          </div>
-        ),
-        cell: ({ row }) => (
-          <div className="flex justify-center">
-            <input
-              type="checkbox"
-              checked={!!row.original[field]}
-              onChange={() => handleToggle(row.original.menu_id, field)}
-              className="w-3.5 h-3.5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer"
-            />
-          </div>
-        ),
-      })),
+          ),
+          cell: ({ row }) => (
+            <div className="flex justify-center">
+              <input
+                type="checkbox"
+                checked={!!row.original[field]}
+                onChange={() => handleToggle(row.original.menu_id, field)}
+                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer transition-all"
+              />
+            </div>
+          ),
+        };
+      }),
     ],
     [data],
   );
-
-  const triggerToast = (message, type) => {
-    window.dispatchEvent(
-      new CustomEvent("global-toast", { detail: { message, type } }),
-    );
-  };
 
   const table = useReactTable({
     data,
@@ -180,49 +190,51 @@ export default function RolePermissionList() {
 
   if (loading && !roleInfo)
     return (
-      <div className="h-screen flex items-center justify-center">
+      <div className="h-[400px] flex items-center justify-center">
         <LoadingDots />
       </div>
     );
 
   return (
-    <div className="p-4 space-y-4 bg-slate-50 min-h-screen text-xxs">
-      <AppHead title={`Permission - ${roleInfo?.role_name || "Role"}`} />
+    <div className="p-4 space-y-4 bg-slate-50 min-h-screen">
+      <AppHead title={`Hak Akses - ${roleInfo?.role_name || "Role"}`} />
 
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-3">
+      {/* HEADER SECTION */}
+      <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="p-1.5 hover:bg-slate-200 rounded-full text-slate-500"
+            className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors border border-slate-100"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={20} />
           </button>
-          <div className="p-2 bg-indigo-600 text-white rounded-lg shadow-indigo-100 shadow-lg">
-            <ShieldCheck size={20} />
-          </div>
+
           <div>
-            <h1 className="text-xs font-bold uppercase tracking-tight">
-              Role:{" "}
-              <span className="text-indigo-600">{roleInfo?.role_name}</span>
+            <h1 className="text-xs font-black uppercase tracking-tight text-slate-800">
+              Peran:{" "}
+              <span className="text-indigo-600 text-[12px]">
+                {roleInfo?.role_name}
+              </span>
             </h1>
-            <p className="text-[10px] text-slate-400 font-mono italic">
-              Code: {roleInfo?.code}
+            <p className="text-[8px] text-slate-400 font-semibold tracking-widest uppercase">
+              Pengaturan Kontrol Akses
             </p>
           </div>
         </div>
         <SubmitButton
           onClick={handleSave}
           isSubmitting={isSubmitting}
-          label="Save Changes"
+          label="Simpan Perubahan"
           fullWidth={false}
-          className="w-auto px-5 py-2 bg-emerald-600 text-white rounded shadow-sm text-xxs font-bold uppercase hover:bg-emerald-700"
+          className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200"
         />
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+      {/* MATRIX TABLE */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-            <thead>
+            <thead className="sticky top-0 z-10">
               {table.getHeaderGroups().map((hg) => (
                 <tr
                   key={hg.id}
@@ -231,7 +243,7 @@ export default function RolePermissionList() {
                   {hg.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-4 py-3 font-bold text-left text-[10px] text-slate-500 uppercase border-r border-slate-100 last:border-0"
+                      className="px-4 py-4 font-bold text-left text-[10px] text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0"
                     >
                       {flexRender(
                         header.column.columnDef.header,
@@ -246,27 +258,28 @@ export default function RolePermissionList() {
               {(() => {
                 let lastModuleId = null;
                 return table.getRowModel().rows.map((row) => {
-                  const { module_id, module_name, module_icon } = row.original;
+                  const { module_id, module_name } = row.original;
                   const showGroupHeader = module_id !== lastModuleId;
                   lastModuleId = module_id;
 
                   return (
                     <React.Fragment key={row.id}>
                       {showGroupHeader && (
-                        <tr className="bg-slate-50/80">
+                        <tr className="bg-slate-50/50">
                           <td
                             colSpan={columns.length}
-                            className="px-4 py-2.5 border-y border-slate-200"
+                            className="px-4 py-3 border-y border-slate-200 bg-slate-100/30"
                           >
-                            <div className="flex items-center gap-2">
-                              <span className="font-black text-slate-700 text-[10px] tracking-widest uppercase">
-                                {module_name}
+                            <div className="flex items-center gap-2 text-indigo-700">
+                              <Layers size={14} className="opacity-70" />
+                              <span className="font-black text-[10px] tracking-[0.2em] uppercase">
+                                Modul {module_name}
                               </span>
                             </div>
                           </td>
                         </tr>
                       )}
-                      <tr className="hover:bg-indigo-50/30 transition-colors group">
+                      <tr className="hover:bg-indigo-50/20 transition-colors group">
                         {row.getVisibleCells().map((cell) => (
                           <td
                             key={cell.id}

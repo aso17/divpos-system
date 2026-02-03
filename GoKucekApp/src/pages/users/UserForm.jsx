@@ -381,8 +381,8 @@ export default function UserForm({
             </button>
             <SubmitButton
               isSubmitting={isSubmitting}
-              label={initialData ? "Update User" : "Save User"}
-              loadingLabel="Saving..."
+              label={initialData ? "Update User" : "Create User"}
+              loadingLabel="Processing..."
               fullWidth={false}
               className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200"
             />
