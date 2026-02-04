@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 use App\Services\RoleService;
 use App\Http\Resources\RoleResource;
 use Illuminate\Http\Request;
-
+use App\Helpers\CryptoHelper;
 class RoleController extends Controller
 {
 
@@ -84,27 +84,38 @@ protected $roleService;
             return response()->json(['message' => $e->getMessage()], 422);
         }
     }
-    public function destroy(Request $request, $id)
-    {
-        try {
-            // 1. Ambil tenant_id dari query params
-            $encryptedTenantId = $request->query('tenant_id');       
-            $tenantId = decrypt($encryptedTenantId);
-            $decryptedId = decrypt($id); 
 
-            // 3. Panggil service
-            // $this->roleService->deleteRole($decryptedId, $tenantId);
-            
-            return response()->json([
-                'status' => 'success',
-                'data' => $tenantId,
-                'data2' => $decryptedId,
-                'message' => 'Role deleted successfully'
-            ]);
-        } catch (\Exception $e) {
-            // Log untuk melihat string mana yang bikin gagal
-            // Log::error("Payload Gagal: ID=$id, Tenant=" . $request->query('tenant_id'));
-            return response()->json(['message' => 'Delete failed: ' . $e->getMessage()], 500);
+
+    public function destroy(Request $request, $id)
+{
+    try {
+        
+        $decryptedId = CryptoHelper::decrypt($id);
+        
+        $encryptedTenantId = $request->query('tenant_id');
+        $tenantId = $encryptedTenantId ? CryptoHelper::decrypt($encryptedTenantId) : null;
+
+        if (!$decryptedId || !$tenantId) {
+            throw new \Exception("Data tidak valid atau sudah kadaluarsa.");
         }
+
+         $this->roleService->deleteRole((int)$decryptedId, (int)$tenantId);
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Role berhasil dihapus',
+            'debug' => [
+                'role_id' => $decryptedId,
+                'tenant_id' => $tenantId
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+         
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Gagal menghapus data: ' . $e->getMessage()
+        ], 500);
     }
+}
 }

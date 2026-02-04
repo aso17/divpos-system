@@ -14,10 +14,12 @@ use App\Helpers\CryptoHelper;
 class UserController extends Controller
 {
     protected $userService;
+    protected $userRepository;
 
     public function __construct(UserService $userService)
     {
         $this->userService = $userService;
+       
     }
     
     // GET /user
@@ -54,113 +56,132 @@ class UserController extends Controller
     }
 
     // POST /user
-  public function store(Request $request)
+    public function store(Request $request)
     {
-        
-       $request->validate([
-        'full_name' => 'required|string|max:100',
-        'email'     => 'required|email|unique:Ms_users,email',
-        'username'  => 'nullable|string|max:50|unique:Ms_users,username',
-        'phone'     => 'nullable|string|max:20',
-        'password'  => 'required|min:8',
-        'role_id'   => 'required|exists:Ms_roles,id',
-        'tenant_id' => 'required|exists:Ms_tenants,id',
-        'is_active' => 'nullable|boolean',
-        'avatar'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-        ]);
+        try {
+            
+            $decryptedTenantId = CryptoHelper::decrypt($request->tenant_id);
 
+            if (!$decryptedTenantId) {
+                throw new \Exception("Tenant ID tidak valid.");
+            }
+            $request->merge([
+                'role_id' => $request->role_id,
+                'tenant_id' => $decryptedTenantId,
+            ]);
 
-       $data = [
-                'full_name' => strip_tags($request->full_name),
-                'email'     => filter_var($request->email, FILTER_SANITIZE_EMAIL),
-                'username'  => strip_tags($request->username),
-                'phone'     => strip_tags($request->phone),
-                'role_id'   => $request->role_id,
-                'tenant_id' => $request->tenant_id,
-                'is_active' => $request->is_active ?? true,
-            ];
+            // 2. Validasi
+            $request->validate([
+                'full_name' => 'required|string|max:100',
+                'email'     => 'required|email|unique:Ms_users,email',
+                'username'  => 'nullable|string|max:50|unique:Ms_users,username',
+                'password'  => 'required|min:8',
+                'role_id'   => 'required|exists:Ms_roles,id',
+                'tenant_id' => 'required|exists:Ms_tenants,id',
+                'avatar'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            ]);
 
-        // Default aktif jika tidak dikirim
-        $data['is_active'] = $data['is_active'] ?? true;
-        // Hash password
-        $data['password'] = Hash::make($request->password);
+            // 3. Panggil Service
+            $user = $this->userService->createUser(
+                $request->all(), 
+                $request->file('avatar')
+            );
 
-        // Upload avatar (nama unik)
-        if ($request->hasFile('avatar')) {
-            $file = $request->file('avatar');
-            $filename = 'avatar_' . time() . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-            $path = $file->storeAs('avatars', $filename, 'public');
-            $data['avatar'] = $path;
-        }
-
-        $user = Ms_user::create($data);
-        return response()->json([
+            return response()->json([
                 'success' => true,
                 'message' => 'User berhasil dibuat',
-                'datauser'    => $user->load('role'), 
+                'datauser' => $user, 
             ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal membuat user: ' . $e->getMessage()
+            ], 500);
+        }
     }
+
     // PUT /user/{id}
+
     public function update(Request $r, $id)
     {
-        $user = Ms_user::findOrFail($id);
+        try {
+            // 1. Dekripsi ID (untuk keperluan query dan validasi unique)
+            $decryptedId = CryptoHelper::decrypt($id);
+            $decryptedTenantId = CryptoHelper::decrypt($r->header('X-Tenant-Id') ?? $r->tenant_id);
 
-        $r->validate([
-            'full_name' => 'required|string|max:100',
-            'email'     => "required|email|unique:Ms_users,email,$id",
-            'username'  => "nullable|unique:Ms_users,username,$id",
-            'role_id'   => 'nullable|exists:Ms_roles,id',
-            'tenant_id' => 'nullable|exists:Ms_tenants,id',
-            'avatar'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-        ]);
+            if (!$decryptedId) throw new \Exception("ID tidak valid.");
 
-        $user->update($r->only([
-            'full_name','email','username','phone','role_id','tenant_id','is_active'
-        ]));
+            // 2. Validasi (Gunakan ID asli untuk rule unique)
+            $r->validate([
+                'full_name' => 'required|string|max:100',
+                'email'     => "required|email|unique:Ms_users,email,$decryptedId",
+                'username'  => "nullable|unique:Ms_users,username,$decryptedId",
+                'role_id'   => 'nullable|exists:Ms_roles,id',
+                'avatar'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            ]);
 
-        if ($r->filled('password')) {
-            $user->update(['password' => Hash::make($r->password)]);
-        }
+            // 3. Siapkan data untuk Service
+            $data = $r->only(['full_name', 'email', 'username', 'phone', 'role_id', 'is_active', 'password']);
+            $avatar = $r->file('avatar');
 
-        // 🔥 HANDLE AVATAR
-        if ($r->hasFile('avatar')) {
-        
-            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
-                Storage::disk('public')->delete($user->avatar);
+            // 4. Jalankan Service
+            $user = $this->userService->updateUserInfo(
+                (int)$decryptedId, 
+                (int)$decryptedTenantId, 
+                $data, 
+                $avatar
+            );
+
+            if (!$user) {
+                return response()->json(['status' => 'error', 'message' => 'User tidak ditemukan'], 404);
             }
-            // Simpan file baru
-            $file = $r->file('avatar');
-            $filename = 'avatar_' . time() . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-            $path = $file->storeAs('avatars', $filename, 'public');
 
-            $user->update(['avatar' => $path]);
+            return response()->json([
+                'success' => true,
+                'message' => 'User berhasil diupdate',
+                'datauser' => $user, 
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Update gagal: ' . $e->getMessage()], 500);
         }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'User berhasil diupdate',
-            'datauser'    => $user->load('role'), 
-        ]);
     }
 
     // DELETE /user/{id}
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $user = Ms_user::find($id);
-        if (!$user) {
+        try {
+            // 1. Dekripsi (Urusan HTTP/Transport)
+            $decryptedId = CryptoHelper::decrypt($id);
+            $decryptedTenantId = CryptoHelper::decrypt($request->query('tenant_id'));
+
+            if (!$decryptedId || !$decryptedTenantId) {
+                return response()->json(['status' => 'error', 'message' => 'Parameter tidak valid'], 400);
+            }
+
+            // 2. Panggil Service (Urusan Logika Bisnis)
+            $user = $this->userService->deleteUserById((int)$decryptedId, (int)$decryptedTenantId);
+
+            if (!$user) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'User tidak ditemukan atau akses ditolak'
+                ], 404);
+            }
+
+            // 3. Respon ke Client
+            return response()->json([
+                'status' => 'success',
+                'message' => 'User ' . $user->full_name . ' berhasil dihapus',
+                'data' => ['id' => $id]
+            ], 200);
+
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'User tidak ditemukan atau sudah dihapus'
-            ], 404);
+                'message' => $e->getMessage()
+            ], 500);
         }
-
-        $user->delete();
-        return response()->json([
-            'status' => 'success',
-            'message' => 'User ' . $user->full_name . ' berhasil dihapus',
-            'data' => [
-                'id' => $id 
-            ]
-        ], 200);
     }
 }

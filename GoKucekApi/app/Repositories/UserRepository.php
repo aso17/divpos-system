@@ -26,4 +26,28 @@ class UserRepository
         ->where('is_active', true)
         ->where('tenant_id', $tenantId);
     }
+
+   public function findByIdAndTenant(int $id, int $tenantId)
+    {
+        return Ms_user::where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->first();
+    }
+
+    public function create(array $data)
+    {
+        $user = Ms_user::create($data);
+        return $user->load('role'); 
+    }
+
+    public function update(Ms_user $user, array $data)
+    {
+        $user->update($data);
+        return $user->fresh(['role']); 
+    }
+
+    public function delete(Ms_user $user)
+    {
+        return $user->delete();
+    }
 }

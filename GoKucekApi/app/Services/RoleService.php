@@ -67,11 +67,9 @@ class RoleService
         return $this->roleRepo->update($id, $data);
     }
 
-    public function deleteRole($id, $encryptedTenantId)
+    public function deleteRole($id, $tenantId)
     {
-        $tenantId = CryptoHelper::decrypt($encryptedTenantId);
-        if (!$tenantId) throw new Exception("Invalid Tenant Access.");
-
+        
         $role = $this->roleRepo->findByIdAndTenant($id, (int)$tenantId);
         if (!$role) {
             throw new Exception("Role not found or access denied.");
