@@ -22,7 +22,7 @@ const RoleService = {
 
   getRoles: (params = {}) => {
     const { tenantId } = getAuthInfo();
-    return api.get("/roles", {
+    return api.get("/role", {
       params: {
         tenant_id: encrypt(tenantId),
         ...params,
@@ -37,7 +37,7 @@ const RoleService = {
       tenant_id: tenantId,
       created_by: userLogin,
     };
-    return api.post("/roles", finalPayload);
+    return api.post("/role", finalPayload);
   },
 
   updateRole: (id, payload) => {
@@ -48,16 +48,25 @@ const RoleService = {
       updated_by: userLogin,
       _method: "PUT",
     };
-    return api.post(`/roles/${id}`, finalPayload);
+    return api.post(`/role/${id}`, finalPayload);
   },
+  // RoleService.js
 
-  deleteRole: (role_id) => {
+  deleteRole: (id) => {
     const { tenantId } = getAuthInfo();
-    console.log("Deleting role with ID:", role_id, "for tenant ID:", tenantId);
-    return api.delete(`/roles/${encrypt(role_id)}`, {
-      params: { tenant_id: encrypt(tenantId) },
+    const roleId = encrypt(id);
+    const tenant_id = encrypt(tenantId);
+    return api.delete(`/role/${roleId}`, {
+      params: { tenant_id: tenant_id },
     });
   },
+
+  // deleteRole: (id) => {
+  //   const { tenantId } = getAuthInfo();
+  //   return api.delete(`/role/${encrypt(id)}`, {
+  //     params: { tenant_id: encrypt(tenantId) },
+  //   });
+  // },
 };
 
 export default RoleService;

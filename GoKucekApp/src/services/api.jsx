@@ -5,6 +5,7 @@ import { apiUrl } from "../utils/Url";
 const api = axios.create({
   baseURL: apiUrl(),
   timeout: 10000,
+  withCredentials: false,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",

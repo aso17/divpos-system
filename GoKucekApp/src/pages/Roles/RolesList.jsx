@@ -76,7 +76,6 @@ export default function RolesList() {
   };
 
   const handleDelete = async (role) => {
-    // 1. Munculkan Konfirmasi
     const setuju = await showConfirm(
       `Apakah anda yakin ingin menghapus role ${role.role_name}?`,
       "Konfirmasi Hapus",
@@ -88,23 +87,18 @@ export default function RolesList() {
 
     try {
       const res = await RolesService.deleteRole(role.id);
-      console.log("Delete response:", res);
+
       const successMsg =
         res.data?.message || "Data role telah berhasil dihapus.";
 
-      // 3. Notifikasi Sukses
       await showConfirm(successMsg, "Hapus Berhasil", "success");
 
-      // 4. Optimistic Update: Hapus dari state tabel secara instan
       setData((prevData) => prevData.filter((item) => item.id !== role.id));
 
-      // 5. Kurangi Total Count (untuk sinkronisasi pagination label)
       if (typeof setTotalCount === "function") {
         setTotalCount((prev) => Math.max(0, prev - 1));
       }
     } catch (err) {
-      // 6. Penanganan Error (Misal: Role sedang digunakan atau masalah koneksi)
-      console.error("Error deleting role:", err);
       const errorMsg =
         err.response?.data?.message ||
         "Terjadi kesalahan server saat menghapus role";

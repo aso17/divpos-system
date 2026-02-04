@@ -97,12 +97,10 @@ export default function UserForm({
     if (open) {
       RoleService.GetRolesByTenant().then((res) => {
         setRoles(res.data?.data || []);
-        // console.log("Loaded roles for UserForm:", res.data?.data || []);
       });
     }
   }, [open]);
 
-  // Cleanup Preview Memory
   useEffect(() => {
     return () => {
       if (avatarPreview && avatarPreview.startsWith("blob:")) {
@@ -122,7 +120,11 @@ export default function UserForm({
         username: initialData.username || "",
         phone: initialData.phone || "",
         password: "",
-        role_id: initialData.role.role_id || "",
+        role_id: (
+          initialData.role_id ||
+          initialData.role?.role_id ||
+          ""
+        ).toString(),
         is_active: initialData.is_active == 1 || initialData.is_active === true,
       });
       setAvatarPreview(
@@ -144,7 +146,7 @@ export default function UserForm({
     setAvatarFile(null);
     setErrors({});
   }, [open, initialData, setValues, setErrors]);
-  // console.log(initialData);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;

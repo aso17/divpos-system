@@ -22,7 +22,7 @@ export default function LoadingDots({
         ))}
       </div>
       <p className="mt-4 text-[7px] font-bold text-slate-400 uppercase tracking-[0.3em] animate-pulse">
-        {fullscreen ? "System Loading" : "Fetching Data"}
+        {fullscreen ? "System Loading" : "Processing..."}
       </p>
     </div>
   );

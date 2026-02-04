@@ -1,6 +1,7 @@
 import api from "./api";
 import { GetWithExpiry } from "../utils/SetWithExpiry";
 import { encrypt } from "../utils/Encryptions";
+
 const getTenantId = () => {
   const user = GetWithExpiry("user");
   return user?.tenant_id || null;
@@ -9,20 +10,21 @@ const getTenantId = () => {
 const UsersService = {
   getUsers: (params = {}) => {
     const tenantId = getTenantId();
+    const encriptedTenantId = encrypt(tenantId);
     return api.get("/user", {
       params: {
-        tenant_id: encrypt(tenantId),
-        ...params, // page, per_page, keyword, dll
+        tenant_id: encriptedTenantId,
+        ...params,
       },
     });
   },
 
   createUser: (payload) => {
     const tenantId = getTenantId();
-
+    const encriptedTenantId = encrypt(tenantId);
     if (payload instanceof FormData) {
-      if (tenantId && !payload.has("tenant_id")) {
-        payload.append("tenant_id", tenantId);
+      if (encriptedTenantId && !payload.has("tenant_id")) {
+        payload.append("tenant_id", encriptedTenantId);
       }
 
       return api.post("/user", payload, {
@@ -40,7 +42,7 @@ const UsersService = {
       }
     });
 
-    if (tenantId) formData.append("tenant_id", tenantId);
+    if (encriptedTenantId) formData.append("tenant_id", encriptedTenantId);
 
     return api.post("/user", formData, {
       headers: {
@@ -51,7 +53,9 @@ const UsersService = {
 
   updateUser: (id, payload) => {
     let finalData;
-
+    const tenantId = getTenantId();
+    const encriptedTenantId = encrypt(tenantId);
+    const encryptedUserId = encrypt(id);
     if (payload instanceof FormData) {
       finalData = payload;
 
@@ -79,12 +83,12 @@ const UsersService = {
     }
 
     // Tambahkan tenant_id jika belum ada
-    const tenantId = getTenantId(); // Pastikan fungsi ini tersedia
-    if (tenantId && !finalData.has("tenant_id")) {
-      finalData.append("tenant_id", tenantId);
+    // Pastikan fungsi ini tersedia
+    if (encriptedTenantId && !finalData.has("tenant_id")) {
+      finalData.append("tenant_id", encriptedTenantId);
     }
 
-    return api.post(`/user/${id}`, finalData, {
+    return api.post(`/user/${encryptedUserId}`, finalData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -93,11 +97,15 @@ const UsersService = {
 
   deleteUser: (id) => {
     const tenantId = getTenantId();
-    return api.delete(`/user/${id}`, {
-      params: { tenant_id: tenantId },
+    const encryptedUserId = encrypt(id);
+    const encryptedTenantId = encrypt(tenantId);
+
+    return api.delete(`/user/${encryptedUserId}`, {
+      params: {
+        tenant_id: encryptedTenantId,
+      },
     });
   },
-
   getUserById: (id) => {
     const tenantId = getTenantId();
     return api.get(`/user/${id}`, {
