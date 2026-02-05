@@ -4,9 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Ms_user;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use App\Http\Resources\UserResource;
 use App\Services\UserService; 
 use App\Helpers\CryptoHelper; 

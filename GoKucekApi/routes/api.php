@@ -8,6 +8,7 @@ use App\Http\Controllers\MenuController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\RolePermissionController;
+use App\Http\Controllers\OutletController;
 
 /*
 |--------------------------------------------------------------------------
@@ -40,6 +41,13 @@ Route::middleware('api')->group(function () {
         Route::post('/user', [UserController::class, 'store']);     
         Route::put('/user/{id}', [UserController::class, 'update']); 
         Route::delete('/user/{id}', [UserController::class, 'destroy']); 
+
+         // 👇 Master MODULE OUTLET
+        Route::get('/outlet/generatecode', [OutletController::class, 'generatecode']); 
+        Route::get('/outlet', [OutletController::class, 'index']); 
+        Route::post('/outlet', [OutletController::class, 'store']); 
+        Route::put('/outlet/{id}', [OutletController::class, 'update']); 
+        Route::delete('/outlet/{id}', [OutletController::class, 'destroy']); 
 
          // 👇 ROLE MODULE
         Route::get('/GetRolesByTenant', [RoleController::class, 'GetRolesByTenantId']); 

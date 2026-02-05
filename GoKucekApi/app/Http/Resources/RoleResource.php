@@ -1,8 +1,6 @@
 <?php
 
 namespace App\Http\Resources;
-
-use App\Helpers\CryptoHelper;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class RoleResource extends JsonResource
