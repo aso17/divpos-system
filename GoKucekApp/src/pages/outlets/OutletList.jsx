@@ -5,35 +5,38 @@ import {
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import { Pencil, Trash2, PlusSquare, Shield, X, Search } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  PlusSquare,
+  Store,
+  X,
+  Search,
+  MapPin,
+  Phone,
+} from "lucide-react";
 
-// Import Components & Services
 import LoadingDots from "../../components/common/LoadingDots";
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
-import RolesService from "../../services/RoleService";
-import { encrypt } from "../../utils/Encryptions";
-import RoleForm from "./RoleForm";
+import OutletService from "../../services/OutletService";
+import OutletForm from "./OutletForm";
 
-export default function RolesList() {
+export default function OutletList() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-
   const [openModal, setOpenModal] = useState(false);
-  const [selectedRole, setSelectedRole] = useState(null);
-  const navigate = useNavigate();
+  const [selectedOutlet, setSelectedOutlet] = useState(null);
 
-  // 1. Fetch Data Logic
-  const fetchRoles = useCallback(
+  const fetchOutlets = useCallback(
     async (isMounted = true) => {
       setLoading(true);
       try {
-        const res = await RolesService.getRoles({
+        const res = await OutletService.getOutlets({
           page: pagination.pageIndex + 1,
           per_page: pagination.pageSize,
           keyword: activeSearch,
@@ -44,7 +47,7 @@ export default function RolesList() {
           setTotalCount(Number(res.data?.meta?.total || 0));
         }
       } catch (error) {
-        console.error("Error fetching roles:", error);
+        console.error("Error fetching outlets:", error);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -54,11 +57,11 @@ export default function RolesList() {
 
   useEffect(() => {
     let isMounted = true;
-    fetchRoles(isMounted);
+    fetchOutlets(isMounted);
     return () => {
       isMounted = false;
     };
-  }, [fetchRoles]);
+  }, [fetchOutlets]);
 
   // 2. Search Handlers
   const handleSearch = (e) => {
@@ -73,9 +76,9 @@ export default function RolesList() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
-  const handleDelete = async (role) => {
+  const handleDelete = async (outlet) => {
     const setuju = await showConfirm(
-      `Apakah anda yakin ingin menghapus role ${role.role_name}?`,
+      `Apakah anda yakin ingin menghapus outlet ${outlet.name}?`,
       "Konfirmasi Hapus",
       "warning",
       { confirmText: "Ya, Hapus", cancelText: "Batal" },
@@ -84,23 +87,23 @@ export default function RolesList() {
     if (!setuju) return;
 
     try {
-      const res = await RolesService.deleteRole(role.id);
+      const res = await OutletService.deleteOutlet(outlet.id);
       const successMsg =
-        res.data?.message || "Data role telah berhasil dihapus.";
+        res.data?.message || "Data outlet telah berhasil dihapus.";
 
       await showConfirm(successMsg, "Hapus Berhasil", "success");
 
-      setData((prevData) => prevData.filter((item) => item.id !== role.id));
+      setData((prevData) => prevData.filter((item) => item.id !== outlet.id));
       setTotalCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
       const errorMsg =
         err.response?.data?.message ||
-        "Terjadi kesalahan server saat menghapus role";
+        "Terjadi kesalahan server saat menghapus outlet";
       showConfirm(errorMsg, "Gagal Hapus", "error");
     }
   };
 
-  // 4. Table Columns Definition
+  // 3. Table Columns Definition
   const columns = useMemo(
     () => [
       {
@@ -116,26 +119,31 @@ export default function RolesList() {
         },
       },
       {
-        accessorKey: "role_name",
-        header: "NAMA ROLE",
+        accessorKey: "name",
+        header: "OUTLET / CABANG",
         cell: ({ row }) => (
           <div className="flex flex-col">
-            <span className="text-gray-800 font-bold text-xxs uppercase">
-              {row.original.role_name}
+            <span className="text-gray-800 font-bold text-xxs uppercase flex items-center gap-1">
+              {row.original.name}
             </span>
             <span className="text-indigo-500 font-mono text-[9px]">
-              {row.original.code}
+              KODE: {row.original.code}
             </span>
           </div>
         ),
       },
       {
-        accessorKey: "description",
-        header: "DESKRIPSI",
-        cell: ({ getValue }) => (
-          <span className="text-gray-500 text-xxs italic truncate max-w-[200px] inline-block">
-            {getValue() || "Tidak ada deskripsi"}
-          </span>
+        accessorKey: "address",
+        header: "ALAMAT & KONTAK",
+        cell: ({ row }) => (
+          <div className="flex flex-col gap-0.5 text-xxs">
+            <span className="text-gray-500 italic truncate max-w-[250px] flex items-center gap-1">
+              <MapPin size={10} /> {row.original.address || "-"}
+            </span>
+            <span className="text-slate-400 flex items-center gap-1 font-medium">
+              <Phone size={10} /> {row.original.phone || "-"}
+            </span>
+          </div>
         ),
       },
       {
@@ -144,20 +152,18 @@ export default function RolesList() {
         cell: ({ getValue }) => {
           const isActive = getValue();
           return (
-            <div className="flex items-center">
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase ${
+                isActive
+                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                  : "bg-rose-50 text-rose-600 border border-rose-100"
+              }`}
+            >
               <span
-                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[8px] font-bold uppercase tracking-wider ${
-                  isActive
-                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                    : "bg-rose-50 text-rose-600 border border-rose-100"
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
-                />
-                {isActive ? "Active" : "Inactive"}
-              </span>
-            </div>
+                className={`w-1 h-1 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
+              />
+              {isActive ? "Operasional" : "Tutup"}
+            </span>
           );
         },
       },
@@ -167,32 +173,17 @@ export default function RolesList() {
         cell: ({ row }) => (
           <div className="flex gap-1 justify-center">
             <button
-              title="Setting Module Permissions"
               onClick={() => {
-                const hashedId = encrypt(row.original.id);
-                navigate(`/rolespermission/${hashedId}`, {
-                  state: {
-                    role_name: row.original.role_name,
-                    code: row.original.code,
-                  },
-                });
-              }}
-              className="p-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-600 hover:text-white transition-all"
-            >
-              <Shield size={12} />
-            </button>
-            <button
-              onClick={() => {
-                setSelectedRole(row.original);
+                setSelectedOutlet(row.original);
                 setOpenModal(true);
               }}
-              className="p-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-600 hover:text-white transition-all"
+              className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-600 hover:text-white transition-all"
             >
               <Pencil size={12} />
             </button>
             <button
               onClick={() => handleDelete(row.original)}
-              className="p-1 bg-red-50 text-red-600 rounded hover:bg-red-600 hover:text-white transition-all"
+              className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-600 hover:text-white transition-all"
             >
               <Trash2 size={12} />
             </button>
@@ -200,10 +191,9 @@ export default function RolesList() {
         ),
       },
     ],
-    [navigate], // fetchRoles dihapus dari dep agar tidak re-render kolom terus menerus
+    [],
   );
 
-  // 5. TanStack Table Instance
   const table = useReactTable({
     data,
     columns,
@@ -218,33 +208,31 @@ export default function RolesList() {
 
   return (
     <div className="p-4 space-y-4 bg-slate-50 min-h-screen text-xxs">
-      <AppHead title="Role Management" />
+      <AppHead title="Outlet Management" />
 
-      {/* Breadcrumb / Title */}
       <div className="flex items-center gap-2 text-slate-700 border-b border-slate-200 pb-2">
-        <Shield size={18} className="text-slate-600" />
+        <Store size={18} className="text-slate-600" />
         <p className="text-xs font-bold uppercase tracking-tight">
-          Role & Permission
+          Master Outlet / Cabang
         </p>
       </div>
 
-      {/* Toolbar */}
       <div className="flex flex-wrap gap-2 items-center justify-between">
         <button
           onClick={() => {
-            setSelectedRole(null);
+            setSelectedOutlet(null);
             setOpenModal(true);
           }}
-          className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded text-xxs font-bold bg-gokucekBlue uppercase hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded text-xxs font-bold bg-gokucekBlue uppercase  transition-colors"
         >
-          <PlusSquare size={12} /> Tambah
+          <PlusSquare size={12} /> Tambah Cabang
         </button>
 
         <form onSubmit={handleSearch} className="flex items-center">
           <div className="relative">
             <input
-              className="border border-slate-300 rounded-l px-3 py-1.5 w-60 text-xxs focus:ring-1 focus:ring-blue-400 outline-none bg-white pr-8"
-              placeholder="Search role name / code..."
+              className="border border-slate-300 rounded-l px-3 py-1.5 w-64 text-xxs outline-none bg-white pr-8 focus:ring-1 focus:ring-blue-400"
+              placeholder="Cari nama atau kode outlet..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -252,7 +240,7 @@ export default function RolesList() {
               <button
                 type="button"
                 onClick={handleReset}
-                className="absolute right-2 top-1.5 text-slate-400 hover:text-rose-500"
+                className="absolute right-2 top-1.5 text-slate-400"
               >
                 <X size={14} />
               </button>
@@ -260,17 +248,15 @@ export default function RolesList() {
           </div>
           <button
             type="submit"
-            className="bg-emerald-700 text-white px-3 py-1.5 rounded-r hover:bg-emerald-800 bg-gokucekBlue transition-colors text-xxs font-bold flex items-center gap-1"
+            className="bg-emerald-700 text-white px-3 py-1.5 rounded-r  bg-gokucekBlue transition-colors font-bold flex items-center gap-1"
           >
             <Search size={12} /> CARI
           </button>
         </form>
       </div>
 
-      {/* Main Table Container */}
-      <div className="bg-white border-t-2 border-indigo-500 rounded-sm shadow-sm overflow-hidden relative min-h-[400px] flex flex-col">
+      <div className="bg-white border-t-2 border-blue-500 rounded-sm shadow-sm overflow-hidden relative min-h-[400px] flex flex-col">
         <div className="overflow-x-auto grow relative">
-          {/* Loading Overlay */}
           {loading && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/50 backdrop-blur-[1px]">
               <LoadingDots overlay />
@@ -278,13 +264,13 @@ export default function RolesList() {
           )}
 
           <table className="w-full">
-            <thead className="bg-white border-b border-slate-100 text-slate-500 uppercase sticky top-0 z-10">
+            <thead className="bg-white border-b border-slate-100 text-slate-500 uppercase sticky top-0 z-10 text-[10px]">
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id}>
                   {hg.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-3 py-3 font-bold text-left border-r border-slate-50 last:border-0 text-[10px] tracking-wider"
+                      className="px-3 py-3 font-bold text-left border-r border-slate-50 last:border-0"
                     >
                       {flexRender(
                         header.column.columnDef.header,
@@ -300,7 +286,7 @@ export default function RolesList() {
                 ? table.getRowModel().rows.map((row) => (
                     <tr
                       key={row.id}
-                      className="hover:bg-blue-50 transition-colors cursor-default group"
+                      className="hover:bg-blue-50/60 transition-colors cursor-default"
                     >
                       {row.getVisibleCells().map((cell) => (
                         <td
@@ -321,38 +307,30 @@ export default function RolesList() {
                         colSpan={columns.length}
                         className="p-10 text-center text-slate-400 italic"
                       >
-                        Data tidak ditemukan
+                        Belum ada data outlet
                       </td>
                     </tr>
                   )}
-              {/* Spacer saat loading awal agar table tidak kolaps */}
-              {loading && data.length === 0 && (
-                <tr>
-                  <td colSpan={columns.length} className="py-40"></td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination Sinkron */}
         <div className="border-t border-slate-100 bg-white">
           <TablePagination table={table} totalEntries={totalCount} />
         </div>
       </div>
 
-      {/* Modal Form Role */}
-      <RoleForm
+      <OutletForm
         open={openModal}
-        initialData={selectedRole}
         onClose={() => setOpenModal(false)}
-        onSuccess={(newRole) => {
-          if (selectedRole) {
+        initialData={selectedOutlet}
+        onSuccess={(newOutlet) => {
+          if (selectedOutlet) {
             setData((prev) =>
-              prev.map((r) => (r.id === newRole.id ? newRole : r)),
+              prev.map((o) => (o.id === newOutlet.id ? newOutlet : o)),
             );
           } else {
-            setData((prev) => [newRole, ...prev]);
+            setData((prev) => [newOutlet, ...prev]);
             setTotalCount((prev) => prev + 1);
           }
           setOpenModal(false);

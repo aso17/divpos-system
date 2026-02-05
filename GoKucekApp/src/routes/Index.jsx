@@ -3,6 +3,7 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import Dashboard from "../pages/dashboard/Dashboard";
 import UsersPage from "../pages/users/UsersList";
 import RolePage from "../pages/Roles/RolesList";
+import OutletPage from "../pages/outlets/OutletList";
 import RolePermissionsPage from "../pages/RolePermission/RolePermissionList";
 import LoginPage from "../pages/login/Login";
 import ProtectedRoute from "./ProtectedRoute";
@@ -27,6 +28,16 @@ export default function AppRoutes() {
               element={
                 <RequirePermission permission="view">
                   <Dashboard />
+                </RequirePermission>
+              }
+            />
+
+            {/* Master Data */}
+            <Route
+              path="/outlet"
+              element={
+                <RequirePermission permission="view">
+                  <OutletPage />
                 </RequirePermission>
               }
             />

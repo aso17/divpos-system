@@ -26,17 +26,12 @@ export default function UsersList() {
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-  // searchTerm untuk menampung ketikan user
   const [searchTerm, setSearchTerm] = useState("");
-  // activeSearch adalah keyword yang benar-benar dikirim ke API
   const [activeSearch, setActiveSearch] = useState("");
 
   const [openModal, setOpenModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [openDetail, setOpenDetail] = useState(false);
-  // ========================
-  // Handlers
-  // ========================
 
   const fetchUsers = useCallback(
     async (isMounted = true) => {
@@ -61,14 +56,12 @@ export default function UsersList() {
     [pagination.pageIndex, pagination.pageSize, activeSearch],
   );
 
-  // Jalankan pencarian
   const handleSearch = (e) => {
-    e.preventDefault(); // Mencegah reload halaman
+    e.preventDefault();
     setActiveSearch(searchTerm);
-    setPagination((p) => ({ ...p, pageIndex: 0 })); // Reset ke halaman pertama
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
-  // Reset pencarian
   const handleResetSearch = () => {
     setSearchTerm("");
     setActiveSearch("");
@@ -208,16 +201,6 @@ export default function UsersList() {
     [],
   );
 
-  const table = useReactTable({
-    data,
-    columns,
-    state: { pagination },
-    onPaginationChange: setPagination,
-    manualPagination: true,
-    rowCount: totalCount,
-    getCoreRowModel: getCoreRowModel(),
-  });
-
   useEffect(() => {
     let isMounted = true;
     fetchUsers(isMounted);
@@ -226,7 +209,21 @@ export default function UsersList() {
     };
   }, [fetchUsers]);
 
-  if (loading) return <LoadingDots fullscreen={false} />;
+  const table = useReactTable({
+    data,
+    columns,
+    state: {
+      pagination,
+    },
+
+    onPaginationChange: setPagination,
+    manualPagination: true,
+    autoResetPageIndex: false,
+    pageCount: Math.ceil(totalCount / pagination.pageSize),
+    rowCount: totalCount,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
   return (
     <div className="p-4 space-y-4 bg-slate-50 min-h-screen text-xxs">
       <AppHead title="User Management" />
@@ -242,12 +239,11 @@ export default function UsersList() {
             setSelectedUser(null);
             setOpenModal(true);
           }}
-          className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded text-xxs bg-gokucekBlue font-bold uppercase"
+          className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded bg-gokucekBlue text-xxs font-bold uppercase"
         >
           <PlusSquare size={12} /> Tambah
         </button>
 
-        {/* INPUT PENCARIAN DENGAN TOMBOL CLICK */}
         <form onSubmit={handleSearch} className="flex items-center">
           <div className="relative">
             <input
@@ -268,20 +264,22 @@ export default function UsersList() {
           </div>
           <button
             type="submit"
-            className="bg-emerald-700 text-white px-3 py-1.5 rounded-r hover:bg-emerald-800 transition-colors text-xxs bg-gokucekBlue font-bold flex items-center gap-1"
+            className="bg-emerald-700 text-white px-3 py-1.5 rounded-r hover:bg-emerald-800 bg-gokucekBlue transition-colors text-xxs font-bold flex items-center gap-1"
           >
             <Search size={12} strokeWidth={3} />
             CARI
           </button>
         </form>
       </div>
+
       <div className="bg-white border-t-2 border-blue-500 rounded-sm shadow-sm overflow-hidden relative min-h-[420px] flex flex-col">
         <div className="overflow-x-auto grow relative">
           {loading && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-sm pt-[40px]">
-              <LoadingDots fullscreen={false} />
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/50 backdrop-blur-[1px]">
+              <LoadingDots overlay />
             </div>
           )}
+
           <table className="w-full">
             <thead className="bg-white border-b border-slate-100 text-slate-500 uppercase sticky top-0 z-10">
               {table.getHeaderGroups().map((hg) => (
@@ -306,7 +304,7 @@ export default function UsersList() {
                 ? table.getRowModel().rows.map((row) => (
                     <tr
                       key={row.id}
-                      className="hover:bg-slate-50 transition-colors"
+                      className="hover:bg-blue-50 transition-colors cursor-default group"
                     >
                       {row.getVisibleCells().map((cell) => (
                         <td
@@ -332,7 +330,8 @@ export default function UsersList() {
                     </tr>
                   )}
 
-              {loading && table.getRowModel().rows.length === 0 && (
+              {/* PERBAIKAN: Menjaga tinggi tabel saat loading awal */}
+              {loading && data.length === 0 && (
                 <tr>
                   <td colSpan={columns.length} className="py-40"></td>
                 </tr>
@@ -342,9 +341,10 @@ export default function UsersList() {
         </div>
 
         <div className="border-t border-slate-100 bg-white">
-          <TablePagination table={table} />
+          <TablePagination table={table} totalEntries={totalCount} />
         </div>
       </div>
+
       <UserForm
         open={openModal}
         initialData={selectedUser}
