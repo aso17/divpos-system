@@ -9,6 +9,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\OutletController;
+use App\Http\Controllers\MasterServiceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -48,6 +49,13 @@ Route::middleware('api')->group(function () {
         Route::post('/outlet', [OutletController::class, 'store']); 
         Route::put('/outlet/{id}', [OutletController::class, 'update']); 
         Route::delete('/outlet/{id}', [OutletController::class, 'destroy']); 
+
+        // 👇 Master MODULE SERVICE
+       
+        Route::get('/masterservice', [MasterServiceController::class, 'index']); 
+        Route::post('/masterservice', [MasterServiceController::class, 'store']); 
+        Route::put('/masterservice/{id}', [MasterServiceController::class, 'update']); 
+        Route::delete('/masterservice/{id}', [MasterServiceController::class, 'destroy']); 
 
          // 👇 ROLE MODULE
         Route::get('/GetRolesByTenant', [RoleController::class, 'GetRolesByTenantId']); 

@@ -108,7 +108,7 @@ class OutletController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        // Dekripsi ID dari URL jika frontend mengirimnya terenkripsi
+        
         $decryptedId = CryptoHelper::decrypt($id) ?? $id;
         $decryptedTenantId = CryptoHelper::decrypt($request->tenant_id);
 
