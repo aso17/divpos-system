@@ -4,6 +4,7 @@ import Dashboard from "../pages/dashboard/Dashboard";
 import UsersPage from "../pages/users/UsersList";
 import RolePage from "../pages/Roles/RolesList";
 import OutletPage from "../pages/outlets/OutletList";
+import LayananPage from "../pages/masterservice/MasterServiceList";
 import RolePermissionsPage from "../pages/RolePermission/RolePermissionList";
 import LoginPage from "../pages/login/Login";
 import ProtectedRoute from "./ProtectedRoute";
@@ -42,7 +43,17 @@ export default function AppRoutes() {
               }
             />
 
-            {/* Users Management */}
+            {/* Master Data */}
+            <Route
+              path="/layanan"
+              element={
+                <RequirePermission permission="view">
+                  <LayananPage />
+                </RequirePermission>
+              }
+            />
+
+            {/* User & Role Management */}
             <Route
               path="/userlist"
               element={

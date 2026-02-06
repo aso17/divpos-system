@@ -8,20 +8,21 @@ import {
   Pencil,
   Trash2,
   PlusSquare,
-  Store,
+  Layers,
   X,
   Search,
-  MapPin,
-  Phone,
+  Info,
+  Calendar,
+  User,
 } from "lucide-react";
 
 import LoadingDots from "../../components/common/LoadingDots";
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
-import OutletService from "../../services/OutletService";
-import OutletForm from "./OutletForm";
+import MasterService from "../../services/MasterService";
+import ServiceForm from "./MasterServiceForm";
 
-export default function OutletList() {
+export default function MasterServiceList() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -29,13 +30,13 @@ export default function OutletList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [openModal, setOpenModal] = useState(false);
-  const [selectedOutlet, setSelectedOutlet] = useState(null);
+  const [selectedService, setSelectedService] = useState(null);
 
-  const fetchOutlets = useCallback(
+  const fetchServices = useCallback(
     async (isMounted = true) => {
       setLoading(true);
       try {
-        const res = await OutletService.getOutlets({
+        const res = await MasterService.getMasterServices({
           page: pagination.pageIndex + 1,
           per_page: pagination.pageSize,
           keyword: activeSearch,
@@ -47,9 +48,8 @@ export default function OutletList() {
         }
       } catch (error) {
         const errorMsg =
-          error.response?.data?.message ||
-          "Terjadi kesalahan saat mengambil data outlet";
-        showConfirm(errorMsg, "Gagal Mengambil Data", "error");
+          error.response?.data?.message || "Gagal mengambil data layanan";
+        console.error(errorMsg);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -59,13 +59,12 @@ export default function OutletList() {
 
   useEffect(() => {
     let isMounted = true;
-    fetchOutlets(isMounted);
+    fetchServices(isMounted);
     return () => {
       isMounted = false;
     };
-  }, [fetchOutlets]);
+  }, [fetchServices]);
 
-  // 2. Search Handlers
   const handleSearch = (e) => {
     e.preventDefault();
     setActiveSearch(searchTerm);
@@ -78,34 +77,31 @@ export default function OutletList() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
-  const handleDelete = async (outlet) => {
+  const handleDelete = async (service) => {
     const setuju = await showConfirm(
-      `Apakah anda yakin ingin menghapus outlet ${outlet.name}?`,
+      `Hapus layanan ${service.name}?`,
       "Konfirmasi Hapus",
       "warning",
-      { confirmText: "Ya, Hapus", cancelText: "Batal" },
     );
 
     if (!setuju) return;
 
     try {
-      const res = await OutletService.deleteOutlet(outlet.id);
+      const res = await MasterService.deleteMasterService(service.id);
       const successMsg =
-        res.data?.message || "Data outlet telah berhasil dihapus.";
+        res.data?.message || "Data layanan telah berhasil dihapus.";
 
       await showConfirm(successMsg, "Hapus Berhasil", "success");
-
-      setData((prevData) => prevData.filter((item) => item.id !== outlet.id));
+      setData((prev) => prev.filter((item) => item.id !== service.id));
       setTotalCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
       const errorMsg =
         err.response?.data?.message ||
-        "Terjadi kesalahan server saat menghapus outlet";
+        "Terjadi kesalahan server saat menghapus layanan";
       showConfirm(errorMsg, "Gagal Hapus", "error");
     }
   };
 
-  // 3. Table Columns Definition
   const columns = useMemo(
     () => [
       {
@@ -122,31 +118,43 @@ export default function OutletList() {
       },
       {
         accessorKey: "name",
-        header: "OUTLET / CABANG",
+        header: "NAMA LAYANAN",
         cell: ({ row }) => (
-          <div className="flex flex-col">
-            <span className="text-gray-800 font-bold text-xxs uppercase flex items-center gap-1">
+          <div className="flex flex-col max-w-[200px]">
+            <span className="text-gray-800 font-bold text-xxs uppercase truncate">
               {row.original.name}
             </span>
-            <span className="text-indigo-500 font-mono text-[9px]">
-              KODE: {row.original.code}
+            <span className="text-gray-500 italic text-[10px] leading-tight mt-0.5 flex items-start gap-1">
+              <Info size={10} className="mt-0.5 shrink-0" />
+              <span className="line-clamp-1">
+                {row.original.description || "Tanpa deskripsi"}
+              </span>
             </span>
           </div>
         ),
       },
       {
-        accessorKey: "address",
-        header: "ALAMAT & KONTAK",
-        cell: ({ row }) => (
-          <div className="flex flex-col gap-0.5 text-xxs">
-            <span className="text-gray-500 italic truncate max-w-[250px] flex items-center gap-1">
-              <MapPin size={10} /> {row.original.address || "-"}
-            </span>
-            <span className="text-slate-400 flex items-center gap-1 font-medium">
-              <Phone size={10} /> {row.original.phone || "-"}
-            </span>
-          </div>
-        ),
+        accessorKey: "created_at",
+        header: "DIBUAT PADA",
+        cell: ({ getValue, row }) => {
+          const rawCreatedBy = row.original.created_by;
+          const creatorName = rawCreatedBy?.includes("-")
+            ? rawCreatedBy.split("-")[1]
+            : rawCreatedBy || "System";
+
+          return (
+            <div className="flex flex-col text-[10px] leading-tight text-slate-600">
+              <span className="flex items-center gap-1 font-medium">
+                <Calendar size={10} className="text-slate-400" />
+                {getValue()?.split(" ")[0] || "-"}
+              </span>
+              <span className="flex items-center gap-1 text-slate-400 mt-0.5 uppercase font-semibold text-[9px]">
+                <User size={10} />
+                {creatorName}
+              </span>
+            </div>
+          );
+        },
       },
       {
         accessorKey: "is_active",
@@ -164,7 +172,7 @@ export default function OutletList() {
               <span
                 className={`w-1 h-1 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
               />
-              {isActive ? "Operasional" : "Tutup"}
+              {isActive ? "Aktif" : "Nonaktif"}
             </span>
           );
         },
@@ -176,16 +184,16 @@ export default function OutletList() {
           <div className="flex gap-1 justify-center">
             <button
               onClick={() => {
-                setSelectedOutlet(row.original);
+                setSelectedService(row.original);
                 setOpenModal(true);
               }}
-              className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-600 hover:text-white transition-all"
+              className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-600 hover:text-white transition-all shadow-sm"
             >
               <Pencil size={12} />
             </button>
             <button
               onClick={() => handleDelete(row.original)}
-              className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-600 hover:text-white transition-all"
+              className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-600 hover:text-white transition-all shadow-sm"
             >
               <Trash2 size={12} />
             </button>
@@ -193,7 +201,7 @@ export default function OutletList() {
         ),
       },
     ],
-    [],
+    [pagination.pageIndex, pagination.pageSize],
   );
 
   const table = useReactTable({
@@ -202,39 +210,45 @@ export default function OutletList() {
     state: { pagination },
     onPaginationChange: setPagination,
     manualPagination: true,
-    autoResetPageIndex: false,
     pageCount: Math.ceil(totalCount / pagination.pageSize),
-    rowCount: totalCount,
     getCoreRowModel: getCoreRowModel(),
   });
 
   return (
-    <div className="p-4 space-y-4 bg-slate-50 min-h-screen text-xxs">
-      <AppHead title="Outlet Management" />
+    <div className="p-4 space-y-4 bg-slate-50 min-h-screen text-xxs font-sans">
+      <AppHead title="Service Management" />
 
-      <div className="flex items-center gap-2 text-slate-700 border-b border-slate-200 pb-2">
-        <Store size={18} className="text-slate-600" />
-        <p className="text-xs font-bold uppercase tracking-tight">
-          Master Outlet / Cabang
-        </p>
+      {/* Header Section */}
+      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div className="flex items-center gap-2 text-slate-700">
+          <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-100">
+            <Layers size={18} className="text-blue-600" />
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-tight">
+              Master Layanan Jasa
+            </p>
+          </div>
+        </div>
       </div>
 
+      {/* Toolbar Section */}
       <div className="flex flex-wrap gap-2 items-center justify-between">
         <button
           onClick={() => {
-            setSelectedOutlet(null);
+            setSelectedService(null);
             setOpenModal(true);
           }}
-          className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded text-xxs font-bold bg-gokucekBlue uppercase  transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded font-bold uppercase tracking-wider bg-gokucekBlue transition-colors shadow-sm"
         >
-          <PlusSquare size={12} /> Tambah Cabang
+          <PlusSquare size={14} /> Tambah Layanan
         </button>
 
-        <form onSubmit={handleSearch} className="flex items-center">
-          <div className="relative">
+        <form onSubmit={handleSearch} className="flex items-center shadow-sm">
+          <div className="relative group">
             <input
               className="border border-slate-300 rounded-l px-3 py-1.5 w-64 text-xxs outline-none bg-white pr-8 focus:ring-1 focus:ring-blue-400"
-              placeholder="Cari nama atau kode outlet..."
+              placeholder="Cari nama layanan..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -242,7 +256,7 @@ export default function OutletList() {
               <button
                 type="button"
                 onClick={handleReset}
-                className="absolute right-2 top-1.5 text-slate-400"
+                className="absolute right-2 top-2 text-slate-400 hover:text-rose-500"
               >
                 <X size={14} />
               </button>
@@ -252,27 +266,28 @@ export default function OutletList() {
             type="submit"
             className="bg-emerald-700 text-white px-3 py-1.5 rounded-r  bg-gokucekBlue transition-colors font-bold flex items-center gap-1"
           >
-            <Search size={12} /> CARI
+            <Search size={14} /> CARI
           </button>
         </form>
       </div>
 
-      <div className="bg-white border-t-2 border-blue-500 rounded-sm shadow-sm overflow-hidden relative min-h-[400px] flex flex-col">
+      {/* Table Section */}
+      <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden flex flex-col min-h-[450px]">
         <div className="overflow-x-auto grow relative">
           {loading && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/50 backdrop-blur-[1px]">
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/60 backdrop-blur-[2px]">
               <LoadingDots overlay />
             </div>
           )}
 
-          <table className="w-full">
-            <thead className="bg-white border-b border-slate-100 text-slate-500 uppercase sticky top-0 z-10 text-[10px]">
+          <table className="w-full border-collapse">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px]">
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id}>
                   {hg.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-3 py-3 font-bold text-left border-r border-slate-50 last:border-0"
+                      className="px-4 py-3 font-bold text-left border-r border-slate-100 last:border-0"
                     >
                       {flexRender(
                         header.column.columnDef.header,
@@ -283,17 +298,17 @@ export default function OutletList() {
                 </tr>
               ))}
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100">
               {table.getRowModel().rows.length > 0
                 ? table.getRowModel().rows.map((row) => (
                     <tr
                       key={row.id}
-                      className="hover:bg-blue-50/60 transition-colors cursor-default"
+                      className="hover:bg-blue-50/40 transition-colors group"
                     >
                       {row.getVisibleCells().map((cell) => (
                         <td
                           key={cell.id}
-                          className="px-3 py-2 align-middle border-r border-slate-50 last:border-0"
+                          className="px-4 py-2.5 align-middle border-r border-slate-50 last:border-0"
                         >
                           {flexRender(
                             cell.column.columnDef.cell,
@@ -305,11 +320,13 @@ export default function OutletList() {
                   ))
                 : !loading && (
                     <tr>
-                      <td
-                        colSpan={columns.length}
-                        className="p-10 text-center text-slate-400 italic"
-                      >
-                        Belum ada data outlet
+                      <td colSpan={columns.length} className="p-20 text-center">
+                        <div className="flex flex-col items-center gap-2 opacity-40">
+                          <Layers size={40} />
+                          <p className="text-xs font-medium italic">
+                            Data layanan tidak ditemukan.
+                          </p>
+                        </div>
                       </td>
                     </tr>
                   )}
@@ -317,22 +334,23 @@ export default function OutletList() {
           </table>
         </div>
 
-        <div className="border-t border-slate-100 bg-white">
+        <div className="border-t border-slate-100 bg-slate-50/50">
           <TablePagination table={table} totalEntries={totalCount} />
         </div>
       </div>
 
-      <OutletForm
+      {/* Modal Form */}
+      <ServiceForm
         open={openModal}
         onClose={() => setOpenModal(false)}
-        initialData={selectedOutlet}
-        onSuccess={(newOutlet) => {
-          if (selectedOutlet) {
+        initialData={selectedService}
+        onSuccess={(newService) => {
+          if (selectedService) {
             setData((prev) =>
-              prev.map((o) => (o.id === newOutlet.id ? newOutlet : o)),
+              prev.map((o) => (o.id === newService.id ? newService : o)),
             );
           } else {
-            setData((prev) => [newOutlet, ...prev]);
+            setData((prev) => [newService, ...prev]);
             setTotalCount((prev) => prev + 1);
           }
           setOpenModal(false);
