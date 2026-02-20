@@ -65,7 +65,6 @@ export default function OutletList() {
     };
   }, [fetchOutlets]);
 
-  // 2. Search Handlers
   const handleSearch = (e) => {
     e.preventDefault();
     setActiveSearch(searchTerm);
@@ -105,7 +104,6 @@ export default function OutletList() {
     }
   };
 
-  // 3. Table Columns Definition
   const columns = useMemo(
     () => [
       {
@@ -114,7 +112,7 @@ export default function OutletList() {
         cell: ({ row, table }) => {
           const { pageIndex, pageSize } = table.options.state.pagination;
           return (
-            <span className="text-slate-600 text-xxs font-semibold">
+            <span className="text-slate-400 font-medium text-[10px]">
               {pageIndex * pageSize + row.index + 1}
             </span>
           );
@@ -124,12 +122,12 @@ export default function OutletList() {
         accessorKey: "name",
         header: "OUTLET / CABANG",
         cell: ({ row }) => (
-          <div className="flex flex-col">
-            <span className="text-gray-800 font-bold text-xxs uppercase flex items-center gap-1">
+          <div className="flex flex-col py-1">
+            <span className="text-slate-800 font-bold text-xs uppercase tracking-tight">
               {row.original.name}
             </span>
-            <span className="text-indigo-500 font-mono text-[9px]">
-              KODE: {row.original.code}
+            <span className="text-emerald-600 font-mono text-[9px] font-bold">
+              #{row.original.code}
             </span>
           </div>
         ),
@@ -138,12 +136,14 @@ export default function OutletList() {
         accessorKey: "address",
         header: "ALAMAT & KONTAK",
         cell: ({ row }) => (
-          <div className="flex flex-col gap-0.5 text-xxs">
-            <span className="text-gray-500 italic truncate max-w-[250px] flex items-center gap-1">
-              <MapPin size={10} /> {row.original.address || "-"}
+          <div className="flex flex-col gap-1 py-1">
+            <span className="text-slate-500 italic truncate max-w-[200px] flex items-center gap-1.5 text-[10px]">
+              <MapPin size={12} className="text-slate-300" />{" "}
+              {row.original.address || "-"}
             </span>
-            <span className="text-slate-400 flex items-center gap-1 font-medium">
-              <Phone size={10} /> {row.original.phone || "-"}
+            <span className="text-slate-400 flex items-center gap-1.5 font-medium text-[10px]">
+              <Phone size={12} className="text-slate-300" />{" "}
+              {row.original.phone || "-"}
             </span>
           </div>
         ),
@@ -155,14 +155,14 @@ export default function OutletList() {
           const isActive = getValue();
           return (
             <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase border ${
                 isActive
-                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                  : "bg-rose-50 text-rose-600 border border-rose-100"
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                  : "bg-rose-50 text-rose-600 border-rose-100"
               }`}
             >
               <span
-                className={`w-1 h-1 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
+                className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
               />
               {isActive ? "Operasional" : "Tutup"}
             </span>
@@ -171,23 +171,27 @@ export default function OutletList() {
       },
       {
         id: "actions",
-        header: () => <div className="text-center text-xxs">ACTION</div>,
+        header: () => (
+          <div className="text-center text-[10px] tracking-widest font-black">
+            AKSI
+          </div>
+        ),
         cell: ({ row }) => (
-          <div className="flex gap-1 justify-center">
+          <div className="flex gap-2 justify-center">
             <button
               onClick={() => {
                 setSelectedOutlet(row.original);
                 setOpenModal(true);
               }}
-              className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-600 hover:text-white transition-all"
+              className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
             >
-              <Pencil size={12} />
+              <Pencil size={14} />
             </button>
             <button
               onClick={() => handleDelete(row.original)}
-              className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-600 hover:text-white transition-all"
+              className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm"
             >
-              <Trash2 size={12} />
+              <Trash2 size={14} />
             </button>
           </div>
         ),
@@ -209,32 +213,50 @@ export default function OutletList() {
   });
 
   return (
-    <div className="p-4 space-y-4 bg-slate-50 min-h-screen text-xxs">
+    <div className="p-6 space-y-6 bg-slate-50/50 min-h-screen">
       <AppHead title="Outlet Management" />
 
-      <div className="flex items-center gap-2 text-slate-700 border-b border-slate-200 pb-2">
-        <Store size={18} className="text-slate-600" />
-        <p className="text-xs font-bold uppercase tracking-tight">
-          Master Outlet / Cabang
-        </p>
-      </div>
+      {/* Header Page */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200">
+            <Store size={24} className="text-emerald-600" />
+          </div>
+          <div>
+            <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">
+              Master Outlet
+            </h1>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              Kelola lokasi dan kontak cabang laundry
+            </p>
+          </div>
+        </div>
 
-      <div className="flex flex-wrap gap-2 items-center justify-between">
         <button
           onClick={() => {
             setSelectedOutlet(null);
             setOpenModal(true);
           }}
-          className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded text-xxs font-bold bg-gokucekBlue uppercase  transition-colors"
+          className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 uppercase"
         >
-          <PlusSquare size={12} /> Tambah Cabang
+          <PlusSquare size={18} /> Tambah Cabang
         </button>
+      </div>
 
-        <form onSubmit={handleSearch} className="flex items-center">
-          <div className="relative">
+      {/* Filter & Search */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">
+        <form
+          onSubmit={handleSearch}
+          className="flex items-center gap-2 w-full md:w-auto"
+        >
+          <div className="relative flex-1 md:w-72 group">
+            <Search
+              className="absolute left-3 top-2.5 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
+              size={16}
+            />
             <input
-              className="border border-slate-300 rounded-l px-3 py-1.5 w-64 text-xxs outline-none bg-white pr-8 focus:ring-1 focus:ring-blue-400"
-              placeholder="Cari nama atau kode outlet..."
+              className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+              placeholder="Cari nama atau kode..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -242,37 +264,41 @@ export default function OutletList() {
               <button
                 type="button"
                 onClick={handleReset}
-                className="absolute right-2 top-1.5 text-slate-400"
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-rose-500"
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             )}
           </div>
           <button
             type="submit"
-            className="bg-emerald-700 text-white px-3 py-1.5 rounded-r  bg-gokucekBlue transition-colors font-bold flex items-center gap-1"
+            className="bg-slate-800 text-white px-6 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all shadow-md"
           >
-            <Search size={12} /> CARI
+            CARI
           </button>
         </form>
       </div>
 
-      <div className="bg-white border-t-2 border-blue-500 rounded-sm shadow-sm overflow-hidden relative min-h-[400px] flex flex-col">
+      {/* Table Section */}
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden relative min-h-[450px] flex flex-col">
         <div className="overflow-x-auto grow relative">
           {loading && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/50 backdrop-blur-[1px]">
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[2px]">
               <LoadingDots overlay />
             </div>
           )}
 
           <table className="w-full">
-            <thead className="bg-white border-b border-slate-100 text-slate-500 uppercase sticky top-0 z-10 text-[10px]">
+            <thead>
               {table.getHeaderGroups().map((hg) => (
-                <tr key={hg.id}>
+                <tr
+                  key={hg.id}
+                  className="bg-slate-50/50 border-b border-slate-100"
+                >
                   {hg.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-3 py-3 font-bold text-left border-r border-slate-50 last:border-0"
+                      className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] text-left"
                     >
                       {flexRender(
                         header.column.columnDef.header,
@@ -288,13 +314,10 @@ export default function OutletList() {
                 ? table.getRowModel().rows.map((row) => (
                     <tr
                       key={row.id}
-                      className="hover:bg-blue-50/60 transition-colors cursor-default"
+                      className="hover:bg-emerald-50/30 transition-colors cursor-default group"
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <td
-                          key={cell.id}
-                          className="px-3 py-2 align-middle border-r border-slate-50 last:border-0"
-                        >
+                        <td key={cell.id} className="px-6 py-4 align-middle">
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext(),
@@ -307,9 +330,9 @@ export default function OutletList() {
                     <tr>
                       <td
                         colSpan={columns.length}
-                        className="p-10 text-center text-slate-400 italic"
+                        className="p-20 text-center text-slate-400 italic text-xs font-medium"
                       >
-                        Belum ada data outlet
+                        Belum ada data outlet yang tersedia
                       </td>
                     </tr>
                   )}
@@ -317,7 +340,7 @@ export default function OutletList() {
           </table>
         </div>
 
-        <div className="border-t border-slate-100 bg-white">
+        <div className="p-4 bg-slate-50/50 border-t border-slate-100">
           <TablePagination table={table} totalEntries={totalCount} />
         </div>
       </div>

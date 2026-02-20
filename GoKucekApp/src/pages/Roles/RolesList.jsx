@@ -5,7 +5,15 @@ import {
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import { Pencil, Trash2, PlusSquare, Shield, X, Search } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  PlusSquare,
+  Shield,
+  X,
+  Search,
+  Lock,
+} from "lucide-react";
 
 // Import Components & Services
 import LoadingDots from "../../components/common/LoadingDots";
@@ -28,7 +36,6 @@ export default function RolesList() {
   const [selectedRole, setSelectedRole] = useState(null);
   const navigate = useNavigate();
 
-  // 1. Fetch Data Logic
   const fetchRoles = useCallback(
     async (isMounted = true) => {
       setLoading(true);
@@ -60,7 +67,6 @@ export default function RolesList() {
     };
   }, [fetchRoles]);
 
-  // 2. Search Handlers
   const handleSearch = (e) => {
     e.preventDefault();
     setActiveSearch(searchTerm);
@@ -87,20 +93,15 @@ export default function RolesList() {
       const res = await RolesService.deleteRole(role.id);
       const successMsg =
         res.data?.message || "Data role telah berhasil dihapus.";
-
       await showConfirm(successMsg, "Hapus Berhasil", "success");
-
       setData((prevData) => prevData.filter((item) => item.id !== role.id));
       setTotalCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
-      const errorMsg =
-        err.response?.data?.message ||
-        "Terjadi kesalahan server saat menghapus role";
+      const errorMsg = err.response?.data?.message || "Gagal menghapus role";
       showConfirm(errorMsg, "Gagal Hapus", "error");
     }
   };
 
-  // 4. Table Columns Definition
   const columns = useMemo(
     () => [
       {
@@ -109,7 +110,7 @@ export default function RolesList() {
         cell: ({ row, table }) => {
           const { pageIndex, pageSize } = table.options.state.pagination;
           return (
-            <span className="text-slate-600 text-xxs font-semibold">
+            <span className="text-slate-400 font-medium text-[10px]">
               {pageIndex * pageSize + row.index + 1}
             </span>
           );
@@ -119,22 +120,22 @@ export default function RolesList() {
         accessorKey: "role_name",
         header: "NAMA ROLE",
         cell: ({ row }) => (
-          <div className="flex flex-col">
-            <span className="text-gray-800 font-bold text-xxs uppercase">
+          <div className="flex flex-col py-1">
+            <span className="text-slate-800 font-bold text-xs uppercase tracking-tight">
               {row.original.role_name}
             </span>
-            <span className="text-indigo-500 font-mono text-[9px]">
-              {row.original.code}
+            <span className="text-emerald-600 font-mono text-[9px] font-bold">
+              ID: {row.original.code}
             </span>
           </div>
         ),
       },
       {
         accessorKey: "description",
-        header: "DESKRIPSI",
+        header: "DESKRIPSI HAK AKSES",
         cell: ({ getValue }) => (
-          <span className="text-gray-500 text-xxs italic truncate max-w-[200px] inline-block">
-            {getValue() || "Tidak ada deskripsi"}
+          <span className="text-slate-500 italic truncate max-w-[250px] inline-block text-[10px]">
+            {getValue() || "Tidak ada deskripsi spesifik"}
           </span>
         ),
       },
@@ -144,30 +145,32 @@ export default function RolesList() {
         cell: ({ getValue }) => {
           const isActive = getValue();
           return (
-            <div className="flex items-center">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase border ${
+                isActive
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                  : "bg-rose-50 text-rose-600 border-rose-100"
+              }`}
+            >
               <span
-                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[8px] font-bold uppercase tracking-wider ${
-                  isActive
-                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                    : "bg-rose-50 text-rose-600 border border-rose-100"
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
-                />
-                {isActive ? "Active" : "Inactive"}
-              </span>
-            </div>
+                className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
+              />
+              {isActive ? "Aktif" : "Nonaktif"}
+            </span>
           );
         },
       },
       {
         id: "actions",
-        header: () => <div className="text-center text-xxs">ACTION</div>,
+        header: () => (
+          <div className="text-center text-[10px] tracking-widest font-black">
+            AKSI
+          </div>
+        ),
         cell: ({ row }) => (
-          <div className="flex gap-1 justify-center">
+          <div className="flex gap-2 justify-center">
             <button
-              title="Setting Module Permissions"
+              title="Setting Permissions"
               onClick={() => {
                 const hashedId = encrypt(row.original.id);
                 navigate(`/rolespermission/${hashedId}`, {
@@ -177,33 +180,32 @@ export default function RolesList() {
                   },
                 });
               }}
-              className="p-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-600 hover:text-white transition-all"
+              className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm"
             >
-              <Shield size={12} />
+              <Lock size={14} />
             </button>
             <button
               onClick={() => {
                 setSelectedRole(row.original);
                 setOpenModal(true);
               }}
-              className="p-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-600 hover:text-white transition-all"
+              className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
             >
-              <Pencil size={12} />
+              <Pencil size={14} />
             </button>
             <button
               onClick={() => handleDelete(row.original)}
-              className="p-1 bg-red-50 text-red-600 rounded hover:bg-red-600 hover:text-white transition-all"
+              className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm"
             >
-              <Trash2 size={12} />
+              <Trash2 size={14} />
             </button>
           </div>
         ),
       },
     ],
-    [navigate], // fetchRoles dihapus dari dep agar tidak re-render kolom terus menerus
+    [navigate],
   );
 
-  // 5. TanStack Table Instance
   const table = useReactTable({
     data,
     columns,
@@ -217,34 +219,50 @@ export default function RolesList() {
   });
 
   return (
-    <div className="p-4 space-y-4 bg-slate-50 min-h-screen text-xxs">
+    <div className="p-6 space-y-6 bg-slate-50/50 min-h-screen">
       <AppHead title="Role Management" />
 
-      {/* Breadcrumb / Title */}
-      <div className="flex items-center gap-2 text-slate-700 border-b border-slate-200 pb-2">
-        <Shield size={18} className="text-slate-600" />
-        <p className="text-xs font-bold uppercase tracking-tight">
-          Role & Permission
-        </p>
-      </div>
+      {/* Header Page */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200">
+            <Shield size={24} className="text-emerald-600" />
+          </div>
+          <div>
+            <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">
+              Role & Permission
+            </h1>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              Konfigurasi tingkatan akses dan modul aplikasi
+            </p>
+          </div>
+        </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap gap-2 items-center justify-between">
         <button
           onClick={() => {
             setSelectedRole(null);
             setOpenModal(true);
           }}
-          className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded text-xxs font-bold bg-gokucekBlue uppercase hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 uppercase"
         >
-          <PlusSquare size={12} /> Tambah
+          <PlusSquare size={18} /> Tambah Role
         </button>
+      </div>
 
-        <form onSubmit={handleSearch} className="flex items-center">
-          <div className="relative">
+      {/* Filter & Search */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">
+        <form
+          onSubmit={handleSearch}
+          className="flex items-center gap-2 w-full md:w-auto"
+        >
+          <div className="relative flex-1 md:w-80 group">
+            <Search
+              className="absolute left-3 top-2.5 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
+              size={16}
+            />
             <input
-              className="border border-slate-300 rounded-l px-3 py-1.5 w-60 text-xxs focus:ring-1 focus:ring-blue-400 outline-none bg-white pr-8"
-              placeholder="Search role name / code..."
+              className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+              placeholder="Cari nama role atau kode..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -252,39 +270,41 @@ export default function RolesList() {
               <button
                 type="button"
                 onClick={handleReset}
-                className="absolute right-2 top-1.5 text-slate-400 hover:text-rose-500"
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-rose-500"
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             )}
           </div>
           <button
             type="submit"
-            className="bg-emerald-700 text-white px-3 py-1.5 rounded-r hover:bg-emerald-800 bg-gokucekBlue transition-colors text-xxs font-bold flex items-center gap-1"
+            className="bg-slate-800 text-white px-6 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all shadow-md"
           >
-            <Search size={12} /> CARI
+            CARI
           </button>
         </form>
       </div>
 
-      {/* Main Table Container */}
-      <div className="bg-white border-t-2 border-indigo-500 rounded-sm shadow-sm overflow-hidden relative min-h-[400px] flex flex-col">
+      {/* Table Section */}
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden relative min-h-[450px] flex flex-col">
         <div className="overflow-x-auto grow relative">
-          {/* Loading Overlay */}
           {loading && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/50 backdrop-blur-[1px]">
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[2px]">
               <LoadingDots overlay />
             </div>
           )}
 
           <table className="w-full">
-            <thead className="bg-white border-b border-slate-100 text-slate-500 uppercase sticky top-0 z-10">
+            <thead>
               {table.getHeaderGroups().map((hg) => (
-                <tr key={hg.id}>
+                <tr
+                  key={hg.id}
+                  className="bg-slate-50/50 border-b border-slate-100"
+                >
                   {hg.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-3 py-3 font-bold text-left border-r border-slate-50 last:border-0 text-[10px] tracking-wider"
+                      className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] text-left"
                     >
                       {flexRender(
                         header.column.columnDef.header,
@@ -300,13 +320,10 @@ export default function RolesList() {
                 ? table.getRowModel().rows.map((row) => (
                     <tr
                       key={row.id}
-                      className="hover:bg-blue-50 transition-colors cursor-default group"
+                      className="hover:bg-emerald-50/30 transition-colors cursor-default group"
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <td
-                          key={cell.id}
-                          className="px-3 py-2 align-middle border-r border-slate-50 last:border-0"
-                        >
+                        <td key={cell.id} className="px-6 py-4 align-middle">
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext(),
@@ -319,29 +336,21 @@ export default function RolesList() {
                     <tr>
                       <td
                         colSpan={columns.length}
-                        className="p-10 text-center text-slate-400 italic"
+                        className="p-20 text-center text-slate-400 italic text-xs font-medium"
                       >
-                        Data tidak ditemukan
+                        Belum ada data role yang tersedia
                       </td>
                     </tr>
                   )}
-              {/* Spacer saat loading awal agar table tidak kolaps */}
-              {loading && data.length === 0 && (
-                <tr>
-                  <td colSpan={columns.length} className="py-40"></td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination Sinkron */}
-        <div className="border-t border-slate-100 bg-white">
+        <div className="p-4 bg-slate-50/50 border-t border-slate-100">
           <TablePagination table={table} totalEntries={totalCount} />
         </div>
       </div>
 
-      {/* Modal Form Role */}
       <RoleForm
         open={openModal}
         initialData={selectedRole}

@@ -2,7 +2,7 @@ export default function LoadingDots({
   fullscreen = false,
   overlay = false, // Prop baru untuk mode melayang di atas tabel
   size = "w-2 h-2",
-  color = "bg-blue-600",
+  color = "bg-emerald-600",
 }) {
   // Susun class berdasarkan kondisi
   let containerClasses =
@@ -26,7 +26,7 @@ export default function LoadingDots({
             key={index}
             className={`${size} ${color} rounded-full animate-bounce`}
             style={{
-              animationDelay: `${index * 0.15}s`,
+              animationDelay: `${index * 0.1}s`,
               animationDuration: "0.8s",
             }}
           />

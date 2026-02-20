@@ -8,35 +8,38 @@ import {
   Pencil,
   Trash2,
   PlusSquare,
-  Layers,
-  X,
   Search,
-  Info,
-  Calendar,
-  User,
+  X,
+  Tag,
+  Layers,
+  Box,
 } from "lucide-react";
 
+// Import Components & Services
 import LoadingDots from "../../components/common/LoadingDots";
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
-import MasterService from "../../services/MasterService";
-import ServiceForm from "./MasterServiceForm";
+import PackageService from "../../services/PackageService";
+import PackageForm from "./PackageForm";
 
-export default function MasterServiceList() {
+export default function PackageList() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-  const [openModal, setOpenModal] = useState(false);
-  const [selectedService, setSelectedService] = useState(null);
 
-  const fetchServices = useCallback(
+  const [openModal, setOpenModal] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState(null);
+
+  // 1. Fetch Data
+  const fetchPackages = useCallback(
     async (isMounted = true) => {
       setLoading(true);
       try {
-        const res = await MasterService.getMasterServices({
+        const res = await PackageService.getPackages({
           page: pagination.pageIndex + 1,
           per_page: pagination.pageSize,
           keyword: activeSearch,
@@ -47,9 +50,7 @@ export default function MasterServiceList() {
           setTotalCount(Number(res.data?.meta?.total || 0));
         }
       } catch (error) {
-        const errorMsg =
-          error.response?.data?.message || "Gagal mengambil data layanan";
-        console.error(errorMsg);
+        console.error("Error fetching packages:", error);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -59,12 +60,13 @@ export default function MasterServiceList() {
 
   useEffect(() => {
     let isMounted = true;
-    fetchServices(isMounted);
+    fetchPackages(isMounted);
     return () => {
       isMounted = false;
     };
-  }, [fetchServices]);
+  }, [fetchPackages]);
 
+  // 2. Handlers
   const handleSearch = (e) => {
     e.preventDefault();
     setActiveSearch(searchTerm);
@@ -77,31 +79,26 @@ export default function MasterServiceList() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
-  const handleDelete = async (service) => {
+  const handleDelete = async (pkg) => {
+    // Asumsi fungsi showConfirm sudah tersedia secara global
     const setuju = await showConfirm(
-      `Hapus layanan ${service.name}?`,
+      `Hapus paket "${pkg.name}"?`,
       "Konfirmasi Hapus",
       "warning",
     );
 
-    if (!setuju) return;
-
-    try {
-      const res = await MasterService.deleteMasterService(service.id);
-      const successMsg =
-        res.data?.message || "Data layanan telah berhasil dihapus.";
-
-      await showConfirm(successMsg, "Hapus Berhasil", "success");
-      setData((prev) => prev.filter((item) => item.id !== service.id));
-      setTotalCount((prev) => Math.max(0, prev - 1));
-    } catch (err) {
-      const errorMsg =
-        err.response?.data?.message ||
-        "Terjadi kesalahan server saat menghapus layanan";
-      showConfirm(errorMsg, "Gagal Hapus", "error");
+    if (setuju) {
+      try {
+        await PackageService.deletePackage(pkg.id);
+        fetchPackages();
+        showConfirm("Paket berhasil dihapus", "Berhasil", "success");
+      } catch (err) {
+        showConfirm("Gagal menghapus data", "Error", "error");
+      }
     }
   };
 
+  // 3. Columns Definition (Sync with Migration)
   const columns = useMemo(
     () => [
       {
@@ -118,41 +115,53 @@ export default function MasterServiceList() {
       },
       {
         accessorKey: "name",
-        header: "NAMA LAYANAN",
+        header: "PAKET & KODE",
         cell: ({ row }) => (
           <div className="flex flex-col py-1">
-            <span className="text-slate-800 font-bold text-xs uppercase tracking-tight">
-              {row.original.name}
+            <div className="flex items-center gap-2">
+              <span className="text-slate-800 font-bold text-xs uppercase tracking-tight">
+                {row.original.name}
+              </span>
+              <span className="text-[9px] font-mono bg-slate-100 px-1 rounded text-slate-500 font-bold">
+                {row.original.code}
+              </span>
+            </div>
+            <div className="flex gap-1 mt-1">
+              <span className="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[8px] font-bold border border-emerald-100 uppercase">
+                {row.original.service?.name || "Service"}
+              </span>
+              <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[8px] font-bold border border-blue-100 uppercase">
+                {row.original.category?.name || "Category"}
+              </span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "price",
+        header: "HARGA / SATUAN",
+        cell: ({ row }) => (
+          <div className="flex flex-col">
+            <span className="text-slate-700 font-black text-xs">
+              Rp {Number(row.original.price).toLocaleString("id-ID")}
             </span>
-            <span className="text-slate-500 italic truncate max-w-[200px] flex items-center gap-1.5 text-[10px] mt-0.5">
-              <Info size={12} className="text-slate-300" />
-              {row.original.description || "Tanpa deskripsi"}
+            <span className="text-[9px] text-slate-400 font-medium italic">
+              Per {row.original.unit}
             </span>
           </div>
         ),
       },
       {
-        accessorKey: "created_at",
-        header: "INFO INPUT",
-        cell: ({ getValue, row }) => {
-          const rawCreatedBy = row.original.created_by;
-          const creatorName = rawCreatedBy?.includes("-")
-            ? rawCreatedBy.split("-")[1]
-            : rawCreatedBy || "System";
-
-          return (
-            <div className="flex flex-col gap-1 py-1">
-              <span className="flex items-center gap-1.5 text-slate-500 font-medium text-[10px]">
-                <Calendar size={12} className="text-slate-300" />
-                {getValue()?.split(" ")[0] || "-"}
-              </span>
-              <span className="flex items-center gap-1.5 text-slate-400 font-bold uppercase text-[9px]">
-                <User size={12} className="text-slate-300" />
-                {creatorName}
-              </span>
-            </div>
-          );
-        },
+        accessorKey: "min_order",
+        header: "MIN. ORDER",
+        cell: ({ getValue, row }) => (
+          <span className="text-slate-600 font-bold text-[10px]">
+            {Number(getValue())}{" "}
+            <span className="text-[8px] font-normal text-slate-400">
+              {row.original.unit}
+            </span>
+          </span>
+        ),
       },
       {
         accessorKey: "is_active",
@@ -178,7 +187,7 @@ export default function MasterServiceList() {
       {
         id: "actions",
         header: () => (
-          <div className="text-center text-[10px] tracking-widest font-black">
+          <div className="text-center text-[10px] tracking-widest font-black text-slate-400">
             AKSI
           </div>
         ),
@@ -186,16 +195,16 @@ export default function MasterServiceList() {
           <div className="flex gap-2 justify-center">
             <button
               onClick={() => {
-                setSelectedService(row.original);
+                setSelectedPackage(row.original);
                 setOpenModal(true);
               }}
-              className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+              className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
             >
               <Pencil size={14} />
             </button>
             <button
               onClick={() => handleDelete(row.original)}
-              className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+              className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"
             >
               <Trash2 size={14} />
             </button>
@@ -203,7 +212,7 @@ export default function MasterServiceList() {
         ),
       },
     ],
-    [pagination.pageIndex, pagination.pageSize],
+    [],
   );
 
   const table = useReactTable({
@@ -218,49 +227,49 @@ export default function MasterServiceList() {
 
   return (
     <div className="p-6 space-y-6 bg-slate-50/50 min-h-screen">
-      <AppHead title="Service Management" />
+      <AppHead title="Paket & Harga" />
 
-      {/* Header Page */}
+      {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200">
-            <Layers size={24} className="text-emerald-600" />
+            <Box size={24} className="text-emerald-600" />
           </div>
           <div>
             <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">
-              Master Layanan
+              Paket & Harga
             </h1>
             <p className="text-xs text-slate-500 mt-1 font-medium">
-              Kelola daftar kategori dan layanan jasa laundry
+              Kelola tarif layanan, satuan, dan minimal order
             </p>
           </div>
         </div>
 
         <button
           onClick={() => {
-            setSelectedService(null);
+            setSelectedPackage(null);
             setOpenModal(true);
           }}
           className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 uppercase"
         >
-          <PlusSquare size={18} /> Tambah Layanan
+          <PlusSquare size={18} /> Tambah Paket
         </button>
       </div>
 
-      {/* Filter & Search */}
+      {/* Filter Section */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">
         <form
           onSubmit={handleSearch}
           className="flex items-center gap-2 w-full md:w-auto"
         >
-          <div className="relative flex-1 md:w-72 group">
+          <div className="relative flex-1 md:w-80 group">
             <Search
               className="absolute left-3 top-2.5 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
               size={16}
             />
             <input
               className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-              placeholder="Cari nama layanan..."
+              placeholder="Cari nama atau kode paket..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -276,9 +285,9 @@ export default function MasterServiceList() {
           </div>
           <button
             type="submit"
-            className="bg-slate-800 text-white px-6 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all shadow-md"
+            className="bg-slate-800 text-white px-6 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all shadow-md uppercase"
           >
-            CARI
+            Cari
           </button>
         </form>
       </div>
@@ -302,7 +311,7 @@ export default function MasterServiceList() {
                   {hg.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] text-left"
+                      className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left"
                     >
                       {flexRender(
                         header.column.columnDef.header,
@@ -318,7 +327,7 @@ export default function MasterServiceList() {
                 ? table.getRowModel().rows.map((row) => (
                     <tr
                       key={row.id}
-                      className="hover:bg-emerald-50/30 transition-colors cursor-default group"
+                      className="hover:bg-emerald-50/30 transition-colors cursor-default"
                     >
                       {row.getVisibleCells().map((cell) => (
                         <td key={cell.id} className="px-6 py-4 align-middle">
@@ -336,7 +345,7 @@ export default function MasterServiceList() {
                         colSpan={columns.length}
                         className="p-20 text-center text-slate-400 italic text-xs font-medium"
                       >
-                        Belum ada data layanan yang tersedia
+                        Belum ada data paket tersedia
                       </td>
                     </tr>
                   )}
@@ -350,19 +359,12 @@ export default function MasterServiceList() {
       </div>
 
       {/* Modal Form */}
-      <ServiceForm
+      <PackageForm
         open={openModal}
+        initialData={selectedPackage}
         onClose={() => setOpenModal(false)}
-        initialData={selectedService}
-        onSuccess={(newService) => {
-          if (selectedService) {
-            setData((prev) =>
-              prev.map((o) => (o.id === newService.id ? newService : o)),
-            );
-          } else {
-            setData((prev) => [newService, ...prev]);
-            setTotalCount((prev) => prev + 1);
-          }
+        onSuccess={() => {
+          fetchPackages();
           setOpenModal(false);
         }}
       />

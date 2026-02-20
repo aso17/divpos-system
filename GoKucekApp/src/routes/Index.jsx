@@ -3,6 +3,7 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import Dashboard from "../pages/dashboard/Dashboard";
 import UsersPage from "../pages/users/UsersList";
 import RolePage from "../pages/Roles/RolesList";
+import PackagePage from "../pages//package/PackageList";
 import OutletPage from "../pages/outlets/OutletList";
 import LayananPage from "../pages/masterservice/MasterServiceList";
 import RolePermissionsPage from "../pages/RolePermission/RolePermissionList";
@@ -67,6 +68,14 @@ export default function AppRoutes() {
               element={
                 <RequirePermission permission="view">
                   <RolePage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/paket"
+              element={
+                <RequirePermission permission="view">
+                  <PackagePage />
                 </RequirePermission>
               }
             />

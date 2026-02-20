@@ -8,7 +8,6 @@ export default function Sidebar() {
   const [open, setOpen] = useState(null);
   const location = useLocation();
 
-  // Ambil ikon chevron dari utils
   const ChevronIcon = icons.chevron;
 
   useEffect(() => {
@@ -19,26 +18,31 @@ export default function Sidebar() {
   }, [location.pathname, menus]);
 
   return (
-    <aside className="w-56 min-h-screen bg-[#244E87] text-white rounded-tr-3xl shadow-xl flex flex-col">
-      {/* Header */}
-      <div className="px-6 py-8 flex items-center gap-3">
-        <div className="bg-white rounded-lg p-1.5 flex-shrink-0">
-          <img
-            src={localStorage.getItem("tenant_logo_path")}
-            alt="GoKucek"
-            className="w-7 h-7 object-contain"
-          />
-        </div>
-        <div className="leading-tight">
-          <h1 className="text-sm font-bold">
-            {localStorage.getItem("tenant_name") || "GoKucek"}
-          </h1>
-          <p className="text-[10px] text-white/60 font-medium">versi 1.0</p>
+    <aside className="w-64 min-h-screen bg-white border-r border-slate-100 flex flex-col transition-all duration-300">
+      {/* Brand Header Section */}
+      <div className="p-5 mb-4">
+        <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-300">
+          <div className="bg-slate-50 rounded-xl p-1.5 flex-shrink-0 border border-slate-100 shadow-inner">
+            <img
+              src={localStorage.getItem("tenant_logo_path")}
+              alt="Logo"
+              className="w-9 h-9 object-contain grayscale-[0.2] hover:grayscale-0 transition-all"
+            />
+          </div>
+          <div className="overflow-hidden">
+            <h1 className="text-[13px] font-extrabold text-slate-800 truncate leading-tight uppercase tracking-tight">
+              {localStorage.getItem("tenant_name") || "GoKucek"}
+            </h1>
+          </div>
         </div>
       </div>
 
-      {/* Menu */}
-      <nav className="flex-1 py-4 space-y-1 overflow-y-auto">
+      {/* Navigation Container */}
+      <nav className="flex-1 px-4 space-y-2 overflow-y-auto custom-scrollbar">
+        <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 opacity-70">
+          Menu Utama
+        </p>
+
         {menus.map((menu) => {
           const Icon = icons[menu.icon];
           const hasChild = menu.children?.length > 0;
@@ -47,83 +51,134 @@ export default function Sidebar() {
             menu.children?.some((c) => c.route === location.pathname);
           const isOpen = open === menu.id;
 
+          const baseItemClass = `group flex items-center justify-between px-4 py-3 rounded-xl text-[12px] transition-all duration-300 cursor-pointer mb-1.5 relative overflow-hidden`;
+          const activeItemClass = `bg-primary-500 text-white shadow-lg shadow-primary-100 font-bold translate-x-1`;
+          const inactiveItemClass = `text-slate-500 hover:bg-primary-50 hover:text-primary-700 hover:translate-x-1`;
+
           return (
-            <div key={menu.id} className="px-3 relative">
+            <div key={menu.id} className="relative px-1">
               {!hasChild ? (
                 <NavLink
                   to={menu.route}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs transition-all relative
-                    ${
-                      isActive
-                        ? "bg-white/15 text-white font-bold"
-                        : "text-white/80 hover:bg-white/10"
-                    }`
+                    `${baseItemClass} ${isActive ? activeItemClass : inactiveItemClass}`
                   }
                 >
-                  {location.pathname === menu.route && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-cyan-400 rounded-r-full shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
-                  )}
-
-                  {Icon && <Icon size={18} className="text-white" />}
-                  <span>{menu.name}</span>
+                  <div className="flex items-center gap-3.5 relative z-10">
+                    {Icon && (
+                      <Icon
+                        size={19}
+                        className={
+                          location.pathname === menu.route
+                            ? "text-white"
+                            : "text-slate-400 group-hover:text-primary-600 transition-colors"
+                        }
+                      />
+                    )}
+                    <span className="tracking-wide">{menu.name}</span>
+                  </div>
                 </NavLink>
               ) : (
                 <>
                   <button
                     onClick={() => setOpen(isOpen ? null : menu.id)}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs transition-all relative
-                    ${
-                      isActive
-                        ? "bg-white/15 text-white font-bold"
-                        : "text-white/80 hover:bg-white/10"
+                    className={`w-full ${baseItemClass} ${
+                      isActive && !isOpen
+                        ? activeItemClass
+                        : isOpen
+                          ? "bg-slate-50 text-slate-800 font-bold border-l-4 border-primary-500 rounded-l-none"
+                          : inactiveItemClass
                     }`}
                   >
-                    {isActive && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-cyan-400 rounded-r-full shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
-                    )}
-
-                    <div className="flex items-center gap-3">
-                      {Icon && <Icon size={18} className="text-white" />}
-                      <span>{menu.name}</span>
+                    <div className="flex items-center gap-3.5 relative z-10">
+                      {Icon && (
+                        <Icon
+                          size={19}
+                          className={
+                            isActive && !isOpen
+                              ? "text-white"
+                              : "text-slate-400 group-hover:text-primary-600"
+                          }
+                        />
+                      )}
+                      <span className="tracking-wide">{menu.name}</span>
                     </div>
-
-                    {/* Tambahkan Ikon Dropdown di sini */}
                     {ChevronIcon && (
                       <ChevronIcon
-                        size={14}
-                        className={`transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
+                        size={12}
+                        className={`transition-transform duration-300 relative z-10 ${
+                          isOpen
+                            ? "rotate-180 text-primary-600"
+                            : "text-slate-400"
+                        } ${isActive && !isOpen ? "text-white" : ""}`}
                       />
                     )}
                   </button>
 
-                  {isOpen && (
-                    <div className="ml-8 mt-1 space-y-1 border-l border-white/10">
+                  {/* Dropdown Sub-menu dengan transisi yang lebih smooth */}
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                      isOpen
+                        ? "max-h-[500px] opacity-100 mb-4 mt-2"
+                        : "max-h-0 opacity-0"
+                    }`}
+                  >
+                    <div className="ml-7 border-l border-slate-200 space-y-1">
                       {menu.children.map((sub) => {
                         const isSubActive = location.pathname === sub.route;
                         return (
                           <NavLink
                             key={sub.id}
                             to={sub.route}
-                            className={`block px-4 py-2 rounded-lg text-xs transition-all
+                            className={`block pl-6 py-2.5 text-[11px] transition-all relative
                             ${
                               isSubActive
-                                ? "text-cyan-400 font-bold"
-                                : "text-white/60 hover:text-white"
+                                ? "text-primary-600 font-bold"
+                                : "text-slate-500 hover:text-primary-600 hover:pl-8"
                             }`}
                           >
+                            {isSubActive && (
+                              <div className="absolute left-[-1.5px] top-1/2 -translate-y-1/2 w-[3px] h-4 bg-primary-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                            )}
                             {sub.name}
                           </NavLink>
                         );
                       })}
                     </div>
-                  )}
+                  </div>
                 </>
               )}
             </div>
           );
         })}
       </nav>
+
+      {/* Footer Sidebar - Design yang lebih Clean */}
+      <div className="p-4 mt-auto">
+        <div className="bg-gradient-to-br from-primary-900 to-slate-900 rounded-2xl p-5 text-white relative overflow-hidden group shadow-xl">
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-5 h-5 bg-white/20 rounded-md flex items-center justify-center backdrop-blur-sm">
+                <div className="w-2 h-2 bg-primary-400 rounded-full"></div>
+              </div>
+              <p className="text-[10px] text-primary-100 font-bold uppercase tracking-widest opacity-80">
+                Pro Plan
+              </p>
+            </div>
+            <p className="text-[12px] font-bold mb-3 tracking-tight">
+              Masa Aktif Hampir Habis
+            </p>
+            <div className="w-full bg-white/10 h-1 rounded-full mb-3">
+              <div className="bg-primary-500 h-full w-[85%] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+            </div>
+            <button className="w-full bg-primary-500 hover:bg-primary-400 text-white transition-all py-2 rounded-xl text-[10px] font-bold shadow-lg shadow-black/20">
+              Perpanjang Sekarang
+            </button>
+          </div>
+          {/* Efek dekorasi cahaya belakang */}
+          <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-primary-500/10 rounded-full blur-3xl group-hover:bg-primary-500/20 transition-all duration-700"></div>
+        </div>
+      </div>
     </aside>
   );
 }

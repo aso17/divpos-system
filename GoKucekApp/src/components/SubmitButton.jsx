@@ -3,7 +3,7 @@ export default function SubmitButton({
   label = "Submit",
   loadingLabel = "Processing...",
   onClick,
-  color = "#244E87", // default blue
+  color = "bg-emerald-600", // default blue
   fullWidth = true,
   type = "submit",
   className = "", // 👈 tambahan
@@ -15,7 +15,7 @@ export default function SubmitButton({
       onClick={onClick}
       className={`
         ${fullWidth ? "w-full" : ""}
-        rounded-lg py-2 px-4
+        rounded-lg py-2 px-4 ${color}
         text-white font-semibold
         flex justify-center items-center gap-2
         disabled:opacity-70 disabled:cursor-not-allowed
