@@ -90,7 +90,7 @@ export default function PackageList() {
     if (setuju) {
       try {
         await PackageService.deletePackage(pkg.id);
-        fetchPackages();
+        // fetchPackages();
         showConfirm("Paket berhasil dihapus", "Berhasil", "success");
       } catch (err) {
         showConfirm("Gagal menghapus data", "Error", "error");
@@ -98,7 +98,6 @@ export default function PackageList() {
     }
   };
 
-  // 3. Columns Definition (Sync with Migration)
   const columns = useMemo(
     () => [
       {
@@ -119,7 +118,7 @@ export default function PackageList() {
         cell: ({ row }) => (
           <div className="flex flex-col py-1">
             <div className="flex items-center gap-2">
-              <span className="text-slate-800 font-bold text-xs uppercase tracking-tight">
+              <span className="text-slate-800 font-bold text-xxs uppercase tracking-tight">
                 {row.original.name}
               </span>
               <span className="text-[9px] font-mono bg-slate-100 px-1 rounded text-slate-500 font-bold">
@@ -232,11 +231,11 @@ export default function PackageList() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200">
+          <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200">
             <Box size={24} className="text-emerald-600" />
           </div>
           <div>
-            <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">
+            <h1 className="text-xs font-black text-slate-800 uppercase tracking-tight leading-none">
               Paket & Harga
             </h1>
             <p className="text-xs text-slate-500 mt-1 font-medium">
@@ -250,7 +249,7 @@ export default function PackageList() {
             setSelectedPackage(null);
             setOpenModal(true);
           }}
-          className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 uppercase"
+          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xxs font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 uppercase"
         >
           <PlusSquare size={18} /> Tambah Paket
         </button>
@@ -285,7 +284,7 @@ export default function PackageList() {
           </div>
           <button
             type="submit"
-            className="bg-slate-800 text-white px-6 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all shadow-md uppercase"
+            className="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xxs font-bold hover:bg-slate-700 transition-all shadow-md uppercase"
           >
             Cari
           </button>
@@ -311,7 +310,7 @@ export default function PackageList() {
                   {hg.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left"
+                      className="px-6 py-4 text-[8px] font-black text-slate-400 uppercase tracking-widest text-left"
                     >
                       {flexRender(
                         header.column.columnDef.header,
@@ -343,7 +342,7 @@ export default function PackageList() {
                     <tr>
                       <td
                         colSpan={columns.length}
-                        className="p-20 text-center text-slate-400 italic text-xs font-medium"
+                        className="p-20 text-center text-slate-400 italic text-xxs font-medium"
                       >
                         Belum ada data paket tersedia
                       </td>

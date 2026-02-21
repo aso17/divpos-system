@@ -11,8 +11,6 @@ export default function RequirePermission({
 
   if (loading) return null;
 
-  console.log("Menus available:", menus);
-
   const flatMenus = menus.flatMap((m) => [m, ...(m.children || [])]);
   const pathToMatch = useRoute || location.pathname;
   const current = flatMenus.find((m) => m.route === pathToMatch);

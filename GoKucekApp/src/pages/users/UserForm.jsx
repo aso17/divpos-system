@@ -377,7 +377,7 @@ export default function UserForm({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-1.5 border border-slate-300 rounded text-[10px] font-bold uppercase text-slate-500 hover:bg-slate-50"
+              className="px-4 py-2 text-[10px] font-black uppercase bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-500 hover:text-white rounded-lg transition-all"
             >
               Cancel
             </button>

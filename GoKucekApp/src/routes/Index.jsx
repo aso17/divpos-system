@@ -5,6 +5,7 @@ import UsersPage from "../pages/users/UsersList";
 import RolePage from "../pages/Roles/RolesList";
 import PackagePage from "../pages//package/PackageList";
 import OutletPage from "../pages/outlets/OutletList";
+import CategoryPage from "../pages/category/CategoryList";
 import LayananPage from "../pages/masterservice/MasterServiceList";
 import RolePermissionsPage from "../pages/RolePermission/RolePermissionList";
 import LoginPage from "../pages/login/Login";
@@ -76,6 +77,14 @@ export default function AppRoutes() {
               element={
                 <RequirePermission permission="view">
                   <PackagePage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/kategori"
+              element={
+                <RequirePermission permission="view">
+                  <CategoryPage />
                 </RequirePermission>
               }
             />

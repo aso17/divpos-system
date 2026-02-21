@@ -57,7 +57,6 @@ export default function RolePermissionList() {
     setIsSubmitting(true);
     try {
       await RolesService.updatePermissions(decryptedId, { permissions: data });
-
       triggerToast("Hak akses berhasil diperbarui!", "success");
     } catch (err) {
       triggerToast("Gagal menyimpan perubahan", "error");
@@ -116,7 +115,7 @@ export default function RolePermissionList() {
         cell: ({ row }) => (
           <button
             onClick={() => toggleRow(row.original.menu_id)}
-            className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+            className="p-1.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
             title="Pilih Baris"
           >
             <CheckSquare size={16} />
@@ -131,8 +130,8 @@ export default function RolePermissionList() {
             <span className="text-slate-800 font-bold text-[10px] uppercase tracking-wide">
               {row.original.menu_name}
             </span>
-            <span className="text-slate-400 text-[9px] font-mono lowercase">
-              id: {row.original.menu_id}
+            <span className="text-slate-400 text-[9px] font-mono lowercase opacity-70">
+              ID: {row.original.menu_id}
             </span>
           </div>
         ),
@@ -158,10 +157,10 @@ export default function RolePermissionList() {
               className="flex flex-col items-center gap-1 cursor-pointer group select-none"
               onClick={() => toggleColumn(field)}
             >
-              <span className="group-hover:text-indigo-600 transition-colors">
+              <span className="group-hover:text-emerald-600 transition-colors uppercase">
                 {labels[field]}
               </span>
-              <div className="text-[8px] text-slate-300 group-hover:text-indigo-400 font-bold tracking-tighter">
+              <div className="text-[7px] text-slate-300 group-hover:text-emerald-400 font-black tracking-tighter">
                 TOGGLE
               </div>
             </div>
@@ -172,7 +171,7 @@ export default function RolePermissionList() {
                 type="checkbox"
                 checked={!!row.original[field]}
                 onChange={() => handleToggle(row.original.menu_id, field)}
-                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer transition-all"
+                className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer transition-all"
               />
             </div>
           ),
@@ -190,7 +189,7 @@ export default function RolePermissionList() {
 
   if (loading && !roleInfo)
     return (
-      <div className="h-[400px] flex items-center justify-center">
+      <div className="h-[400px] flex items-center justify-center bg-slate-50">
         <LoadingDots />
       </div>
     );
@@ -199,39 +198,40 @@ export default function RolePermissionList() {
     <div className="p-4 space-y-4 bg-slate-50 min-h-screen">
       <AppHead title={`Hak Akses - ${roleInfo?.role_name || "Role"}`} />
 
-      {/* HEADER SECTION */}
-      <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      {/* HEADER SECTION - Emerald Theme */}
+      <div className="flex items-center justify-between bg-white p-4 rounded-sm shadow-sm border-t-4 border-emerald-500">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors border border-slate-100"
+            className="p-2 hover:bg-slate-50 rounded text-slate-500 transition-colors border border-slate-200 shadow-sm"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} />
           </button>
 
           <div>
-            <h1 className="text-xs font-black uppercase tracking-tight text-slate-800">
+            <h1 className="text-xs font-black uppercase tracking-tight text-slate-800 flex items-center gap-2">
+              <ShieldCheck size={14} className="text-emerald-600" />
               Peran:{" "}
-              <span className="text-indigo-600 text-[12px]">
+              <span className="text-emerald-600 text-[12px]">
                 {roleInfo?.role_name}
               </span>
             </h1>
-            <p className="text-[8px] text-slate-400 font-semibold tracking-widest uppercase">
-              Pengaturan Kontrol Akses
+            <p className="text-[8px] text-slate-400 font-bold tracking-widest uppercase mt-0.5">
+              Matrix Kontrol Akses Sistem
             </p>
           </div>
         </div>
         <SubmitButton
           onClick={handleSave}
           isSubmitting={isSubmitting}
-          label="Simpan Perubahan"
+          label="Simpan Hak Akses"
           fullWidth={false}
-          className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200"
+          className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-200"
         />
       </div>
 
       {/* MATRIX TABLE */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-sm shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead className="sticky top-0 z-10">
@@ -243,7 +243,7 @@ export default function RolePermissionList() {
                   {hg.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-4 py-4 font-bold text-left text-[10px] text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0"
+                      className="px-4 py-4 font-bold text-center text-[10px] text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0"
                     >
                       {flexRender(
                         header.column.columnDef.header,
@@ -265,21 +265,21 @@ export default function RolePermissionList() {
                   return (
                     <React.Fragment key={row.id}>
                       {showGroupHeader && (
-                        <tr className="bg-slate-50/50">
+                        <tr className="bg-emerald-50/30">
                           <td
                             colSpan={columns.length}
-                            className="px-4 py-3 border-y border-slate-200 bg-slate-100/30"
+                            className="px-4 py-2.5 border-y border-emerald-100 shadow-inner"
                           >
-                            <div className="flex items-center gap-2 text-indigo-700">
+                            <div className="flex items-center gap-2 text-emerald-700">
                               <Layers size={14} className="opacity-70" />
-                              <span className="font-black text-[10px] tracking-[0.2em] uppercase">
-                                Modul {module_name}
+                              <span className="font-black text-[9px] tracking-[0.25em] uppercase">
+                                Modul: {module_name}
                               </span>
                             </div>
                           </td>
                         </tr>
                       )}
-                      <tr className="hover:bg-indigo-50/20 transition-colors group">
+                      <tr className="hover:bg-emerald-50/20 transition-colors group">
                         {row.getVisibleCells().map((cell) => (
                           <td
                             key={cell.id}

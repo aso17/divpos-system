@@ -6,8 +6,8 @@ import { useFormValidation } from "../../hooks/useFormValidation";
 
 // Import Service
 import PackageService from "../../services/PackageService";
-// import ServiceService from "../../services/ServiceService";
-// import CategoryService from "../../services/CategoryService";
+import MasterService from "../../services/MasterService";
+import CategoryService from "../../services/CategoryService";
 
 export default function PackageForm({
   open,
@@ -47,8 +47,8 @@ export default function PackageForm({
       const loadOptions = async () => {
         try {
           const [resSvc, resCat] = await Promise.all([
-            ServiceService.getAllServices(),
-            CategoryService.getAllCategories(),
+            MasterService.getMasterServices(),
+            CategoryService.getCategories(),
           ]);
           setServices(resSvc.data?.data || []);
           setCategories(resCat.data?.data || []);
@@ -99,12 +99,13 @@ export default function PackageForm({
       const payload = { ...values, is_active: values.is_active ? 1 : 0 };
 
       let response;
+
       if (initialData?.id) {
         response = await PackageService.updatePackage(initialData.id, payload);
       } else {
         response = await PackageService.createPackage(payload);
       }
-
+      console.log(response);
       triggerToast(response.data?.message || "Success", "success");
       onSuccess?.(response.data?.data);
       onClose();
@@ -120,7 +121,9 @@ export default function PackageForm({
 
   const triggerToast = (message, type) => {
     window.dispatchEvent(
-      new CustomEvent("global-toast", { detail: { message, type } }),
+      new CustomEvent("global-toast", {
+        detail: { message, type },
+      }),
     );
   };
 
@@ -263,14 +266,13 @@ export default function PackageForm({
             </label>
           </div>
 
-          {/* Footer Buttons - Diperbaiki ukurannya */}
           <div className="col-span-2 flex justify-end gap-2 pt-4 mt-2 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-[10px] font-black uppercase bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-500 hover:text-white rounded-lg transition-all"
             >
-              Batal
+              Cancel
             </button>
             <SubmitButton
               isSubmitting={isSubmitting}

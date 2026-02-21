@@ -104,10 +104,12 @@ export default function MasterServiceForm({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-sm w-full max-w-md shadow-2xl overflow-hidden border-t-4 border-indigo-600 animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-sm w-full max-w-md shadow-2xl overflow-hidden border-t-4 border-emerald-500 animate-in fade-in zoom-in duration-200">
         <div className="p-6">
           <h2 className="text-xs font-bold mb-6 text-slate-700 uppercase tracking-wider border-b pb-3 flex items-center gap-2">
-            <span className="p-1 bg-indigo-50 text-indigo-600 rounded">🛠️</span>
+            <span className="p-1 bg-emerald-50 text-emerald-600 rounded">
+              🛠️
+            </span>
             {initialData ? "Edit Layanan Jasa" : "Tambah Layanan Baru"}
           </h2>
 
@@ -123,7 +125,7 @@ export default function MasterServiceForm({
               <input
                 value={values.name}
                 onChange={(e) => handleChange("name", e.target.value)}
-                className={inputClasses({ error: !!errors.name })}
+                className={`${inputClasses({ error: !!errors.name })} focus:border-emerald-500 focus:ring-emerald-500/20`}
                 placeholder="Contoh: Cuci Kering, Setrika Saja"
                 autoFocus
               />
@@ -140,7 +142,7 @@ export default function MasterServiceForm({
               <textarea
                 value={values.description}
                 onChange={(e) => handleChange("description", e.target.value)}
-                className={`${inputClasses({ error: !!errors.description })} min-h-[80px] py-2`}
+                className={`${inputClasses({ error: !!errors.description })} min-h-[80px] py-2 focus:border-emerald-500 focus:ring-emerald-500/20`}
                 placeholder="Jelaskan apa saja yang didapat dalam layanan ini..."
               />
               {errors.description && (
@@ -157,10 +159,10 @@ export default function MasterServiceForm({
                   type="checkbox"
                   checked={values.is_active}
                   onChange={(e) => handleChange("is_active", e.target.checked)}
-                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer transition-all"
+                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer transition-all"
                 />
                 <div className="flex flex-col">
-                  <span className="text-slate-600 font-bold uppercase text-[9px] group-hover:text-indigo-600 transition-colors">
+                  <span className="text-slate-600 font-bold uppercase text-[9px] group-hover:text-emerald-600 transition-colors">
                     Status Layanan Aktif
                   </span>
                   <span className="text-[8px] text-slate-400">
@@ -175,8 +177,7 @@ export default function MasterServiceForm({
               <button
                 type="button"
                 onClick={onClose}
-                disabled={isSubmitting}
-                className="px-4 py-2 border border-slate-300 rounded text-[10px] font-bold uppercase text-slate-500 hover:bg-slate-50 transition-all disabled:opacity-50"
+                className="px-4 py-2 text-[10px] font-black uppercase bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-500 hover:text-white rounded-lg transition-all"
               >
                 Cancel
               </button>
@@ -185,7 +186,7 @@ export default function MasterServiceForm({
                 label={initialData ? "Update Layanan" : "Create Layanan"}
                 loadingLabel="Processing..."
                 fullWidth={false}
-                className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-200"
+                className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-100 transition-all"
               />
             </div>
           </form>
