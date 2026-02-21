@@ -87,6 +87,7 @@ class MasterServiceController extends Controller
         }
 
         // 2. Validasi Ketat (Sesuaikan dengan skema tabel Ms_services)
+        
         $validated = $request->validate([
             'tenant_id'   => 'required|integer|exists:Ms_tenants,id',
             'name'        => 'sometimes|required|string|max:100',

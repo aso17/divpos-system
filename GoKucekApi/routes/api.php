@@ -10,6 +10,8 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\OutletController;
 use App\Http\Controllers\MasterServiceController;
+use App\Http\Controllers\PackageController;
+use App\Http\Controllers\CategoryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,12 +53,22 @@ Route::middleware('api')->group(function () {
         Route::delete('/outlet/{id}', [OutletController::class, 'destroy']); 
 
         // 👇 Master MODULE SERVICE
-       
         Route::get('/masterservice', [MasterServiceController::class, 'index']); 
         Route::post('/masterservice', [MasterServiceController::class, 'store']); 
         Route::put('/masterservice/{id}', [MasterServiceController::class, 'update']); 
         Route::delete('/masterservice/{id}', [MasterServiceController::class, 'destroy']); 
-
+        
+        // 👇 Master MODULE Package Harga
+        Route::get('/package', [PackageController::class, 'index']); 
+        Route::post('/package', [PackageController::class, 'store']); 
+        Route::put('/package/{id}', [PackageController::class, 'update']); 
+        Route::delete('/package/{id}', [PackageController::class, 'destroy']); 
+        
+        Route::get('/category', [CategoryController::class, 'index']); 
+        Route::post('/category', [CategoryController::class, 'store']); 
+        Route::put('/category/{id}', [CategoryController::class, 'update']); 
+        Route::delete('/category/{id}', [CategoryController::class, 'destroy']); 
+        
          // 👇 ROLE MODULE
         Route::get('/GetRolesByTenant', [RoleController::class, 'GetRolesByTenantId']); 
         Route::get('/role', [RoleController::class, 'index']); 

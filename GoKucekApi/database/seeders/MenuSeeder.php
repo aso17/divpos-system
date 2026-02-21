@@ -19,18 +19,29 @@ class MenuSeeder extends Seeder
             ['module'=>'TRANSAKSI','menu_name'=>'Transaksi','code'=>'TRX_ORDER','route_name'=>'/transaksi','icon'=>'credit-card','order_no'=>2,'parent'=>null],
             ['module'=>'TRANSAKSI','menu_name'=>'Riwayat Transaksi','code'=>'TRX_HISTORY','route_name'=>'/trxriwayat','icon'=>'history','order_no'=>3,'parent'=>null],
 
+            // // MASTER DATA (PARENT)
+            // ['module'=>'MASTER','menu_name'=>'Master Data','code'=>'MST_PARENT','route_name'=>null,'icon'=>'database','order_no'=>4,'parent'=>null],
+
+            // ['module'=>'MASTER','menu_name'=>'Outlet / Cabang','code'=>'MST_OUTLET','route_name'=>'/outlet','icon'=>'map-pin','order_no'=>1,'parent'=>'MST_PARENT'],
+            // ['module'=>'MASTER','menu_name'=>'Pelanggan','code'=>'MST_PELANGGAN','route_name'=>'/pelanggan','icon'=>'users','order_no'=>2,'parent'=>'MST_PARENT'],
+            // ['module'=>'MASTER','menu_name'=>'Layanan','code'=>'MST_LAYANAN','route_name'=>'layanan','icon'=>'package','order_no'=>3,'parent'=>'MST_PARENT'],
+            // ['module'=>'MASTER','menu_name'=>'Paket / Harga','code'=>'MST_PAKET','route_name'=>'/paket','icon'=>'tag','order_no'=>4,'parent'=>'MST_PARENT'],
+            
             // MASTER DATA (PARENT)
             ['module'=>'MASTER','menu_name'=>'Master Data','code'=>'MST_PARENT','route_name'=>null,'icon'=>'database','order_no'=>4,'parent'=>null],
 
             ['module'=>'MASTER','menu_name'=>'Outlet / Cabang','code'=>'MST_OUTLET','route_name'=>'/outlet','icon'=>'map-pin','order_no'=>1,'parent'=>'MST_PARENT'],
             ['module'=>'MASTER','menu_name'=>'Pelanggan','code'=>'MST_PELANGGAN','route_name'=>'/pelanggan','icon'=>'users','order_no'=>2,'parent'=>'MST_PARENT'],
-            ['module'=>'MASTER','menu_name'=>'Layanan','code'=>'MST_LAYANAN','route_name'=>'layanan','icon'=>'package','order_no'=>3,'parent'=>'MST_PARENT'],
-            ['module'=>'MASTER','menu_name'=>'Paket / Harga','code'=>'MST_PAKET','route_name'=>'/paket','icon'=>'tag','order_no'=>4,'parent'=>'MST_PARENT'],
+            ['module'=>'MASTER','menu_name'=>'Karyawan / User','code'=>'MST_USER','route_name'=>'/karyawan','icon'=>'user-check','order_no'=>3,'parent'=>'MST_PARENT'],
 
-            // OPSIONAL TAMBAHAN
-            ['module'=>'MASTER','menu_name'=>'Karyawan / User','code'=>'MST_KARYAWAN','route_name'=>'/master/karyawan','icon'=>'user-cog','order_no'=>5,'parent'=>'MST_PARENT'],
-            ['module'=>'MASTER','menu_name'=>'Metode Pembayaran','code'=>'MST_PEMBAYARAN','route_name'=>'/master/pembayaran','icon'=>'credit-card','order_no'=>6,'parent'=>'MST_PARENT'],
+            // Kelompok Pengaturan Produk
+            ['module'=>'MASTER','menu_name'=>'Jenis Layanan','code'=>'MST_LAYANAN','route_name'=>'/layanan','icon'=>'layers','order_no'=>4,'parent'=>'MST_PARENT'],
+            ['module'=>'MASTER','menu_name'=>'Kategori & Durasi','code'=>'MST_KATEGORI','route_name'=>'/kategori','icon'=>'clock','order_no'=>5,'parent'=>'MST_PARENT'],
+            ['module'=>'MASTER','menu_name'=>'Paket / Harga','code'=>'MST_PAKET','route_name'=>'/paket','icon'=>'tag','order_no'=>6,'parent'=>'MST_PARENT'],
 
+            // Kelompok Keuangan
+            ['module'=>'MASTER','menu_name'=>'Metode Pembayaran','code'=>'MST_PAYMENT','route_name'=>'/payment-method','icon'=>'credit-card','order_no'=>7,'parent'=>'MST_PARENT'],
+          
             // LAPORAN
             ['module'=>'REPORT','menu_name'=>'Laporan','code'=>'RPT_PARENT','route_name'=>null,'icon'=>'bar-chart-2','order_no'=>5,'parent'=>null],
             ['module'=>'REPORT','menu_name'=>'Harian','code'=>'RPT_DAILY','route_name'=>'/laporan/harian','icon'=>'calendar','order_no'=>1,'parent'=>'RPT_PARENT'],

@@ -17,7 +17,7 @@ return new class extends Migration
         $table->foreignId('service_id')->constrained('Ms_services')->onDelete('cascade');
         $table->foreignId('category_id')->constrained('Ms_categories')->onDelete('cascade');
         $table->string('code', 20);       
-    
+
         $table->string('name', 100); 
         
         $table->string('description', 200)->nullable();
