@@ -11,7 +11,20 @@ const getAuthInfo = () => {
 };
 
 const PackageService = {
-  // Ambil daftar paket (Master Paket)
+  getNextCode: (serviceId, categoryId) => {
+    const { tenantId } = getAuthInfo();
+    const service_Id = encrypt(serviceId);
+    const category_Id = encrypt(categoryId);
+    return api.get("/generate-code", {
+      params: {
+        tenant_id: encrypt(tenantId),
+        service_id: service_Id,
+        category_id: category_Id,
+        module: "package",
+      },
+    });
+  },
+
   getPackages: (params = {}) => {
     const { tenantId } = getAuthInfo();
     return api.get("/package", {
@@ -24,6 +37,7 @@ const PackageService = {
 
   // Buat paket baru
   createPackage: (payload) => {
+    console.log(payload);
     const { tenantId, userLogin } = getAuthInfo();
     const finalPayload = {
       ...payload,
@@ -36,19 +50,21 @@ const PackageService = {
   // Update data paket
   updatePackage: (id, payload) => {
     const { tenantId, userLogin } = getAuthInfo();
+    const package_id = encrypt(id);
     const finalPayload = {
       ...payload,
       tenant_id: encrypt(tenantId),
       updated_by: encrypt(userLogin),
-      _method: "PUT", // Gunakan POST + _method PUT untuk kompatibilitas Laravel
+      _method: "PUT",
     };
-    return api.post(`/package/${id}`, finalPayload);
+    return api.post(`/package/${package_id}`, finalPayload);
   },
 
   // Hapus paket (Soft Delete)
   deletePackage: (id) => {
     const { tenantId } = getAuthInfo();
-    return api.delete(`/package/${encrypt(id)}`, {
+    const package_id = encrypt(id);
+    return api.delete(`/package/${package_id}`, {
       params: {
         tenant_id: encrypt(tenantId),
       },

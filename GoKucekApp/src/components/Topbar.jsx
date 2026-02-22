@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Bell,
   Search,
+  CheckCircle2,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -46,114 +47,136 @@ export default function Topbar({ onToggleSidebar }) {
   }, []);
 
   return (
-    <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-8 sticky top-0 z-40">
+    <header className="h-20 bg-white/70 backdrop-blur-xl border-b border-slate-100 flex items-center justify-between px-4 md:px-8 sticky top-0 z-40 transition-all">
       {/* LEFT SECTION */}
-      <div className="flex items-center gap-6 flex-1">
+      <div className="flex items-center gap-4 md:gap-6 flex-1">
         <button
           onClick={onToggleSidebar}
-          className="p-2.5 rounded-xl bg-slate-50 text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-all border border-slate-100 active:scale-95"
+          className="p-2.5 rounded-xl bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-slate-100 shadow-sm active:scale-95 group"
         >
-          <Menu size={20} />
+          <Menu
+            size={20}
+            className="group-hover:rotate-180 transition-transform duration-500"
+          />
         </button>
 
-        {/* Search Bar - Menambah kesan Dashboard Premium */}
-        <div className="hidden md:flex items-center gap-3 bg-slate-50 border border-slate-100 px-4 py-2 rounded-2xl w-full max-w-xs focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:border-primary-500 transition-all group">
+        {/* Search Bar - Diperhalus */}
+        <div className="hidden lg:flex items-center gap-3 bg-slate-100/50 border border-slate-100 px-4 py-2.5 rounded-2xl w-full max-w-sm focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:border-emerald-500/50 focus-within:bg-white transition-all group">
           <Search
             size={18}
-            className="text-slate-400 group-focus-within:text-primary-500"
+            className="text-slate-400 group-focus-within:text-emerald-500 transition-colors"
           />
           <input
             type="text"
-            placeholder="Cari orderan..."
-            className="bg-transparent border-none outline-none text-sm text-slate-600 w-full placeholder:text-slate-400"
+            placeholder="Cari transaksi atau pelanggan..."
+            className="bg-transparent border-none outline-none text-[13px] font-medium text-slate-600 w-full placeholder:text-slate-400"
           />
+          <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-slate-200 bg-white px-1.5 font-sans text-[10px] font-medium text-slate-400 opacity-100">
+            <span className="text-xs">⌘</span>K
+          </kbd>
         </div>
       </div>
 
       {/* RIGHT SECTION */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4">
         {/* Notifikasi */}
-        <button className="p-2.5 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-primary-600 transition-all relative">
-          <Bell size={20} />
-          <span className="absolute top-2.5 right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+        <button className="p-2.5 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-emerald-600 transition-all relative group border border-transparent hover:border-slate-100">
+          <Bell size={20} className="group-hover:shake-animation" />
+          <span className="absolute top-2.5 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
         </button>
 
-        <div className="h-8 w-px bg-slate-100 mx-2" />
+        <div className="h-6 w-px bg-slate-200 mx-1 md:mx-2" />
 
         {/* Profile Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <div
             onClick={() => setOpen(!open)}
-            className="flex items-center gap-3 p-1.5 pr-3 rounded-2xl cursor-pointer select-none hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100"
+            className={`flex items-center gap-3 p-1 rounded-2xl cursor-pointer select-none transition-all border border-transparent 
+              ${open ? "bg-slate-50 border-slate-100 shadow-inner" : "hover:bg-slate-50/50 hover:border-slate-100"}`}
           >
-            <div className="relative">
+            <div className="relative group">
               <img
                 src={avatar}
-                className="w-10 h-10 rounded-xl object-cover shadow-sm border border-slate-200"
+                className={`w-9 h-9 md:w-10 md:h-10 rounded-xl object-cover shadow-md border-2 transition-transform duration-300 group-hover:scale-105 
+                  ${open ? "border-emerald-500 shadow-emerald-100" : "border-white"}`}
                 alt="avatar"
               />
-              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-primary-500 border-2 border-white rounded-full shadow-sm"></div>
+              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full shadow-sm"></div>
             </div>
 
-            <div className="hidden sm:block text-left">
-              <p className="text-sm font-bold text-slate-800 leading-none">
+            <div className="hidden sm:block text-left mr-1">
+              <p className="text-[13px] font-black text-slate-800 leading-none">
                 {user?.full_name || "Admin GoKucek"}
               </p>
-              <p className="text-[10px] font-bold text-primary-600 uppercase tracking-tighter mt-1">
-                {user?.role || "Staff Manager"}
-              </p>
+              <div className="flex items-center gap-1 mt-1">
+                <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-tighter">
+                  {user?.role || "Staff Manager"}
+                </p>
+                <CheckCircle2 size={10} className="text-emerald-500" />
+              </div>
             </div>
 
             <ChevronDown
-              size={16}
-              className={`text-slate-400 transition-transform duration-300 ${
-                open ? "rotate-180 text-primary-600" : ""
+              size={14}
+              className={`text-slate-400 transition-all duration-300 ${
+                open ? "rotate-180 text-emerald-600" : ""
               }`}
             />
           </div>
 
           {/* Dropdown Menu Box */}
           <div
-            className={`absolute right-0 top-[calc(100%+12px)] w-56 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 overflow-hidden transform transition-all duration-300 origin-top-right
+            className={`absolute right-0 top-[calc(100%+15px)] w-64 bg-white border border-slate-100 rounded-[1.5rem] shadow-2xl z-50 overflow-hidden transform transition-all duration-300 origin-top-right
               ${
                 open
                   ? "opacity-100 scale-100 translate-y-0"
-                  : "opacity-0 scale-95 -translate-y-2 pointer-events-none"
+                  : "opacity-0 scale-95 -translate-y-4 pointer-events-none"
               }
             `}
           >
-            <div className="p-4 border-b border-slate-50 bg-slate-50/50">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                Akun Anda
-              </p>
-              <p className="text-sm font-bold text-slate-800 truncate">
-                {user?.email || "admin@gokucek.com"}
-              </p>
+            {/* Header Dropdown */}
+            <div className="p-5 border-b border-slate-50 bg-gradient-to-br from-slate-50 to-white">
+              <div className="flex items-center gap-3">
+                <img
+                  src={avatar}
+                  className="w-10 h-10 rounded-lg object-cover"
+                  alt="p"
+                />
+                <div className="overflow-hidden">
+                  <p className="text-[12px] font-black text-slate-800 truncate">
+                    {user?.full_name}
+                  </p>
+                  <p className="text-[10px] font-medium text-slate-400 truncate lowercase">
+                    {user?.email || "admin@gokucek.com"}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="p-2">
-              <button className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-primary-50 hover:text-primary-700 rounded-xl transition-colors group">
-                <User
-                  size={18}
-                  className="text-slate-400 group-hover:text-primary-600"
-                />{" "}
+              <button className="flex items-center gap-3 w-full px-4 py-3 text-[13px] font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-all group">
+                <div className="p-1.5 rounded-lg bg-slate-50 group-hover:bg-white group-hover:shadow-sm transition-all text-slate-400 group-hover:text-emerald-600">
+                  <User size={16} />
+                </div>
                 Profil Saya
               </button>
-              <button className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-primary-50 hover:text-primary-700 rounded-xl transition-colors group">
-                <Settings
-                  size={18}
-                  className="text-slate-400 group-hover:text-primary-600"
-                />{" "}
+              <button className="flex items-center gap-3 w-full px-4 py-3 text-[13px] font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-all group">
+                <div className="p-1.5 rounded-lg bg-slate-50 group-hover:bg-white group-hover:shadow-sm transition-all text-slate-400 group-hover:text-emerald-600">
+                  <Settings size={16} />
+                </div>
                 Pengaturan
               </button>
             </div>
 
-            <div className="p-2 border-t border-slate-50">
+            <div className="p-2 border-t border-slate-50 bg-slate-50/30">
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 rounded-xl transition-colors font-bold"
+                className="flex items-center gap-3 w-full px-4 py-3 text-[13px] text-red-500 hover:bg-red-50 rounded-xl transition-all font-black uppercase tracking-widest"
               >
-                <LogOut size={18} /> Keluar Aplikasi
+                <div className="p-1.5 rounded-lg bg-red-100/50 text-red-600">
+                  <LogOut size={16} />
+                </div>
+                Keluar
               </button>
             </div>
           </div>

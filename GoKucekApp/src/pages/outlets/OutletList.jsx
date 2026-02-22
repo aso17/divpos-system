@@ -15,7 +15,7 @@ import {
   Phone,
 } from "lucide-react";
 
-import LoadingDots from "../../components/common/LoadingDots";
+import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
 import OutletService from "../../services/OutletService";
@@ -213,20 +213,20 @@ export default function OutletList() {
   });
 
   return (
-    <div className="p-6 space-y-6 bg-slate-50/50 min-h-screen">
+    <div className="px-2 py-4 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-28 md:pb-6">
       <AppHead title="Outlet Management" />
 
-      {/* Header Page */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200">
-            <Store size={24} className="text-emerald-600" />
+      {/* --- Header Section --- */}
+      <div className="flex items-center justify-between gap-4 px-1">
+        <div className="flex items-center gap-2.5">
+          <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
+            <Store size={20} className="text-emerald-600" />
           </div>
           <div>
-            <h1 className="text-xs font-black text-slate-800 uppercase tracking-tight leading-none">
+            <h1 className="text-[11px] md:text-sm font-black text-slate-800 uppercase leading-none">
               Master Outlet
             </h1>
-            <p className="text-xs text-slate-500 mt-1 font-medium">
+            <p className="hidden md:block text-[10px] text-slate-500 mt-1 font-medium">
               Kelola lokasi dan kontak cabang laundry
             </p>
           </div>
@@ -237,84 +237,138 @@ export default function OutletList() {
             setSelectedOutlet(null);
             setOpenModal(true);
           }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xxs font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 uppercase"
+          className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
         >
           <PlusSquare size={18} /> Tambah Cabang
         </button>
       </div>
 
-      {/* Filter & Search */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">
-        <form
-          onSubmit={handleSearch}
-          className="flex items-center gap-2 w-full md:w-auto"
-        >
-          <div className="relative flex-1 md:w-72 group">
-            <Search
-              className="absolute left-3 top-2.5 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
-              size={16}
-            />
-            <input
-              className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xxs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-              placeholder="Cari nama atau kode..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={handleReset}
-                className="absolute right-3 top-2.5 text-slate-400 hover:text-rose-500"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-          <button
-            type="submit"
-            className="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all shadow-md"
-          >
-            CARI
-          </button>
-        </form>
+      {/* --- Search Section (Anti-Molor) --- */}
+      <div className="flex justify-start px-1">
+        <div className="bg-white p-2 rounded-2xl border border-slate-100 shadow-sm w-full md:w-auto md:min-w-[320px]">
+          <form onSubmit={handleSearch} className="flex items-center gap-1.5">
+            <div className="relative flex-1 group">
+              <Search
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
+                size={13}
+              />
+              <input
+                className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] outline-none focus:bg-white focus:border-emerald-500/50 transition-all placeholder:text-slate-400"
+                placeholder="Cari nama atau kode..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="bg-slate-900 text-white h-[32px] px-3 md:px-4 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-sm"
+            >
+              <Search size={14} className="md:hidden" />
+              <span className="hidden md:block">CARI</span>
+            </button>
+          </form>
+        </div>
       </div>
 
-      {/* Table Section */}
-      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden relative min-h-[450px] flex flex-col">
-        <div className="overflow-x-auto grow relative">
-          {loading && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[2px]">
-              <LoadingDots overlay />
+      {/* --- Responsive Data View Outlet --- */}
+      <ResponsiveDataView
+        data={data}
+        loading={loading}
+        emptyMessage="Belum ada data outlet tersedia"
+        renderMobileCard={(outlet) => (
+          <div
+            key={outlet.id}
+            className="bg-white rounded-[1.25rem] p-3 shadow-sm border border-slate-100 space-y-3 mx-1"
+          >
+            <div className="flex justify-between items-start gap-2">
+              <div className="space-y-0.5 flex-1">
+                <h3 className="text-[11px] font-black text-slate-800 uppercase leading-tight">
+                  {outlet.name}
+                </h3>
+                <span className="text-[7px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100 uppercase">
+                  #{outlet.code}
+                </span>
+              </div>
+              <div
+                className={`px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase border shrink-0 ${outlet.is_active ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"}`}
+              >
+                {outlet.is_active ? "Operasional" : "Tutup"}
+              </div>
             </div>
-          )}
 
-          <table className="w-full">
-            <thead>
-              {table.getHeaderGroups().map((hg) => (
-                <tr
-                  key={hg.id}
-                  className="bg-slate-50/50 border-b border-slate-100"
-                >
-                  {hg.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      className="px-6 py-4 text-[8px] font-black text-slate-400 uppercase tracking-[0.15em] text-left"
+            <div className="space-y-2 py-2 border-y border-slate-50">
+              <div className="flex items-center gap-2">
+                <MapPin size={10} className="text-slate-300 shrink-0" />
+                <p className="text-[9px] text-slate-500 italic truncate">
+                  {outlet.address || "Alamat tidak tersedia"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone size={10} className="text-slate-300 shrink-0" />
+                <p className="text-[9px] text-slate-600 font-bold">
+                  {outlet.phone || "-"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => {
+                  setSelectedOutlet(outlet);
+                  setOpenModal(true);
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
+              >
+                <Pencil size={10} /> Edit
+              </button>
+              <button
+                onClick={() => handleDelete(outlet)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
+              >
+                <Trash2 size={10} /> Hapus
+              </button>
+            </div>
+          </div>
+        )}
+        renderDesktopTable={() => (
+          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  {table.getHeaderGroups().map((hg) => (
+                    <tr
+                      key={hg.id}
+                      className="bg-slate-50/50 border-b border-slate-100"
                     >
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                    </th>
+                      {hg.headers.map((header) => (
+                        <th
+                          key={header.id}
+                          className="px-6 py-4 text-[8px] font-black text-slate-400 uppercase tracking-widest"
+                        >
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                        </th>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {table.getRowModel().rows.length > 0
-                ? table.getRowModel().rows.map((row) => (
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {table.getRowModel().rows.map((row) => (
                     <tr
                       key={row.id}
-                      className="hover:bg-emerald-50/30 transition-colors cursor-default group"
+                      className="hover:bg-emerald-50/30 transition-colors"
                     >
                       {row.getVisibleCells().map((cell) => (
                         <td key={cell.id} className="px-6 py-4 align-middle">
@@ -325,25 +379,27 @@ export default function OutletList() {
                         </td>
                       ))}
                     </tr>
-                  ))
-                : !loading && (
-                    <tr>
-                      <td
-                        colSpan={columns.length}
-                        className="p-20 text-center text-slate-400 italic text-xs font-medium"
-                      >
-                        Belum ada data outlet yang tersedia
-                      </td>
-                    </tr>
-                  )}
-            </tbody>
-          </table>
-        </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-4 bg-slate-50/50 border-t border-slate-100">
+              <TablePagination table={table} totalEntries={totalCount} />
+            </div>
+          </div>
+        )}
+      />
 
-        <div className="p-4 bg-slate-50/50 border-t border-slate-100">
-          <TablePagination table={table} totalEntries={totalCount} />
-        </div>
-      </div>
+      {/* Floating Action Button Mobile */}
+      <button
+        onClick={() => {
+          setSelectedOutlet(null);
+          setOpenModal(true);
+        }}
+        className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 border-4 border-white transition-all"
+      >
+        <PlusSquare size={20} />
+      </button>
 
       <OutletForm
         open={openModal}

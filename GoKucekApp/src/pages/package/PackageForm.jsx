@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import SubmitButton from "../../components/SubmitButton";
 import { rules } from "../../utils/validators/rules";
 import { inputClasses } from "../../utils/validators/inputClasses";
+import { formatRupiah, parseNumber } from "../../utils/formatter";
 import { useFormValidation } from "../../hooks/useFormValidation";
 
 // Import Service
@@ -18,6 +19,7 @@ export default function PackageForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const { values, errors, handleChange, validate, setValues, setErrors } =
     useFormValidation(
@@ -69,7 +71,7 @@ export default function PackageForm({
         code: initialData.code || "",
         name: initialData.name || "",
         description: initialData.description || "",
-        price: initialData.price || "",
+        price: initialData.price ? initialData.price.toString() : "",
         unit: initialData.unit || "Kg",
         min_order: initialData.min_order || 1,
         is_active: initialData.is_active == 1 || initialData.is_active === true,
@@ -90,6 +92,34 @@ export default function PackageForm({
     setErrors({});
   }, [open, initialData, setValues, setErrors]);
 
+  // Fungsi Generate Kode Otomatis
+  const generateAutoCode = useCallback(
+    async (sId, cId) => {
+      if (!sId || !cId || initialData) return;
+
+      setIsGenerating(true);
+      try {
+        const res = await PackageService.getNextCode(sId, cId);
+        handleChange("code", res.data.code);
+      } catch (err) {
+        console.error("Auto-generate failed", err);
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [initialData, handleChange],
+  );
+
+  useEffect(() => {
+    if (values.service_id && values.category_id && !initialData) {
+      generateAutoCode(values.service_id, values.category_id);
+    }
+  }, [values.service_id, values.category_id, generateAutoCode, initialData]);
+
+  const handlePriceInputChange = (e) => {
+    const rawValue = parseNumber(e.target.value);
+    handleChange("price", rawValue);
+  };
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
@@ -105,7 +135,7 @@ export default function PackageForm({
       } else {
         response = await PackageService.createPackage(payload);
       }
-      console.log(response);
+
       triggerToast(response.data?.message || "Success", "success");
       onSuccess?.(response.data?.data);
       onClose();
@@ -182,12 +212,9 @@ export default function PackageForm({
             </label>
             <input
               value={values.code}
-              onChange={(e) =>
-                handleChange("code", e.target.value.toUpperCase())
-              }
-              disabled={!!initialData}
-              className={`${inputClasses({ error: !!errors.code })} py-1.5 font-mono focus:ring-emerald-500 focus:border-emerald-500`}
-              placeholder="CUKIL"
+              disabled={true}
+              className={`${inputClasses({ error: !!errors.code })} bg-slate-50 font-mono text-emerald-600 font-bold cursor-not-allowed`}
+              placeholder={isGenerating ? "Generating..." : "AUTO-CODE"}
             />
           </div>
 
@@ -208,9 +235,9 @@ export default function PackageForm({
               Harga (Rp)
             </label>
             <input
-              type="number"
-              value={values.price}
-              onChange={(e) => handleChange("price", e.target.value)}
+              type="text"
+              value={formatRupiah(values.price)}
+              onChange={handlePriceInputChange}
               className={`${inputClasses({ error: !!errors.price })} py-1.5 focus:ring-emerald-500 focus:border-emerald-500`}
             />
           </div>
@@ -276,7 +303,7 @@ export default function PackageForm({
             </button>
             <SubmitButton
               isSubmitting={isSubmitting}
-              label={initialData ? "Update" : "Create"}
+              label={initialData ? "Update" : "Save"}
               loadingLabel="Processing..."
               fullWidth={false}
               className="text-[10px] font-bold uppercase py-1.5 px-6 rounded shadow-sm shadow-blue-200"

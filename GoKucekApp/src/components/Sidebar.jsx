@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { icons } from "../utils/Icons";
+import { ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
 
 export default function Sidebar() {
   const { menus } = useAuth();
   const [open, setOpen] = useState(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
 
   const ChevronIcon = icons.chevron;
@@ -17,135 +19,152 @@ export default function Sidebar() {
     if (parent) setOpen(parent.id);
   }, [location.pathname, menus]);
 
+  const toggleCollapse = () => setIsCollapsed(!isCollapsed);
+
   return (
-    <aside className="w-64 min-h-screen bg-white border-r border-slate-100 flex flex-col transition-all duration-300">
-      {/* Brand Header Section */}
-      <div className="p-5 mb-4">
-        <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-300">
-          <div className="bg-slate-50 rounded-xl p-1.5 flex-shrink-0 border border-slate-100 shadow-inner">
+    <aside
+      className={`relative min-h-screen bg-white border-r border-slate-100 flex flex-col transition-all duration-500 ease-in-out z-40 
+      ${isCollapsed ? "w-20" : "w-56"}`} // Dikurangi ke w-56 agar lebih ramping
+    >
+      {/* Tombol Toggle */}
+      <button
+        onClick={toggleCollapse}
+        className="hidden md:flex absolute -right-3 top-10 w-6 h-6 bg-white border border-slate-100 shadow-sm rounded-full items-center justify-center text-slate-400 hover:text-emerald-600 z-50 transition-colors"
+      >
+        {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
+
+      {/* Brand Header - Padding dikecilkan */}
+      <div
+        className={`p-3 mb-2 transition-all duration-300 ${isCollapsed ? "px-4" : ""}`}
+      >
+        <div
+          className={`flex items-center gap-2 p-2 rounded-2xl bg-slate-50/50 border border-slate-100 transition-all ${isCollapsed ? "justify-center" : ""}`}
+        >
+          <div className="bg-white rounded-xl p-1 flex-shrink-0 shadow-sm border border-slate-100">
             <img
               src={localStorage.getItem("tenant_logo_path")}
               alt="Logo"
-              className="w-9 h-9 object-contain grayscale-[0.2] hover:grayscale-0 transition-all"
+              className="w-6 h-6 object-contain" // Ukuran logo dikecilkan sedikit
             />
           </div>
-          <div className="overflow-hidden">
-            <h1 className="text-[13px] font-extrabold text-slate-800 truncate leading-tight uppercase tracking-tight">
-              {localStorage.getItem("tenant_name") || "GoKucek"}
-            </h1>
-          </div>
+          {!isCollapsed && (
+            <div className="overflow-hidden animate-in fade-in slide-in-from-left-2">
+              <h1 className="text-[10px] font-black text-slate-800 truncate uppercase tracking-tight leading-none">
+                {localStorage.getItem("tenant_name") || "GoKucek"}
+              </h1>
+              <span className="text-[7px] text-emerald-600 font-bold uppercase tracking-tighter">
+                Laundry System
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Navigation Container */}
-      <nav className="flex-1 px-4 space-y-2 overflow-y-auto custom-scrollbar">
-        <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 opacity-70">
-          Menu Utama
-        </p>
+      {/* Navigation - Padding px-2 agar item menu lebih lebar di dalam */}
+      <nav className="flex-1 px-2.5 space-y-0.5 overflow-y-auto custom-scrollbar overflow-x-hidden">
+        {!isCollapsed && (
+          <p className="px-3 text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 mt-2 opacity-60">
+            Menu Utama
+          </p>
+        )}
 
         {menus.map((menu) => {
-          const Icon = icons[menu.icon];
+          const Icon = icons[menu.icon] || LayoutGrid;
           const hasChild = menu.children?.length > 0;
           const isActive =
             menu.route === location.pathname ||
             menu.children?.some((c) => c.route === location.pathname);
           const isOpen = open === menu.id;
 
-          const baseItemClass = `group flex items-center justify-between px-4 py-3 rounded-xl text-[12px] transition-all duration-300 cursor-pointer mb-1.5 relative overflow-hidden`;
-          const activeItemClass = `bg-primary-500 text-white shadow-lg shadow-primary-100 font-bold translate-x-1`;
-          const inactiveItemClass = `text-slate-500 hover:bg-primary-50 hover:text-primary-700 hover:translate-x-1`;
-
           return (
-            <div key={menu.id} className="relative px-1">
+            <div key={menu.id} className="relative">
               {!hasChild ? (
                 <NavLink
                   to={menu.route}
-                  className={({ isActive }) =>
-                    `${baseItemClass} ${isActive ? activeItemClass : inactiveItemClass}`
-                  }
+                  className={({ isActive }) => `
+                    group flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-300 mb-0.5
+                    ${
+                      isActive
+                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-100/50"
+                        : "text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
+                    }
+                    ${isCollapsed ? "justify-center px-0 mx-auto w-10" : ""}
+                  `}
                 >
-                  <div className="flex items-center gap-3.5 relative z-10">
-                    {Icon && (
-                      <Icon
-                        size={19}
-                        className={
-                          location.pathname === menu.route
-                            ? "text-white"
-                            : "text-slate-400 group-hover:text-primary-600 transition-colors"
-                        }
-                      />
-                    )}
-                    <span className="tracking-wide">{menu.name}</span>
-                  </div>
+                  <Icon
+                    size={18} // Ukuran icon konsisten 18px
+                    className={
+                      isActive
+                        ? "text-white"
+                        : "text-slate-400 group-hover:text-emerald-600"
+                    }
+                  />
+                  {!isCollapsed && (
+                    <span className="text-[11px] font-bold tracking-tight">
+                      {menu.name}
+                    </span>
+                  )}
                 </NavLink>
               ) : (
                 <>
                   <button
-                    onClick={() => setOpen(isOpen ? null : menu.id)}
-                    className={`w-full ${baseItemClass} ${
-                      isActive && !isOpen
-                        ? activeItemClass
-                        : isOpen
-                          ? "bg-slate-50 text-slate-800 font-bold border-l-4 border-primary-500 rounded-l-none"
-                          : inactiveItemClass
-                    }`}
+                    onClick={() =>
+                      !isCollapsed && setOpen(isOpen ? null : menu.id)
+                    }
+                    className={`w-full group flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-300 mb-0.5
+                    ${isActive && !isOpen ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500 hover:bg-emerald-50"}
+                    ${isCollapsed ? "justify-center px-0 mx-auto w-10" : ""}
+                    `}
                   >
-                    <div className="flex items-center gap-3.5 relative z-10">
-                      {Icon && (
-                        <Icon
-                          size={19}
-                          className={
-                            isActive && !isOpen
-                              ? "text-white"
-                              : "text-slate-400 group-hover:text-primary-600"
-                          }
-                        />
+                    <div className="flex items-center gap-2.5">
+                      <Icon
+                        size={18}
+                        className={
+                          isActive && !isOpen
+                            ? "text-white"
+                            : "text-slate-400 group-hover:text-emerald-600"
+                        }
+                      />
+                      {!isCollapsed && (
+                        <span className="text-[11px] font-bold tracking-tight">
+                          {menu.name}
+                        </span>
                       )}
-                      <span className="tracking-wide">{menu.name}</span>
                     </div>
-                    {ChevronIcon && (
+                    {!isCollapsed && (
                       <ChevronIcon
-                        size={12}
-                        className={`transition-transform duration-300 relative z-10 ${
-                          isOpen
-                            ? "rotate-180 text-primary-600"
-                            : "text-slate-400"
-                        } ${isActive && !isOpen ? "text-white" : ""}`}
+                        size={10}
+                        className={`transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
                       />
                     )}
                   </button>
 
-                  {/* Dropdown Sub-menu dengan transisi yang lebih smooth */}
-                  <div
-                    className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                      isOpen
-                        ? "max-h-[500px] opacity-100 mb-4 mt-2"
-                        : "max-h-0 opacity-0"
-                    }`}
-                  >
-                    <div className="ml-7 border-l border-slate-200 space-y-1">
-                      {menu.children.map((sub) => {
-                        const isSubActive = location.pathname === sub.route;
-                        return (
-                          <NavLink
-                            key={sub.id}
-                            to={sub.route}
-                            className={`block pl-6 py-2.5 text-[11px] transition-all relative
-                            ${
-                              isSubActive
-                                ? "text-primary-600 font-bold"
-                                : "text-slate-500 hover:text-primary-600 hover:pl-8"
-                            }`}
-                          >
-                            {isSubActive && (
-                              <div className="absolute left-[-1.5px] top-1/2 -translate-y-1/2 w-[3px] h-4 bg-primary-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                            )}
-                            {sub.name}
-                          </NavLink>
-                        );
-                      })}
+                  {/* Sub-menu: Lebih Rapat (ml-4) */}
+                  {!isCollapsed && (
+                    <div
+                      className={`overflow-hidden transition-all duration-300 ${isOpen ? "max-h-80 mb-2" : "max-h-0"}`}
+                    >
+                      <div className="ml-4 border-l border-slate-100 space-y-0.5 my-1">
+                        {menu.children.map((sub) => {
+                          const isSubActive = location.pathname === sub.route;
+                          return (
+                            <NavLink
+                              key={sub.id}
+                              to={sub.route}
+                              className={`block pl-4 py-1.5 text-[10px] transition-all relative font-bold
+                              ${isSubActive ? "text-emerald-600 bg-emerald-50/50 rounded-r-lg" : "text-slate-400 hover:text-emerald-600 hover:pl-5"}`}
+                            >
+                              {isSubActive && (
+                                <div className="absolute left-[-1px] top-1/2 -translate-y-1/2 w-[2px] h-3 bg-emerald-500 rounded-full" />
+                              )}
+                              {sub.name}
+                            </NavLink>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
             </div>
@@ -153,32 +172,22 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer Sidebar - Design yang lebih Clean */}
-      <div className="p-4 mt-auto">
-        <div className="bg-gradient-to-br from-primary-900 to-slate-900 rounded-2xl p-5 text-white relative overflow-hidden group shadow-xl">
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-5 h-5 bg-white/20 rounded-md flex items-center justify-center backdrop-blur-sm">
-                <div className="w-2 h-2 bg-primary-400 rounded-full"></div>
-              </div>
-              <p className="text-[10px] text-primary-100 font-bold uppercase tracking-widest opacity-80">
-                Pro Plan
+      {/* Footer - Lebih Ringkas */}
+      {!isCollapsed && (
+        <div className="p-3 mt-auto">
+          <div className="bg-slate-900 rounded-xl p-2.5 text-white relative overflow-hidden border border-slate-800">
+            <p className="text-[9px] font-bold tracking-tight opacity-90">
+              V. 2.4.0 (Ent)
+            </p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <div className="w-1 h-1 bg-emerald-400 rounded-full"></div>
+              <p className="text-[7px] text-emerald-400 font-black uppercase tracking-widest text-[7px]">
+                Sistem Online
               </p>
             </div>
-            <p className="text-[12px] font-bold mb-3 tracking-tight">
-              Masa Aktif Hampir Habis
-            </p>
-            <div className="w-full bg-white/10 h-1 rounded-full mb-3">
-              <div className="bg-primary-500 h-full w-[85%] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
-            </div>
-            <button className="w-full bg-primary-500 hover:bg-primary-400 text-white transition-all py-2 rounded-xl text-[10px] font-bold shadow-lg shadow-black/20">
-              Perpanjang Sekarang
-            </button>
           </div>
-          {/* Efek dekorasi cahaya belakang */}
-          <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-primary-500/10 rounded-full blur-3xl group-hover:bg-primary-500/20 transition-all duration-700"></div>
         </div>
-      </div>
+      )}
     </aside>
   );
 }

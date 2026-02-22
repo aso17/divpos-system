@@ -172,7 +172,6 @@ export default function RoleForm({
               />
             </div>
 
-            {/* Active Status - Indigo ganti ke Emerald */}
             <div className="flex items-center pb-2">
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input
