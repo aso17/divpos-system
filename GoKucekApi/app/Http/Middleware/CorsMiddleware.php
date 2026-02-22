@@ -22,7 +22,7 @@ class CorsMiddleware
         $host = parse_url($origin, PHP_URL_HOST);
 
         // ✅ DEV MODE
-        if (in_array($host, ['localhost', '127.0.0.1'])) {
+        if (in_array($host, ['localhost', '127.0.0.1','192.168.0.118'])) {
             return $this->handleAllowed($request, $next, $origin);
         }
 

@@ -17,6 +17,24 @@ class PackageController extends Controller
         $this->packageService = $packageService;
     }
 
+
+    public function generateCode(Request $request)
+    {
+        // Cek parameter wajib saja
+        if (!$request->service_id || !$request->category_id || !$request->tenant_id) {
+            return response()->json(['message' => 'Incomplete parameters'], 422);
+        }
+
+        $newCode = $this->packageService->generatePackageCode(
+            $request->tenant_id, 
+            $request->service_id, 
+            $request->category_id
+        );
+
+        return response()->json(['code' => $newCode]);
+    }
+        
+
     /**
      * Ambil daftar paket dengan filter tenant_id
      */
@@ -26,8 +44,6 @@ class PackageController extends Controller
             return response()->json(['message' => 'tenant_id is required'], 422);
         }
 
-        // Service harus menangani dekripsi tenant_id di dalamnya 
-        // atau kita kirim hasil dekripsi ke service
         $query = $this->packageService->getAllPackages($request->all());
 
         if (!$query) {
@@ -47,47 +63,65 @@ class PackageController extends Controller
     /**
      * Simpan paket baru
      */
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'tenant_id'   => 'required',
-            'service_id'  => 'required',
-            'category_id' => 'required',
-            'code'        => 'required|string|unique:Ms_packages,code', // Sesuaikan nama tabel
-            'name'        => 'required|string|min:3',
-            'price'       => 'required|numeric|min:0',
-            'unit'        => 'required|string',
-            'min_order'   => 'required|numeric',
-        ]);
+        public function store(Request $request)
+            {
+                $validator = Validator::make($request->all(), [
+                    'tenant_id'   => 'required',
+                    'service_id'  => 'required',
+                    'category_id' => 'required',
+                    'code'        => 'required|string|alpha_dash|max:20|unique:Ms_packages,code', 
+                    'name'        => 'required|string|min:3|max:100|regex:/^[a-zA-Z0-9\s\-\(\)]+$/',
+                    'price'       => 'required|numeric|min:0',
+                    'unit'        => 'required|string|max:10|alpha', 
+                    'min_order'   => 'required|numeric|min:0.1',
+                    'description' => 'nullable|string|max:255',
+                ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'errors' => $validator->errors(), 
-                'message' => 'Validasi gagal'
-            ], 422);
-        }
+                if ($validator->fails()) {
+                    return response()->json([
+                        'errors' => $validator->errors(), 
+                        'message' => 'Validasi gagal'
+                    ], 422);
+                }
 
-        $data = $this->packageService->createPackage($request->all());
+                $validatedData = $request->only([
+                    'tenant_id', 'service_id', 'category_id', 'code', 
+                    'name', 'price', 'unit', 'min_order', 'description', 'is_active', 'created_by' // Tambahkan created_by di sini!
+                ]);
 
-        return response()->json([
-            'message' => 'Paket berhasil dibuat',
-            'data'    => new PackageResource($data)
-        ], 201);
-    }
+                $data = $this->packageService->createPackage($validatedData);
 
-    /**
-     * Update data paket
-     */
+                if (!$data) {
+                    return response()->json([
+                        'message' => 'Gagal memproses data. Pastikan sesi login dan tenant valid.'
+                    ], 400);
+                }
+
+                return response()->json([
+                    'message' => 'Paket berhasil dibuat',
+                    'data'    => new PackageResource($data)
+                ], 201);
+            }
+
+   
     public function update(Request $request, $id)
     {
+        
+        $decryptedId = CryptoHelper::decrypt($id);
+        if (!$decryptedId) {
+            return response()->json(['message' => 'ID Paket tidak valid'], 400);
+        }
+
         $validator = Validator::make($request->all(), [
             'tenant_id'   => 'required',
             'service_id'  => 'required',
             'category_id' => 'required',
-            'name'        => 'required|string|min:3',
+            // Validasi Unique: Abaikan ID asli (integer) di database
+            'code'        => 'required|string|alpha_dash|max:20|unique:Ms_packages,code,' . $decryptedId, 
+            'name'        => 'required|string|min:3|max:100|regex:/^[a-zA-Z0-9\s\-\(\)]+$/',
             'price'       => 'required|numeric|min:0',
-            'unit'        => 'required|string',
-            'min_order'   => 'required|numeric',
+            'unit'        => 'required|string|max:10',
+            'min_order'   => 'required|numeric|min:0.1',
         ]);
 
         if ($validator->fails()) {
@@ -97,10 +131,17 @@ class PackageController extends Controller
             ], 422);
         }
 
-        $updated = $this->packageService->updatePackage($id, $request->all());
+       
+        $validatedData = $request->only([
+            'tenant_id', 'service_id', 'category_id', 'code', 
+            'name', 'price', 'unit', 'min_order', 'description', 
+            'is_active', 'updated_by' 
+        ]);
+
+        $updated = $this->packageService->updatePackage($decryptedId, $validatedData);
 
         if (!$updated) {
-            return response()->json(['message' => 'Gagal mengupdate paket atau data tidak ditemukan'], 404);
+            return response()->json(['message' => 'Gagal mengupdate paket'], 400);
         }
 
         return response()->json([

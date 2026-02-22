@@ -3,9 +3,35 @@
 namespace App\Repositories;
 
 use App\Models\Ms_package;
-
+use Illuminate\Support\Facades\DB;
 class PackageRepository
 {
+
+   public function getLastCodeByPrefix(int $tenantId, string $prefix)
+    {
+        return Ms_package::select('code')
+            ->where('tenant_id', $tenantId)
+            ->where('code', 'LIKE', $prefix . '-%')
+            ->orderBy('id', 'DESC')
+            ->value('code'); 
+    }
+
+    public function getServiceName(int $id)
+    {
+        return DB::table('Ms_services')
+            ->where('id', $id)
+            ->select('name') 
+            ->value('name');
+    }
+
+    public function getCategoryName(int $id)
+    {
+        return DB::table('Ms_categories')
+            ->where('id', $id)
+            ->select('name') 
+            ->value('name');
+    }
+
     /**
      * Base query untuk mengambil data paket berdasarkan tenant
      */
@@ -17,7 +43,7 @@ class PackageRepository
             'is_active', 'tenant_id', 'created_at'
         )
         ->with([
-            'service:id,name,code', 
+            'service:id,name', 
             'category:id,name,slug',
             'tenant:id,slug,code'
         ])

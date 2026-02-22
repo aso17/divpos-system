@@ -6,20 +6,22 @@ use App\Models\Ms_service;
 
 class ServiceRepository
 {
-    /**
-     * Query dasar yang selalu terfilter berdasarkan tenant_id
-     * Mendukung pencarian keyword untuk nama layanan
-     */
-   public function getBaseQuery(int $tenantId, $keyword = null)
+   
+    public function getBaseQuery(int $tenantId, $keyword = null)
     {
-        // Tentukan kolom yang benar-benar dibutuhkan saja
-        $columns = ['id', 'name', 'description', 'is_active', 'created_at','created_by'];
-        return Ms_Service::select($columns)
+        return Ms_Service::select([
+                'id', 
+                'name', 
+                'description', 
+                'is_active', 
+                'created_at', 
+                'created_by'
+            ])
             ->where('tenant_id', $tenantId)
             ->when($keyword, function ($query) use ($keyword) {
-            
-                $query->where('name', 'like', '%' . $keyword . '%');
-            });
+                $query->where('name', 'ilike', '%' . $keyword . '%');
+            })
+            ->orderBy('name', 'asc');
     }
     /**
      * Untuk List Table: Mendukung Paginasi dan Search

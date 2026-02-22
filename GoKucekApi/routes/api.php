@@ -59,6 +59,7 @@ Route::middleware('api')->group(function () {
         Route::delete('/masterservice/{id}', [MasterServiceController::class, 'destroy']); 
         
         // 👇 Master MODULE Package Harga
+        Route::get('/generate-code', [PackageController::class, 'generateCode']); 
         Route::get('/package', [PackageController::class, 'index']); 
         Route::post('/package', [PackageController::class, 'store']); 
         Route::put('/package/{id}', [PackageController::class, 'update']); 
