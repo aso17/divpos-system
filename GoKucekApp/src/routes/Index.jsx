@@ -7,6 +7,8 @@ import PackagePage from "../pages//package/PackageList";
 import OutletPage from "../pages/outlets/OutletList";
 import CategoryPage from "../pages/category/CategoryList";
 import LayananPage from "../pages/masterservice/MasterServiceList";
+import PaymentMethodPage from "../pages/paymentMethod/PaymentMethodList";
+import TransactionPage from "../pages/transactions/Transactions";
 import RolePermissionsPage from "../pages/RolePermission/RolePermissionList";
 import LoginPage from "../pages/login/Login";
 import ProtectedRoute from "./ProtectedRoute";
@@ -35,6 +37,15 @@ export default function AppRoutes() {
               }
             />
 
+            <Route
+              path="/transaksi"
+              element={
+                <RequirePermission permission="view">
+                  <TransactionPage />
+                </RequirePermission>
+              }
+            />
+
             {/* Master Data */}
             <Route
               path="/outlet"
@@ -51,6 +62,16 @@ export default function AppRoutes() {
               element={
                 <RequirePermission permission="view">
                   <LayananPage />
+                </RequirePermission>
+              }
+            />
+
+            {/* Master Data */}
+            <Route
+              path="/payment-method"
+              element={
+                <RequirePermission permission="view">
+                  <PaymentMethodPage />
                 </RequirePermission>
               }
             />
