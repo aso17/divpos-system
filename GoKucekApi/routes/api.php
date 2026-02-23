@@ -12,6 +12,9 @@ use App\Http\Controllers\OutletController;
 use App\Http\Controllers\MasterServiceController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\PaymentMethodController;
 
 /*
 |--------------------------------------------------------------------------
@@ -44,6 +47,11 @@ Route::middleware('api')->group(function () {
         Route::post('/user', [UserController::class, 'store']);     
         Route::put('/user/{id}', [UserController::class, 'update']); 
         Route::delete('/user/{id}', [UserController::class, 'destroy']); 
+        
+        Route::get('/package-transaction', [TransactionController::class, 'getPackages']);
+        Route::get('/customer-transaction', [TransactionController::class, 'getCustomers']);
+        Route::get('/outlet-transaction', [TransactionController::class, 'getOutlets']);
+        Route::post('/transactions', [TransactionController::class, 'store']);
 
          // 👇 Master MODULE OUTLET
         Route::get('/outlet/generatecode', [OutletController::class, 'generatecode']); 
@@ -69,6 +77,17 @@ Route::middleware('api')->group(function () {
         Route::post('/category', [CategoryController::class, 'store']); 
         Route::put('/category/{id}', [CategoryController::class, 'update']); 
         Route::delete('/category/{id}', [CategoryController::class, 'destroy']); 
+        
+        
+        Route::get('/customer', [CustomerController::class, 'index']); 
+        Route::post('/customer', [CustomerController::class, 'store']); 
+        Route::put('/customer/{id}', [CustomerController::class, 'update']); 
+        Route::delete('/customer/{id}', [CustomerController::class, 'destroy']); 
+        
+        Route::get('/payment-method', [PaymentMethodController::class, 'index']); 
+        Route::post('/payment-method', [PaymentMethodController::class, 'store']); 
+        Route::put('/payment-method/{id}', [PaymentMethodController::class, 'update']); 
+        Route::delete('/payment-method/{id}', [PaymentMethodController::class, 'destroy']); 
         
          // 👇 ROLE MODULE
         Route::get('/GetRolesByTenant', [RoleController::class, 'GetRolesByTenantId']); 

@@ -63,45 +63,45 @@ class PackageController extends Controller
     /**
      * Simpan paket baru
      */
-        public function store(Request $request)
-            {
-                $validator = Validator::make($request->all(), [
-                    'tenant_id'   => 'required',
-                    'service_id'  => 'required',
-                    'category_id' => 'required',
-                    'code'        => 'required|string|alpha_dash|max:20|unique:Ms_packages,code', 
-                    'name'        => 'required|string|min:3|max:100|regex:/^[a-zA-Z0-9\s\-\(\)]+$/',
-                    'price'       => 'required|numeric|min:0',
-                    'unit'        => 'required|string|max:10|alpha', 
-                    'min_order'   => 'required|numeric|min:0.1',
-                    'description' => 'nullable|string|max:255',
-                ]);
+public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'tenant_id'   => 'required',
+            'service_id'  => 'required',
+            'category_id' => 'required',
+            'code'        => 'required|string|alpha_dash|max:20|unique:Ms_packages,code', 
+            'name'        => 'required|string|min:3|max:100|regex:/^[a-zA-Z0-9\s\-\(\)]+$/',
+            'price'       => 'required|numeric|min:0',
+            'unit'        => 'required|string|max:10|alpha', 
+            'min_order'   => 'required|numeric|min:0.1',
+            'description' => 'nullable|string|max:255',
+        ]);
 
-                if ($validator->fails()) {
-                    return response()->json([
-                        'errors' => $validator->errors(), 
-                        'message' => 'Validasi gagal'
-                    ], 422);
-                }
+        if ($validator->fails()) {
+            return response()->json([
+                'errors' => $validator->errors(), 
+                'message' => 'Validasi gagal'
+            ], 422);
+        }
 
-                $validatedData = $request->only([
-                    'tenant_id', 'service_id', 'category_id', 'code', 
-                    'name', 'price', 'unit', 'min_order', 'description', 'is_active', 'created_by' // Tambahkan created_by di sini!
-                ]);
+        $validatedData = $request->only([
+            'tenant_id', 'service_id', 'category_id', 'code', 
+            'name', 'price', 'unit', 'min_order', 'description', 'is_active', 'created_by' // Tambahkan created_by di sini!
+        ]);
 
-                $data = $this->packageService->createPackage($validatedData);
+        $data = $this->packageService->createPackage($validatedData);
 
-                if (!$data) {
-                    return response()->json([
-                        'message' => 'Gagal memproses data. Pastikan sesi login dan tenant valid.'
-                    ], 400);
-                }
+        if (!$data) {
+            return response()->json([
+                'message' => 'Gagal memproses data. Pastikan sesi login dan tenant valid.'
+            ], 400);
+        }
 
-                return response()->json([
-                    'message' => 'Paket berhasil dibuat',
-                    'data'    => new PackageResource($data)
-                ], 201);
-            }
+        return response()->json([
+            'message' => 'Paket berhasil dibuat',
+            'data'    => new PackageResource($data)
+        ], 201);
+    }
 
    
     public function update(Request $request, $id)
