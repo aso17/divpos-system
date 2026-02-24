@@ -12,6 +12,11 @@ class Tr_Transaction extends Model
     use SoftDeletes;
 
     protected $table = 'Tr_transactions';
+    const STATUS_PENDING = 'PENDING';
+    const STATUS_PROCESS = 'PROCESS';
+    const STATUS_READY   = 'READY';
+    const STATUS_TAKEN   = 'TAKEN';
+    const STATUS_CANCELED = 'CANCELED';
 
     /**
      * White-listing kolom yang boleh diisi secara massal.

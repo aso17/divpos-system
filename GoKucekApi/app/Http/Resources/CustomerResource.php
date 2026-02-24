@@ -15,19 +15,19 @@ class CustomerResource extends JsonResource
      */
     public function toArray($request)
     {
-        return [
-            // Enkripsi ID agar aman di sisi Client (React)
-            'id'         => CryptoHelper::encrypt($this->id),
-            'tenant_id'  => CryptoHelper::encrypt($this->tenant_id),
-            
-            // Data Utama
-            'name'       => $this->name,
-            'phone'      => $this->phone,
-            'address'    => $this->address ?? '',
-            
-            // Meta Data
-            'created_at' => $this->created_at->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at->format('Y-m-d H:i:s'),
-        ];
+       return [
+        // Enkripsi ID agar aman di sisi Client (React)
+        'id'         => CryptoHelper::encrypt($this->id),
+        'tenant_id'  => CryptoHelper::encrypt($this->tenant_id),
+        
+        // Data Utama
+        'name'       => $this->name,
+        'phone'      => $this->phone,
+        'address'    => $this->address ?? '',
+        
+        // Meta Data - PERBAIKAN DI SINI
+        'created_at' => $this->created_at ? $this->created_at->format('Y-m-d H:i:s') : null,
+        'updated_at' => $this->updated_at ? $this->updated_at->format('Y-m-d H:i:s') : null,
+    ];
     }
 }

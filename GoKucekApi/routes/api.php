@@ -48,9 +48,11 @@ Route::middleware('api')->group(function () {
         Route::put('/user/{id}', [UserController::class, 'update']); 
         Route::delete('/user/{id}', [UserController::class, 'destroy']); 
         
+        Route::get('/transaction/init-data', [TransactionController::class, 'getInitData']);
         Route::get('/package-transaction', [TransactionController::class, 'getPackages']);
         Route::get('/customer-transaction', [TransactionController::class, 'getCustomers']);
         Route::get('/outlet-transaction', [TransactionController::class, 'getOutlets']);
+        Route::get('/paymentmethod-transaction', [TransactionController::class, 'getPaymentMethods']);
         Route::post('/transactions', [TransactionController::class, 'store']);
 
          // 👇 Master MODULE OUTLET

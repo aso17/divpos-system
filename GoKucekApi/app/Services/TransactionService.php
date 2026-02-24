@@ -2,12 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\Tr_Transaction;
+use App\Models\Tr_TransactionDetail;
+use App\Models\Tr_Payment;
+use App\Models\Tr_StatusLog;
 use App\Repositories\CustomerRepository;
-use App\Models\Tr_order; // Sesuaikan nama model order Anda
-use App\Models\Tr_order_item;
-use App\Helpers\CryptoHelper;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class TransactionService
 {
@@ -18,82 +19,95 @@ class TransactionService
         $this->customerRepo = $customerRepo;
     }
 
-    // public function createTransaction(array $data)
-    // {
-    //     return DB::transaction(function () use ($data) {
-    //         // 1. Dekripsi Dasar
-    //         $tenantId = (int) CryptoHelper::decrypt($data['tenant_id']);
-    //         $userId = CryptoHelper::decrypt($data['created_by']) ?? $data['created_by'];
+   public function createTransaction(array $data)
+    {
+        // Pastikan pakai Throwable agar menangkap semua jenis error (Error & Exception)
+        return DB::transaction(function () use ($data) {
+            try {
+                // 1. Handle Customer
+                $customer = $this->handleCustomer($data['tenant_id'], $data['customer'], $data['created_by']);
 
-    //         // 2. Handling Customer (Baru atau Lama)
-    //         $customerId = $this->handleCustomer($tenantId, $data['customer'], $userId);
+                // 2. Simpan Header
+                $transaction = Tr_Transaction::create([
+                    'tenant_id'         => $data['tenant_id'],
+                    'outlet_id'         => $data['outlet_id'],
+                    'invoice_no'        => $this->generateInvoiceNumber($data['tenant_id']),
+                    'customer_id'       => $customer->id,
+                    'customer_name'     => $customer->name,
+                    'customer_phone'    => $customer->phone,
+                    'order_date'        => now(),
+                    'total_base_price'  => $data['grand_total'],
+                    'grand_total'       => $data['grand_total'],
+                    'payment_method_id' => $data['payment_method_id'],
+                    'payment_amount'    => $data['payment_amount'],
+                    'change_amount'     => $data['change_amount'],
+                    'total_paid'        => $data['payment_amount'] - $data['change_amount'],
+                    'status'            => Tr_Transaction::STATUS_PENDING,
+                    'payment_status'    => 'PAID',
+                    'created_by'        => $data['created_by'],
+                ]);
 
-    //         // 3. Generate Nomor Invoice (Contoh: INV/2026/02/0001)
-    //         $invoiceNo = $this->generateInvoiceNumber($tenantId);
+                // 3. Simpan Detail
+                foreach ($data['items'] as $item) {
+                    $transaction->details()->create([ // Gunakan relasi agar lebih konsisten
+                        'tenant_id'      => $data['tenant_id'],
+                        'package_id'     => $item['package_id'],
+                        'package_name'   => $item['package_name'] ?? 'Layanan',
+                        'qty'            => $item['qty'],
+                        'price_per_unit' => $item['price'],
+                        'subtotal'       => $item['subtotal'],
+                    ]);
+                }
 
-    //         // 4. Simpan Header Order (tr_orders)
-    //         $order = Tr_order::create([
-    //             'tenant_id'      => $tenantId,
-    //             'customer_id'    => $customerId,
-    //             'invoice_no'     => $invoiceNo,
-    //             'total_price'    => $data['grand_total'],
-    //             'payment_amount' => $data['payment_amount'],
-    //             'change_amount'  => $data['change_amount'],
-    //             'status'         => 'PROCESS', // Default status
-    //             'created_by'     => $userId,
-    //         ]);
+                // 4. Catat Payment
+                $transaction->payments()->create([
+                    'tenant_id'         => $data['tenant_id'],
+                    'payment_method_id' => $data['payment_method_id'],
+                    'amount'            => $data['payment_amount'] - $data['change_amount'],
+                    'payment_date'      => now(),
+                    'paid_by'           => $customer->name,
+                    'received_by'       => $data['created_by'],
+                ]);
 
-    //         // 5. Simpan Item Order (tr_order_items)
-    //         foreach ($data['items'] as $item) {
-    //             Tr_order_item::create([
-    //                 'order_id'   => $order->id,
-    //                 'package_id' => (int) CryptoHelper::decrypt($item['package_id']),
-    //                 'qty'        => $item['qty'],
-    //                 'price'      => $item['price'],
-    //                 'subtotal'   => $item['subtotal'],
-    //             ]);
-    //         }
+                // 5. Catat Log Status
+                $transaction->logs()->create([
+                    'tenant_id'   => $data['tenant_id'],
+                    'status'      => Tr_Transaction::STATUS_PENDING,
+                    'changed_by'  => $data['created_by'],
+                    'description' => 'Transaksi baru dibuat.',
+                ]);
 
-    //         return $order->load(['customer', 'items.package']);
-    //     });
-    // }
+                return $transaction->load(['details', 'customer']);
 
-    // /**
-    //  * Logika untuk menentukan pakai customer lama atau buat baru
-    //  */
-    // private function handleCustomer($tenantId, $customerData, $userId)
-    // {
-    //     // Jika is_new false dan ada ID, gunakan customer lama
-    //     if (!$customerData['is_new'] && !empty($customerData['id'])) {
-    //         return (int) CryptoHelper::decrypt($customerData['id']);
-    //     }
+            } catch (\Throwable $e) {
+                // Jika ada satu hal kecil saja yang gagal, PostgreSQL WAJIB rollback di sini
+                // Kita throw lagi supaya DB::transaction tahu ada kegagalan
+                throw $e; 
+            }
+        });
+    }
 
-    //     // Jika baru, buat customer di database
-    //     $newCustomer = $this->customerRepo->create([
-    //         'tenant_id'  => $tenantId,
-    //         'name'       => $customerData['name'],
-    //         'phone'      => $customerData['phone'],
-    //         'created_by' => $userId
-    //     ]);
+    private function handleCustomer($tenantId, $customerData, $userId)
+    {
+        // Panggil langsung model Ms_Customer
+        return \App\Models\Ms_Customer::firstOrCreate(
+            [
+                'tenant_id' => $tenantId,
+                'phone'     => $customerData['phone'],
+                'name'      => $customerData['name']
+            ],
+            ['created_by' => $userId]
+        );
+    }
 
-    //     return $newCustomer->id;
-    // }
-
-    // /**
-    //  * Generate Invoice: INV / TAHUNBULAN / URUTAN
-    //  */
-    // private function generateInvoiceNumber($tenantId)
-    // {
-    //     $prefix = "INV/" . date('Ym') . "/";
-    //     $lastOrder = Tr_order::where('tenant_id', $tenantId)
-    //         ->where('invoice_no', 'like', $prefix . '%')
-    //         ->orderBy('id', 'desc')
-    //         ->first();
-
-    //     $nextNumber = $lastOrder 
-    //         ? ((int) substr($lastOrder->invoice_no, -4)) + 1 
-    //         : 1;
-
-    //     return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-    // }
+    private function generateInvoiceNumber($tenantId)
+    {
+        $prefix = "INV/" . date('Ym') . "/";
+        $last = Tr_Transaction::where('tenant_id', $tenantId)
+                ->where('invoice_no', 'like', $prefix . '%')
+                ->latest('id')->first();
+        
+        $count = $last ? ((int) substr($last->invoice_no, -4)) + 1 : 1;
+        return $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+    }
 }

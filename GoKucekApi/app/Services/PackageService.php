@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Repositories\PackageRepository;
 use App\Helpers\CryptoHelper;
+use App\Models\Ms_Package;
 use Illuminate\Support\Str;
 
 class PackageService
@@ -13,6 +14,13 @@ class PackageService
     public function __construct(PackageRepository $packageRepo)
     {
         $this->packageRepo = $packageRepo;
+    }
+
+
+    public function getPackageById($id)
+    {
+        
+        return Ms_Package::find($id);
     }
 
    public function generatePackageCode($encryptedTenantId, $serviceId, $categoryId)

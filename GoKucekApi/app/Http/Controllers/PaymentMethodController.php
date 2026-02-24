@@ -18,10 +18,10 @@ class PaymentMethodController extends Controller
 
     public function index(Request $request)
     {
-        // Ambil tenant_id dari query param (yang dikirim React dalam bentuk terenkripsi)
+       
         $tenantId = $request->query('tenant_id'); 
 
-        $data = $this->service->getDataList(
+        $data = $this->service->getAllPaymentMethods(
             $tenantId,
             $request->query('keyword'),
             $request->query('per_page', 10)

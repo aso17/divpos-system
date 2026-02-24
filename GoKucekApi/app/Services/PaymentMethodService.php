@@ -14,7 +14,7 @@ class PaymentMethodService
         $this->repository = $repository;
     }
 
-   public function getDataList($tenantId, $keyword, $perPage)
+   public function getAllPaymentMethods($tenantId, $keyword, $perPage)
     {
         
         $decryptedTenantId = CryptoHelper::decrypt($tenantId);

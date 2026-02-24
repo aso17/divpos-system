@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Repositories\CustomerRepository;
 use App\Helpers\CryptoHelper;
+use App\Models\Ms_Customer;
 use Illuminate\Support\Str;
 
 class CustomerService
@@ -14,6 +15,8 @@ class CustomerService
     {
         $this->customerRepo = $customerRepo;
     }
+
+
 
     /**
      * Ambil daftar customer dengan filter keyword (Nama/HP)
