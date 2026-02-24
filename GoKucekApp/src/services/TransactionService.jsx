@@ -11,7 +11,15 @@ const getAuthInfo = () => {
 };
 
 const TransactionService = {
-  // Ambil data pelanggan untuk dropdown
+  getInitData: (params = {}) => {
+    const { tenantId } = getAuthInfo();
+    return api.get("/transaction/init-data", {
+      params: {
+        tenant_id: encrypt(tenantId),
+        ...params,
+      },
+    });
+  },
   getCustomers: (params = {}) => {
     const { tenantId } = getAuthInfo();
     return api.get("/customer-transaction", {
@@ -32,6 +40,15 @@ const TransactionService = {
       },
     });
   },
+  getPaymentMethods: (params = {}) => {
+    const { tenantId } = getAuthInfo();
+    return api.get("/paymentmethod-transaction", {
+      params: {
+        tenant_id: encrypt(tenantId),
+        ...params,
+      },
+    });
+  },
 
   // Ambil data paket laundry
   getOutlets: (params = {}) => {
@@ -45,14 +62,22 @@ const TransactionService = {
   },
 
   // Simpan transaksi baru
-  createTransaction: (payload) => {
+  createTransaction: async (payload) => {
+    console.log("Payload sebelum enkripsi:", payload);
     const { tenantId, userLogin } = getAuthInfo();
+
     const finalPayload = {
       ...payload,
       tenant_id: encrypt(tenantId),
       created_by: encrypt(userLogin),
     };
-    return api.post("/transaction", finalPayload);
+
+    try {
+      const response = await api.post("/transactions", finalPayload);
+      return response;
+    } catch (error) {
+      throw error;
+    }
   },
 };
 
