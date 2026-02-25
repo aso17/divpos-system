@@ -2,17 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Validator;
 use App\Services\PackageService;
 use App\Services\CustomerService;
 use App\Services\OutletService;
 use App\Services\TransactionService;
 use App\Services\PaymentMethodService;
 use App\Http\Resources\PackageResource;
+use App\Http\Resources\TransactionResource;
 use App\Http\Resources\PaymentMethodResource;
 use App\Http\Resources\CustomerResource;
 use App\Http\Resources\OutletResource;
 use Illuminate\Http\Request;
 use App\Helpers\CryptoHelper; 
+
 
 class TransactionController extends Controller
 {
@@ -118,7 +121,18 @@ class TransactionController extends Controller
         return PaymentMethodResource::collection($data);
     }
 
-    
+    public function getTransactionHistory(Request $request)
+    {
+        $data = $this->transactionService->getTransactionHistory($request->all());
+        $formattedData = TransactionResource::collection($data)->response()->getData(true);
+
+        // Ini isi manual dari apa yang biasanya dilakukan sendResponse
+        return response()->json([
+            'success' => true,
+            'data'    => $formattedData,
+            'message' => "Riwayat transaksi berhasil diambil",
+        ], 200);
+    }
 
     // Dipanggil oleh TransactionService.getCustomers() di React
     public function getCustomers(Request $request)
@@ -134,72 +148,45 @@ class TransactionController extends Controller
 
 
     public function store(Request $request)
-{
-    try {
-        // 1. Dekripsi ID yang diperlukan
-        $tenantId = CryptoHelper::decrypt($request->tenant_id);
-        $outletId = CryptoHelper::decrypt($request->outlet_id);
-        $paymentMethodId = CryptoHelper::decrypt($request->payment_method_id);
-        $createdBy = CryptoHelper::decrypt($request->created_by);
-
-        if (!$tenantId) {
-            return response()->json(['message' => 'Invalid Tenant Context'], 400);
-        }
-
-        // 2. Ambil data customer dari request (pakai fallback array agar tidak error undefined key)
-        $customerData = $request->input('customer', []); 
-        
-        // 3. Kalkulasi Harga Aman
-        $items = $request->input('items', []);
-        $calculatedItems = [];
-        $grandTotalServer = 0;
-
-        foreach ($items as $item) {
-            $packageId = CryptoHelper::decrypt($item['package_id']); 
-            $package = $this->packageService->getPackageById($packageId);
-            
-            if (!$package) continue;
-
-            $subtotal = $package->price * $item['qty'];
-            $grandTotalServer += $subtotal;
-
-            $calculatedItems[] = [
-                'package_id'   => $packageId,
-                'package_name' => $package->name, // Ambil nama asli dari DB
-                'qty'          => $item['qty'],
-                'price'        => $package->price,
-                'subtotal'     => $subtotal
-            ];
-        }
-
-        // 4. KIRIM SEMUA KE SERVICE (Termasuk data customer mentah)
-        // Dengan begini, handleCustomer akan berjalan DI DALAM DB::transaction
-        $transaction = $this->transactionService->createTransaction([
-            'tenant_id'         => $tenantId,
-            'outlet_id'         => $outletId,
-            'customer'          => [
-                'name'  => $customerData['name'] ?? 'Guest',
-                'phone' => $customerData['phone'] ?? '-'
-            ],
-            'payment_method_id' => $paymentMethodId,
-            'items'             => $calculatedItems,
-            'grand_total'       => $grandTotalServer,
-            'payment_amount'    => $request->payment_amount,
-            'change_amount'     => $request->payment_amount - $grandTotalServer,
-            'created_by'        => $createdBy,
+    {
+        $validator = Validator::make($request->all(), [
+            'customer.name' => 'required|string|max:100|regex:/^[a-zA-Z0-9\s\.]+$/', 
+            'customer.phone' => 'required|string|min:10|max:15|regex:/^[0-9]+$/',
+            'payment_amount' => 'required|numeric|min:0',
+            'items' => 'required|array|min:1',
+            'items.*.package_id' => 'required',
+            'items.*.qty' => 'required|numeric|min:0.1',
         ]);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Transaksi Berhasil',
-            'data' => $transaction
-        ], 201);
+        if ($validator->fails()) {
+            return response()->json(['status' => 'error', 'message' => $validator->errors()->first()], 422);
+        }
+        
+        try {
+            $data = [
+                'tenant_id'         => CryptoHelper::decrypt($request->tenant_id),
+                'outlet_id'         => CryptoHelper::decrypt($request->outlet_id),
+                'payment_method_id' => CryptoHelper::decrypt($request->payment_method_id),
+                'created_by'        => CryptoHelper::decrypt($request->created_by),
+                'customer'          => $request->input('customer'),
+                'items'             => $request->input('items'),
+                'payment_amount'    => (int) round($request->payment_amount), // Pastikan bulat sejak awal
+            ];
 
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Gagal memproses transaksi: ' . $e->getMessage()
-        ], 500);
+            if (!$data['tenant_id']) return response()->json(['message' => 'Invalid Context'], 400);
+
+            // Langsung serahkan ke Service tanpa hitung apapun di sini
+            $transaction = $this->transactionService->createTransaction($data);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Transaksi Berhasil',
+                'data' => $transaction->load(['details', 'customer', 'outlet', 'initialPaymentMethod'])
+            ], 201);
+
+        } catch (\Exception $e) {
+            // Exception akan menangkap throw dari service (misal: "Uang kurang")
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 422);
+        }
     }
-}
 }

@@ -49,6 +49,7 @@ Route::middleware('api')->group(function () {
         Route::delete('/user/{id}', [UserController::class, 'destroy']); 
         
         Route::get('/transaction/init-data', [TransactionController::class, 'getInitData']);
+        Route::get('/transactions-history', [TransactionController::class, 'getTransactionHistory']);
         Route::get('/package-transaction', [TransactionController::class, 'getPackages']);
         Route::get('/customer-transaction', [TransactionController::class, 'getCustomers']);
         Route::get('/outlet-transaction', [TransactionController::class, 'getOutlets']);

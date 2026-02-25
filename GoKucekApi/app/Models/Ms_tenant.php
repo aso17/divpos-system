@@ -26,7 +26,17 @@ class Ms_tenant extends Model
     /* =======================
      |  Relationships
      ======================= */
+    public function configs()
+    {
+        return $this->hasMany(TenantConfig::class);
+    }
 
+    // Helper untuk mengambil config tertentu secara instan
+    public function getConfig($key, $default = null)
+    {
+        $config = $this->configs()->where('key', $key)->first();
+        return $config ? $config->value : $default;
+    }
     public function createdBy()
     {
         return $this->belongsTo(Ms_user::class, 'created_by');
