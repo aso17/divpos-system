@@ -9,6 +9,7 @@ import CategoryPage from "../pages/category/CategoryList";
 import LayananPage from "../pages/masterservice/MasterServiceList";
 import PaymentMethodPage from "../pages/paymentMethod/PaymentMethodList";
 import TransactionPage from "../pages/transactions/Transactions";
+import TrxHistoryPage from "../pages/transactions/TransactionHistory";
 import RolePermissionsPage from "../pages/RolePermission/RolePermissionList";
 import LoginPage from "../pages/login/Login";
 import ProtectedRoute from "./ProtectedRoute";
@@ -38,7 +39,7 @@ export default function AppRoutes() {
             />
 
             <Route
-              path="/transaksi"
+              path="/transactions"
               element={
                 <RequirePermission permission="view">
                   <TransactionPage />
@@ -46,9 +47,18 @@ export default function AppRoutes() {
               }
             />
 
+            <Route
+              path="/transaction-history"
+              element={
+                <RequirePermission permission="view">
+                  <TrxHistoryPage />
+                </RequirePermission>
+              }
+            />
+
             {/* Master Data */}
             <Route
-              path="/outlet"
+              path="/outlets"
               element={
                 <RequirePermission permission="view">
                   <OutletPage />
@@ -58,7 +68,7 @@ export default function AppRoutes() {
 
             {/* Master Data */}
             <Route
-              path="/layanan"
+              path="/services"
               element={
                 <RequirePermission permission="view">
                   <LayananPage />
@@ -78,7 +88,7 @@ export default function AppRoutes() {
 
             {/* User & Role Management */}
             <Route
-              path="/userlist"
+              path="/users"
               element={
                 <RequirePermission permission="view">
                   <UsersPage />
@@ -86,7 +96,7 @@ export default function AppRoutes() {
               }
             />
             <Route
-              path="/rolelist"
+              path="/roles"
               element={
                 <RequirePermission permission="view">
                   <RolePage />
@@ -94,7 +104,7 @@ export default function AppRoutes() {
               }
             />
             <Route
-              path="/paket"
+              path="/packages"
               element={
                 <RequirePermission permission="view">
                   <PackagePage />
@@ -102,7 +112,7 @@ export default function AppRoutes() {
               }
             />
             <Route
-              path="/kategori"
+              path="/categories"
               element={
                 <RequirePermission permission="view">
                   <CategoryPage />

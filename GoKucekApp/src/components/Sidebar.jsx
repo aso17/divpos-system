@@ -54,7 +54,7 @@ export default function Sidebar() {
                 {localStorage.getItem("tenant_name") || "GoKucek"}
               </h1>
               <span className="text-[7px] text-emerald-600 font-bold uppercase tracking-tighter">
-                Laundry System
+                System
               </span>
             </div>
           )}

@@ -40,6 +40,7 @@ const TransactionService = {
       },
     });
   },
+
   getPaymentMethods: (params = {}) => {
     const { tenantId } = getAuthInfo();
     return api.get("/paymentmethod-transaction", {
@@ -61,9 +62,19 @@ const TransactionService = {
     });
   },
 
+  getTransactionHistory: (params = {}) => {
+    const { tenantId } = getAuthInfo();
+    return api.get("/transactions-history", {
+      params: {
+        tenant_id: encrypt(tenantId),
+        ...params,
+      },
+    });
+  },
+
   // Simpan transaksi baru
   createTransaction: async (payload) => {
-    console.log("Payload sebelum enkripsi:", payload);
+    // console.log("Payload sebelum enkripsi:", payload);
     const { tenantId, userLogin } = getAuthInfo();
 
     const finalPayload = {

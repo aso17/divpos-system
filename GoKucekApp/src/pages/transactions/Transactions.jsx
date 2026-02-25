@@ -5,10 +5,12 @@ import { useFormValidation } from "../../hooks/useFormValidation";
 import { rules } from "../../utils/validators/rules";
 import { inputClasses } from "../../utils/validators/inputClasses";
 import AppHead from "../../components/common/AppHead";
+import TransactionSuccessModal from "./TransactionSuccessModal";
 import { encrypt } from "../../utils/Encryptions";
 
 const Transactions = () => {
   const hasFetched = useRef(false);
+  const issubmitting = useRef(false);
   const [cart, setCart] = useState([]);
   const [packages, setPackages] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -17,6 +19,8 @@ const Transactions = () => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [payAmount, setPayAmount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [lastTransactionData, setLastTransactionData] = useState(null);
 
   // VALIDASI FINAL - Menggabungkan state pelanggan ke dalam hook
   const { values, errors, handleChange, validate, setValues, setErrors } =
@@ -51,7 +55,7 @@ const Transactions = () => {
     try {
       const res = await TransactionService.getInitData();
       const data = res.data.data;
-      console.log("Init Data:", data);
+      // console.log("Init Data:", data);
       setPackages(data.packages || []);
       setOutlets(data.outlets || []);
       setCustomers(data.customers || []);
@@ -104,10 +108,12 @@ const Transactions = () => {
   const addToCart = (pkg) => {
     if (cart.find((x) => x.id === pkg.id))
       return triggerToast("Layanan sudah ada.", "warning");
-    setCart([...cart, { ...pkg, qty: 1 }]);
+    setCart([...cart, { ...pkg, qty: 1, unit: pkg.unit }]);
   };
 
   const handleSubmit = async () => {
+    if (issubmitting.current) return;
+    // console.log("Status Lock:", issubmitting.current);
     if (!validate()) return;
     if (cart.length === 0) return triggerToast("Keranjang kosong!", "warning");
     if (cart.some((item) => item.qty <= 0))
@@ -115,6 +121,7 @@ const Transactions = () => {
     if (isCash && payAmount < subtotal)
       return triggerToast("Uang kurang!", "error");
 
+    issubmitting.current = true;
     setLoading(true);
     try {
       const payload = {
@@ -126,19 +133,16 @@ const Transactions = () => {
           phone: values.customer_phone,
           is_new: values.is_new,
         },
+        // HANYA kirim ID dan QTY. Biarkan BE ambil harga asli dari DB
         items: cart.map((item) => ({
           package_id: encrypt(item.id),
           qty: item.qty,
-          price: safeNumber(item.price),
-          subtotal: item.qty * safeNumber(item.price),
         })),
-        grand_total: subtotal,
+        // Kirim nominal uang yang diterima kasir secara mentah
         payment_amount: isCash ? payAmount : subtotal,
-        change_amount: change,
       };
 
       const response = await TransactionService.createTransaction(payload);
-      triggerToast("Transaksi Berhasil!", "success");
 
       // Reset
       setCart([]);
@@ -152,8 +156,12 @@ const Transactions = () => {
       }));
 
       // handlePrint(response.data.data.id);
-      console.log("Siap cetak ID:", response.data.data.id);
+      // console.log("Siap cetak ID:", response.data.data);
+      setLastTransactionData(response.data.data);
+      setShowModal(true);
+      issubmitting.current = false;
     } catch (error) {
+      issubmitting.current = false;
       triggerToast("Gagal simpan transaksi!", "error");
     } finally {
       setLoading(false);
@@ -309,7 +317,7 @@ const Transactions = () => {
                       }
                     />
                     <span className="text-[9px] font-bold text-gray-400 uppercase">
-                      Kg
+                      {item.unit}
                     </span>
                   </div>
                 </div>
@@ -400,6 +408,13 @@ const Transactions = () => {
           </div>
         </div>
       </div>
+
+      {/* COMPONENT PRINT */}
+      <TransactionSuccessModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        data={lastTransactionData}
+      />
     </div>
   );
 };
