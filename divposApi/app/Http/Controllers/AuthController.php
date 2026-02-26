@@ -1,56 +1,47 @@
 <?php
 namespace App\Http\Controllers;
-use App\Models\Ms_user;
-use App\Repositories\UserRepository;
+
+use App\Services\AuthService;
 use App\Http\Resources\LoginResource;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 
 class AuthController extends Controller
 {
-    protected $userRepo;
+    protected $authService;
 
-    public function __construct(UserRepository $userRepo)
+    public function __construct(AuthService $authService)
     {
-        $this->userRepo = $userRepo;
+        $this->authService = $authService;
     }
+
     public function login(Request $request)
     {
-        $request->validate([
+        // Validasi Input
+        $credentials = $request->validate([
             'email'    => 'required|email',
             'password' => 'required|string',
         ]);
 
-        // 2. Gunakan instance repository
-        $user = $this->userRepo->findActiveUserByEmail($request->email);
+        // Panggil Service
+        $result = $this->authService->attemptLogin(
+            $credentials, 
+            $request->ip(), 
+            $request->userAgent()
+        );
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'message' => ['Invalid email or password'],
-            ]);
-        }
-
-        // 3. Update info login
-        $user->update([
-            'last_login_at' => now(),
-            'last_login_ip' => $request->ip(),
-        ]);
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
+        // Response
         return response()->json([
-            'token' => $token,
-            'user'  => new LoginResource($user)
+            'token' => $result['token'],
+            'user'  => new LoginResource($result['user'])
         ]);
     }
-    
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        if ($request->user()) {
+            $request->user()->currentAccessToken()->delete();
+        }
 
-        return response()->json(['message' => 'Logged out successfully']);
+        return response()->json(['message' => 'Berhasil logout']);
     }
-
 }
