@@ -12,10 +12,10 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
     { email: "", password: "" },
     {
       email: [
-        (v) => rules.required(v, "Email is required"),
-        (v) => rules.email(v, "Please enter a valid email address"),
+        (v) => rules.required(v, "Email wajib diisi"),
+        (v) => rules.email(v, "Format email tidak valid"),
       ],
-      password: [(v) => rules.required(v, "Password is required")],
+      password: [(v) => rules.required(v, "Password wajib diisi")],
     },
   );
 
@@ -28,61 +28,92 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Email */}
-      <div>
-        <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 ml-1">
-          <Mail size={16} className="text-gray-400" />
-          Email
+      {/* EMAIL */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-slate-500 tracking-wide">
+          Email Address
         </label>
-        <input
-          type="email"
-          value={values.email}
-          onChange={(e) => handleChange("email", e.target.value)}
-          className={inputClasses({ error: !!errors.email })}
-          placeholder=""
-        />
+
+        <div className="relative group">
+          <Mail
+            size={18}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
+          />
+
+          <input
+            type="email"
+            value={values.email}
+            onChange={(e) => handleChange("email", e.target.value)}
+            placeholder="nama@email.com"
+            className={`
+          w-full pl-11 pr-4 py-3 rounded-2xl text-sm
+          bg-slate-50 border border-slate-200
+          focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
+          transition-all duration-200
+          ${errors.email ? "border-red-400 focus:ring-red-400/20" : ""}
+        `}
+          />
+        </div>
+
         {errors.email && (
-          <p className="text-xs text-red-500 mt-1 ml-1">{errors.email}</p>
+          <p className="text-xs text-red-500 mt-1 font-medium">
+            {errors.email}
+          </p>
         )}
       </div>
 
-      {/* Password */}
-      <div>
-        <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 ml-1">
-          <Lock size={16} className="text-gray-400" />
+      {/* PASSWORD */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-slate-500 tracking-wide">
           Password
         </label>
-        <div className="relative mt-1">
+
+        <div className="relative group">
+          <Lock
+            size={18}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
+          />
+
           <input
             type={showPassword ? "text" : "password"}
             value={values.password}
             onChange={(e) => handleChange("password", e.target.value)}
-            className={inputClasses({
-              error: !!errors.password,
-              extra: "pr-12",
-            })}
-            placeholder=""
+            placeholder="••••••••"
+            className={`
+          w-full pl-11 pr-12 py-3 rounded-2xl text-sm
+          bg-slate-50 border border-slate-200
+          focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
+          transition-all duration-200
+          ${errors.password ? "border-red-400 focus:ring-red-400/20" : ""}
+        `}
           />
+
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-gray-600"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600 transition-colors"
           >
-            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
+
         {errors.password && (
-          <p className="text-xs text-red-500 mt-1 ml-1">{errors.password}</p>
+          <p className="text-xs text-red-500 mt-1 font-medium">
+            {errors.password}
+          </p>
         )}
       </div>
 
-      {/* Submit */}
-      <SubmitButton
-        isSubmitting={isSubmitting}
-        label="LOGIN"
-        loadingLabel="Logging in..."
-        className="bg-gokucekBlue"
-      />
+      {/* SUBMIT BUTTON */}
+      <div className="pt-2">
+        <SubmitButton
+          isSubmitting={isSubmitting}
+          label="LOGIN"
+          loadingLabel="logging in..."
+          fullWidth={false}
+          className="w-full py-2.5 rounded-2xl text-sm font-semibold shadow-lg active:scale-[0.98] transition-all duration-200"
+        />
+      </div>
     </form>
   );
 }

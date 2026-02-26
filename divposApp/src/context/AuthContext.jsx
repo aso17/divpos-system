@@ -48,6 +48,7 @@ export const AuthProvider = ({ children }) => {
       SetWithExpiry("access_token", data.token, 1440);
       SetWithExpiry("user", data.user, 1440);
       localStorage.setItem("tenant_name", data.user.tenant.slug);
+      // localStorage.setItem("role_name", data.user.role.name);
       localStorage.setItem("tenant_logo_path", data.user.tenant.logo_path);
       localStorage.setItem("tenant_code", data.user.tenant.code);
 
