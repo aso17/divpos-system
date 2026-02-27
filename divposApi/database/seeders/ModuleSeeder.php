@@ -1,5 +1,7 @@
 <?php
 
+// database/seeders/ModuleSeeder.php
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -13,11 +15,11 @@ class ModuleSeeder extends Seeder
             [
                 'module_name' => 'Dashboard',
                 'code'        => 'DASHBOARD',
-                'icon'        => 'home',        // ✅ ada
+                'icon'        => 'home',
                 'order_no'    => 1,
             ],
             [
-                'module_name' => 'Transaksi',
+                'module_name' => 'Transaction', // UBAH
                 'code'        => 'TRANSAKSI',
                 'icon'        => 'credit-card', 
                 'order_no'    => 2,
@@ -25,19 +27,19 @@ class ModuleSeeder extends Seeder
             [
                 'module_name' => 'Master Data',
                 'code'        => 'MASTER',
-                'icon'        => 'grid',        // 📦 / struktur data
+                'icon'        => 'grid', 
                 'order_no'    => 3,
             ],
             [
-                'module_name' => 'Laporan',
+                'module_name' => 'Report', // UBAH
                 'code'        => 'REPORT',
-                'icon'        => 'file-text',   // 📄 laporan
+                'icon'        => 'file-text', 
                 'order_no'    => 4,
             ],
             [
-                'module_name' => 'Pengaturan',
+                'module_name' => 'Setting', // UBAH
                 'code'        => 'SETTING',
-                'icon'        => 'settings',    // ⚙️
+                'icon'        => 'settings', 
                 'order_no'    => 5,
             ],
         ];
@@ -46,7 +48,9 @@ class ModuleSeeder extends Seeder
             DB::table('Ms_modules')->updateOrInsert(
                 ['code' => $module['code']],
                 [
-                    ...$module,
+                    'module_name' => $module['module_name'], // Tambahkan ini agar terupdate
+                    'icon'        => $module['icon'],
+                    'order_no'    => $module['order_no'],
                     'is_active'   => true,
                     'created_at'  => now(),
                     'updated_at'  => now(),

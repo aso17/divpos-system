@@ -18,52 +18,52 @@ return new class extends Migration
             $table->string('username', 50)->unique()->nullable();
             $table->string('password', 255); // bcrypt / argon2
             $table->string('phone', 20)->nullable();       // E.164 format
-            $table->string('avatar', 225)->nullable();     // path file saja
+            $table->string('avatar', 255)->nullable();     // path file saja
+            
             // Status & security
             $table->boolean('is_active')->default(true);       
             $table->timestampTz('email_verified_at')->nullable();
             $table->timestampTz('last_login_at')->nullable();
             $table->string('last_login_ip', 45)->nullable(); 
             $table->timestampTz('last_activity_at')->nullable();
+            
             // Relation
             $table->foreignId('role_id')->nullable()->constrained('Ms_roles')->nullOnDelete();
-            $table->foreignId('tenant_id')->nullable()->constrained('Ms_tenants')->nullOnDelete();
+            
+            // PERBAIKAN: Gunakan cascadeOnDelete agar user terhapus jika tenant dihapus
+            $table->foreignId('tenant_id')->nullable()->constrained('Ms_tenants')->cascadeOnDelete();
 
             // Audit
             $table->timestampsTz();
             $table->softDeletesTz();
 
             // Index 
-            $table->index(['tenant_id', 'is_active']);
-            $table->index(['tenant_id', 'role_id']);
+            $table->index(['tenant_id', 'is_active'], 'idx_user_tenant_active');
+            $table->index(['tenant_id', 'role_id'], 'idx_user_tenant_role');
         });
 
-
-
         Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->id();
-            $table->string('email')->index();
+            $table->string('email')->primary(); // Email primary untuk token reset
             $table->string('token');
             $table->timestamp('created_at')->nullable();
         });
 
+        Schema::create('log_user_login', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')
+                ->constrained('Ms_users')
+                ->cascadeOnDelete();
 
+            $table->ipAddress('ip_address');
+            $table->string('user_agent')->nullable();
+            $table->boolean('is_success')->default(true);
+            $table->string('fail_reason')->nullable();
 
-      Schema::create('log_user_login', function (Blueprint $table) {
-        $table->id();
-        $table->foreignId('user_id')
-            ->constrained('Ms_users')
-            ->cascadeOnDelete();
-
-        $table->ipAddress('ip_address');
-        $table->string('user_agent')->nullable();
-        $table->boolean('is_success')->default(true);
-        $table->string('fail_reason')->nullable();
-
-        $table->timestamp('logged_in_at');
-    });
-
-
+            $table->timestamp('logged_in_at')->useCurrent();
+            
+            // PERBAIKAN: Index untuk laporan aktivitas
+            $table->index(['user_id', 'logged_in_at'], 'idx_log_user_date');
+        });
     }
 
     /**
@@ -75,5 +75,4 @@ return new class extends Migration
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('Ms_users');
     }
-
 };

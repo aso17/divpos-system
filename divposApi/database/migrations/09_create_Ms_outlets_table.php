@@ -18,7 +18,7 @@ return new class extends Migration
                   ->onDelete('cascade'); 
 
             // Identity Outlet
-            $table->string('name', 150)->index();
+            $table->string('name', 150); // index di sini dihapus, dipindah ke komposit bawah
             $table->string('code', 50)->unique(); 
             
             // Contact & Location
@@ -28,8 +28,8 @@ return new class extends Migration
             $table->string('city', 100)->nullable();
             
             // Configuration & Status
-            $table->boolean('is_active')->default(true)->index();
-            $table->boolean('is_main_branch')->default(false); // Flag untuk cabang utama/pusat
+            $table->boolean('is_active')->default(true); // index dihapus, dipindah ke komposit bawah
+            $table->boolean('is_main_branch')->default(false);
             
             // Audit Trail
             $table->string('created_by', 100)->nullable();
@@ -38,8 +38,10 @@ return new class extends Migration
             $table->timestampsTz();
             $table->softDeletesTz();
 
-            // Index tambahan untuk optimasi pencarian tenant-specific
-            $table->index(['tenant_id', 'is_active']);
+            // --- PERBAIKAN: Index Komposit untuk Performa ---
+            // Ini akan mempercepat query saat mencari outlet aktif dalam satu tenant
+            $table->index(['tenant_id', 'is_active', 'name'], 'idx_outlet_tenant_active_name');
+            // ------------------------------------------------
         });
     }
 

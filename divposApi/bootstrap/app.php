@@ -5,6 +5,8 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\CorsMiddleware;
 use App\Http\Middleware\ResolveTenant;
+use App\Http\Middleware\ResolveAppConfig;
+
 
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
@@ -19,12 +21,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'cors.tenant' => CorsMiddleware::class,
             'resolve.tenant' => ResolveTenant::class,
+            'resolve.appconfig' => ResolveAppConfig::class,
         ]);
 
         // 🔓 PUBLIC API (NO SANCTUM)
         $middleware->group('api-public', [
             'cors.tenant',
             'resolve.tenant',
+            'resolve.appconfig',
             'throttle:30,1',
         ]);
 
@@ -32,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->group('api', [
             'cors.tenant',
             'resolve.tenant',
+            'resolve.appconfig',
             EnsureFrontendRequestsAreStateful::class,
             'throttle:150,1',
         ]);

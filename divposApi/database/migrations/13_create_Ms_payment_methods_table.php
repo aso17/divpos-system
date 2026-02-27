@@ -27,6 +27,11 @@ return new class extends Migration
             $table->string('description', 200)->nullable();
             $table->boolean('is_active')->default(true);
             
+            // --- TAMBAHAN ---
+            // Untuk metode pembayaran default (biasanya Tunai)
+            $table->boolean('is_default')->default(false);
+            // ----------------
+            
             // Audit Trail
             $table->string('created_by', 50)->nullable();
             $table->string('updated_by', 50)->nullable();
@@ -36,6 +41,11 @@ return new class extends Migration
             
             // Agar satu tenant tidak punya nama metode pembayaran yang ganda
             $table->unique(['tenant_id', 'name'], 'idx_pay_tenant_name');
+            
+            // --- TAMBAHAN ---
+            // Index untuk performa filter metode aktif per tenant
+            $table->index(['tenant_id', 'is_active'], 'idx_pay_tenant_active');
+            // ----------------
         });
     }
 

@@ -53,11 +53,13 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            // --- Indexing (Kecepatan Query) ---
+           // --- Indexing (Kecepatan Query) ---
             $table->unique(['tenant_id', 'invoice_no']); // Invoice tidak boleh kembar dalam 1 tenant
-            $table->index(['tenant_id', 'status']);
-            $table->index(['tenant_id', 'order_date']);
-            $table->index(['customer_phone']);
+
+            // PERBAIKAN: Masukkan outlet_id ke dalam index komposit utama
+            $table->index(['tenant_id', 'outlet_id', 'status'], 'idx_trans_tenant_outlet_status');                
+            $table->index(['tenant_id', 'order_date'], 'idx_trans_tenant_date');                
+            $table->index(['customer_phone'], 'idx_trans_cust_phone');
         });
     }
 

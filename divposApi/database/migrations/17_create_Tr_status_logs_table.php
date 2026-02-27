@@ -6,39 +6,40 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('Tr_status_logs', function (Blueprint $table) {
             $table->id();
             
             // --- Relasi ---
-            // Kita tetap butuh tenant_id agar bisa ditarik laporan aktivitas per tenant dengan cepat
             $table->foreignId('tenant_id')->constrained('Ms_tenants')->onDelete('cascade');
             $table->foreignId('transaction_id')->constrained('Tr_transactions')->onDelete('cascade');
             
             // --- Detail Status ---
-            // Menggunakan Enum agar konsisten dengan status yang ada di table Header
+            // Enum konsisten dengan Tr_transactions
             $table->enum('status', ['PENDING', 'PROCESS', 'READY', 'TAKEN', 'CANCELED']);
             
             // --- Deskripsi & Pelaku ---
-            $table->string('changed_by'); // Nama atau ID user yang melakukan perubahan
-            $table->text('notes')->nullable(); // Catatan tambahan (misal: "Baju luntur, perlu penanganan khusus")
-            $table->string('description')->nullable(); // Keterangan otomatis (misal: "Status diubah ke PROCESS")
+            $table->string('changed_by', 100); // Nama/ID user yang mengubah status
+            
+            // PERBAIKAN: Gunakan string(255) untuk konsistensi performa
+            $table->string('notes', 255)->nullable(); 
+            
+            // PERBAIKAN: Beri batas panjang agar efisien
+            $table->string('description', 255)->nullable(); 
 
-            $table->timestamps(); // created_at adalah penanda waktu kejadian (Timestamp log)
+            // created_at adalah penanda waktu kejadian
+            $table->timestamp('created_at')->useCurrent();
+            // updated_at tidak terlalu krusial untuk log, tapi baik ada
+            $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
 
             // --- Indexing ---
-            $table->index(['tenant_id', 'transaction_id']);
-            $table->index('status');
+            // Optimasi komposit untuk laporan status per transaksi
+            $table->index(['tenant_id', 'transaction_id'], 'idx_log_tenant_trans');
+            $table->index('status', 'idx_log_status');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('Tr_status_logs');

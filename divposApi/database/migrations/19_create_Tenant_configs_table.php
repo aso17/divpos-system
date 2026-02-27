@@ -11,10 +11,8 @@ return new class extends Migration
         Schema::create('tenant_configs', function (Blueprint $table) {
             $table->id();
             // Relasi ke tabel tenants
-            $table->foreignId('tenant_id')->constrained('tenants')->onDelete('cascade');
-            
-            // 'key' untuk nama pengaturannya (misal: label_service)
-            // 'value' untuk isinya (misal: Treatment)
+            $table->foreignId('tenant_id')->constrained('Ms_tenants')->onDelete('cascade');
+        
             $table->string('key');
             $table->text('value'); 
             

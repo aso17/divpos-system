@@ -19,17 +19,22 @@ return new class extends Migration
             $table->string('code', 20)->unique(); 
             $table->string('domain', 150)->unique()->nullable(); 
 
-            // Contact & Business (Tambahan Penting)
+            // --- TAMBAHAN: Relasi ke Master Jenis Bisnis ---
+            // Ini yang krusial untuk performa query hybrid
+            $table->foreignId('business_type_id')->after('name')->constrained('Ms_business_types');
+            // ------------------------------------------------
+
+            // Contact & Business
             $table->string('email', 100)->nullable(); 
             $table->string('phone', 20)->nullable();
             $table->text('address')->nullable();
 
             // Branding
             $table->string('logo_path')->nullable();
-            $table->string('primary_color', 7)->default('#2563EB'); 
+            $table->string('primary_color', 7)->default('#059669'); 
             $table->string('theme', 20)->default('light');
 
-            // Subscription & Status (Kritis untuk SaaS)
+            // Subscription & Status
             $table->boolean('is_active')->default(true)->index();
             // Default Tenant Flag
             $table->boolean('is_default')->default(false)->index();
@@ -43,7 +48,6 @@ return new class extends Migration
             $table->timestampsTz(); 
             $table->softDeletesTz();
         });
-
     }
 
     /**
