@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import { rules } from "../../utils/validators/rules";
-import { inputClasses } from "../../utils/validators/inputClasses";
 import { useFormValidation } from "../../hooks/useFormValidation";
 import SubmitButton from "../../components/SubmitButton";
 
@@ -12,10 +11,10 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
     { email: "", password: "" },
     {
       email: [
-        (v) => rules.required(v, "Email wajib diisi"),
-        (v) => rules.email(v, "Format email tidak valid"),
+        (v) => rules.required(v, "Email address is required"),
+        (v) => rules.email(v, "Please enter a valid email address"),
       ],
-      password: [(v) => rules.required(v, "Password wajib diisi")],
+      password: [(v) => rules.required(v, "Password is required")],
     },
   );
 
@@ -27,17 +26,19 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* EMAIL */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-slate-500 tracking-wide">
-          Email Address
+      <div className="space-y-1">
+        <label className="text-[11px] font-semibold text-slate-500 tracking-wide">
+          Email
         </label>
 
         <div className="relative group">
           <Mail
-            size={18}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 
+                       text-slate-400 group-focus-within:text-emerald-600 
+                       transition-colors"
           />
 
           <input
@@ -46,32 +47,34 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
             onChange={(e) => handleChange("email", e.target.value)}
             placeholder="nama@email.com"
             className={`
-          w-full pl-11 pr-4 py-3 rounded-2xl text-sm
-          bg-slate-50 border border-slate-200
-          focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
-          transition-all duration-200
-          ${errors.email ? "border-red-400 focus:ring-red-400/20" : ""}
-        `}
+              w-full pl-9 pr-3 py-2.5
+              rounded-xl text-xs sm:text-sm
+              bg-slate-50 border border-slate-200
+              focus:outline-none focus:ring-2 focus:ring-emerald-500/20 
+              focus:border-emerald-500
+              transition-all duration-200
+              ${errors.email ? "border-red-400 focus:ring-red-400/20" : ""}
+            `}
           />
         </div>
 
         {errors.email && (
-          <p className="text-xs text-red-500 mt-1 font-medium">
-            {errors.email}
-          </p>
+          <p className="text-[10px] text-red-500 font-medium">{errors.email}</p>
         )}
       </div>
 
       {/* PASSWORD */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-slate-500 tracking-wide">
+      <div className="space-y-1">
+        <label className="text-[11px] font-semibold text-slate-500 tracking-wide">
           Password
         </label>
 
         <div className="relative group">
           <Lock
-            size={18}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 
+                       text-slate-400 group-focus-within:text-emerald-600 
+                       transition-colors"
           />
 
           <input
@@ -80,38 +83,44 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
             onChange={(e) => handleChange("password", e.target.value)}
             placeholder="••••••••"
             className={`
-          w-full pl-11 pr-12 py-3 rounded-2xl text-sm
-          bg-slate-50 border border-slate-200
-          focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
-          transition-all duration-200
-          ${errors.password ? "border-red-400 focus:ring-red-400/20" : ""}
-        `}
+              w-full pl-9 pr-10 py-2.5
+              rounded-xl text-xs sm:text-sm
+              bg-slate-50 border border-slate-200
+              focus:outline-none focus:ring-2 focus:ring-emerald-500/20 
+              focus:border-emerald-500
+              transition-all duration-200
+              ${errors.password ? "border-red-400 focus:ring-red-400/20" : ""}
+            `}
           />
 
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600 transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 
+                       text-slate-400 hover:text-emerald-600 
+                       transition-colors"
           >
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
 
         {errors.password && (
-          <p className="text-xs text-red-500 mt-1 font-medium">
+          <p className="text-[10px] text-red-500 font-medium">
             {errors.password}
           </p>
         )}
       </div>
 
       {/* SUBMIT BUTTON */}
-      <div className="pt-2">
+      <div className="pt-1">
         <SubmitButton
           isSubmitting={isSubmitting}
-          label="LOGIN"
-          loadingLabel="logging in..."
-          fullWidth={false}
-          className="w-full py-2.5 rounded-2xl text-sm font-semibold shadow-lg active:scale-[0.98] transition-all duration-200"
+          label="Login"
+          loadingLabel="Memproses..."
+          className="w-full py-2.5 rounded-xl 
+                     text-xs sm:text-sm font-semibold 
+                     shadow-md active:scale-[0.98] 
+                     transition-all duration-200"
         />
       </div>
     </form>

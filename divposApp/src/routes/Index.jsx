@@ -39,7 +39,7 @@ export default function AppRoutes() {
             />
 
             <Route
-              path="/transactions"
+              path="/transaction"
               element={
                 <RequirePermission permission="view">
                   <TransactionPage />

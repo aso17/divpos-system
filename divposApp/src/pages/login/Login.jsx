@@ -1,26 +1,24 @@
-import { useContext, useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { ProjectContext } from "../../context/ProjectContext";
+import SystemService from "../../services/SystemService";
 import { useAuth } from "../../context/AuthContext";
 import AppHead from "../../components/common/AppHead";
+import LoadingDots from "../../components/common/LoadingDots";
 import LoginForm from "./LoginForm";
 
 export default function Login() {
-  const { project, loading } = useContext(ProjectContext);
+  const [config, setConfig] = useState(null);
   const { login: loginFromContext } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="h-12 w-12 bg-slate-100 rounded-full mb-4"></div>
-          <div className="h-3 w-24 bg-slate-50 rounded"></div>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    SystemService.getAppConfig()
+      .then((response) => {
+        setConfig(response.data);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleLogin = async (values) => {
     setIsSubmitting(true);
@@ -28,79 +26,103 @@ export default function Login() {
       await loginFromContext(values);
       navigate("/dashboard");
     } catch (error) {
-      console.error("Login error:", error);
       const message =
         error.response?.data?.message || error.message || "Login gagal";
+
       window.dispatchEvent(
         new CustomEvent("global-toast", {
-          detail: { message: message, type: "error" },
+          detail: { message, type: "error" },
         }),
       );
     } finally {
       setIsSubmitting(false);
     }
   };
+
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-green-50 px-4">
-      {/* BACKGROUND DECOR */}
-      <div className="absolute -top-40 -right-40 w-96 h-96 bg-emerald-400/20 rounded-full blur-3xl" />
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-green-300/20 rounded-full blur-3xl" />
+    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-green-50 px-4 sm:px-6">
+      {/* Background decorative - hidden di mobile kecil */}
+      <div className="hidden sm:block absolute -top-32 -right-32 w-72 h-72 bg-emerald-400/10 rounded-full blur-3xl" />
+      <div className="hidden sm:block absolute -bottom-32 -left-32 w-72 h-72 bg-green-300/10 rounded-full blur-3xl" />
 
-      <AppHead title={`Login | ${project?.name || "Divpos"}`} />
+      {!config && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[2px]">
+          <LoadingDots overlay />
+        </div>
+      )}
 
-      <div className="relative w-full max-w-sm">
-        {/* CARD */}
-        <div className="backdrop-blur-xl bg-white/80 border border-white/40 rounded-3xl shadow-2xl shadow-emerald-900/10 p-7 md:p-8 transition-all duration-500">
-          {/* LOGO */}
-          <div className="flex justify-center mb-6">
-            {project?.logo_path ? (
+      <AppHead
+        title={`Login | ${config?.appName || "Divpos"}`}
+        icon={config?.favicon_path}
+      />
+
+      {/* Container */}
+      <div className="relative w-full max-w-xs sm:max-w-sm">
+        {/* Card */}
+        <div
+          className="bg-white/90 backdrop-blur-md border border-white/40 
+                        rounded-2xl shadow-lg p-5 sm:p-6 
+                        transition-all duration-300"
+        >
+          {/* Logo */}
+          <div className="flex justify-center mb-4">
+            {config?.logo_path ? (
               <img
-                src={project.logo_path}
-                alt={project.name}
-                className="h-14 w-auto object-contain transition-all duration-500 hover:scale-105"
+                src={config.logo_path}
+                alt={config.appName}
+                className="h-9 sm:h-10 w-auto object-contain"
               />
             ) : (
-              <div className="h-14 w-14 bg-gradient-to-tr from-emerald-600 to-green-400 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-emerald-200">
-                {project?.name?.charAt(0) || "D"}
+              <div
+                className="h-9 w-9 sm:h-10 sm:w-10 
+                              bg-gradient-to-tr from-emerald-600 to-green-400 
+                              rounded-xl flex items-center justify-center 
+                              text-white font-bold text-xs sm:text-sm shadow"
+              >
+                {config?.appName?.charAt(0) || "D"}
               </div>
             )}
           </div>
 
-          {/* HEADING */}
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-semibold text-slate-800 tracking-tight">
+          {/* Heading */}
+          <div className="text-center mb-5">
+            <h1 className="text-lg sm:text-xl font-semibold text-slate-800">
               Selamat Datang
             </h1>
-            <p className="text-sm text-slate-500 mt-2">
-              Masuk ke sistem{" "}
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Masuk ke{" "}
               <span className="font-semibold text-emerald-600">
-                {project?.name || "Divpos"}
+                {config?.appName || "Divpos"}
               </span>
             </p>
           </div>
 
-          {/* FORM */}
           <LoginForm
-            project={project}
+            project={config}
             isSubmitting={isSubmitting}
             onSubmit={handleLogin}
           />
 
-          {/* FOOTER LINKS */}
-          <div className="mt-7 pt-6 border-t border-slate-100 flex justify-between items-center text-xs">
+          {/* Footer */}
+          <div
+            className="mt-5 pt-4 border-t border-slate-100 
+                          flex justify-between items-center 
+                          text-[11px] sm:text-xs"
+          >
             <Link
               to="/forgot-password"
-              className="text-slate-400 hover:text-emerald-600 transition-colors duration-200"
+              className="text-slate-400 hover:text-emerald-600 transition-colors"
             >
               Lupa password?
             </Link>
 
             <Link
               to="/register"
-              className="px-4 py-1.5 rounded-full font-semibold transition-all duration-300 hover:scale-105"
+              className="px-3 py-1 rounded-full font-medium 
+                         transition-all hover:scale-105"
               style={{
-                backgroundColor: `${project?.primary_color || "#10b981"}20`,
-                color: project?.primary_color || "#10b981",
+                backgroundColor: `${config?.primary_color || "#10b981"}15`,
+                color: config?.primary_color || "#10b981",
               }}
             >
               Buat Akun
@@ -108,9 +130,14 @@ export default function Login() {
           </div>
         </div>
 
-        {/* BOTTOM TEXT */}
-        <p className="text-center text-slate-400 text-[10px] mt-8 tracking-[0.3em] uppercase opacity-70">
-          Powered by Divpos System
+        {/* Bottom text */}
+        <p
+          className="text-center text-slate-400 
+                      text-[9px] sm:text-[10px] 
+                      mt-6 tracking-[0.25em] 
+                      uppercase opacity-60"
+        >
+          Powered by {config?.appName || "Divpos"}
         </p>
       </div>
     </div>
