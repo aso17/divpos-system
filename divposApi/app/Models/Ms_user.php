@@ -45,4 +45,10 @@ class Ms_user extends Authenticatable
     {
         return $this->belongsTo(Ms_tenant::class, 'tenant_id');
     }
+
+
+    public function refreshTokens()
+{
+    return $this->hasMany(UserRefreshToken::class, 'user_id');
+}
 }

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
 use App\Repositories\MenuRepository;
+
 class MenuService
 {
     public static function getMenuByRole(int $roleId)
@@ -12,9 +13,11 @@ class MenuService
             $rows = MenuRepository::getByRole($roleId);
 
             $menus = [];
+            $flatPermissions = []; // ⚡️ TAMBAHAN: Untuk Map Izin
 
-            // 1️⃣ Mapping (SIMPAN order_no)
+            // 1️⃣ Mapping
             foreach ($rows as $row) {
+                // Data untuk Sidebar Tree
                 $menus[$row->menu_id] = [
                     'id'        => $row->menu_id,
                     'name'      => $row->menu_name,
@@ -24,17 +27,28 @@ class MenuService
                     'order_no'  => $row->order_no,
                     'permissions' => [
                         'view'   => (bool) $row->can_view,
-                        'create'=> (bool) $row->can_create,
-                        'update'=> (bool) $row->can_update,
-                        'delete'=> (bool) $row->can_delete,
+                        'create' => (bool) $row->can_create,
+                        'update' => (bool) $row->can_update,
+                        'delete' => (bool) $row->can_delete,
                     ],
                     'children' => [],
                 ];
+
+                // 2️⃣ ⚡️ GENERATE FLAT PERMISSION MAP ⚡️
+                // Digunakan oleh RequirePermission.js untuk cek rute
+                if ($row->route_name) {
+                    $flatPermissions[$row->route_name] = [
+                        'view'   => (bool) $row->can_view,
+                        'create' => (bool) $row->can_create,
+                        'update' => (bool) $row->can_update,
+                        'delete' => (bool) $row->can_delete,
+                    ];
+                }
             }
 
             $tree = [];
 
-            // 2️⃣ Build tree
+            // 3️⃣ Build tree
             foreach ($menus as $id => &$menu) {
                 if ($menu['parent_id'] && isset($menus[$menu['parent_id']])) {
                     $menus[$menu['parent_id']]['children'][] = &$menu;
@@ -43,7 +57,7 @@ class MenuService
                 }
             }
 
-            // 3️⃣ SORT children
+            // 4️⃣ SORT children
             foreach ($tree as &$parent) {
                 if (!empty($parent['children'])) {
                     usort($parent['children'], fn ($a, $b) =>
@@ -52,12 +66,16 @@ class MenuService
                 }
             }
 
-            // 4️⃣ SORT parent
+            // 5️⃣ SORT parent
             usort($tree, fn ($a, $b) =>
                 $a['order_no'] <=> $b['order_no']
             );
 
-            return $tree;
+            // 6️⃣ ⚡️ KEMBALIKAN KEDUA STRUKTUR ⚡️
+            return [
+                'tree' => $tree,
+                'map'  => $flatPermissions
+            ];
         });
     }
 }

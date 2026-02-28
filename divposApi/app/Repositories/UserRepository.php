@@ -71,4 +71,9 @@ class UserRepository
             'last_login_ip' => $ip,
         ]);
     }
+
+    public function findByRefreshToken(string $hashedToken)
+    {
+        return Ms_user::where('refresh_token', $hashedToken)->first();
+    }
 }

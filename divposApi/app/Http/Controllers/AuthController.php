@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Services\AuthService;
@@ -14,34 +15,66 @@ class AuthController extends Controller
         $this->authService = $authService;
     }
 
+    /**
+     * 🔐 Login
+     */
     public function login(Request $request)
     {
-        // Validasi Input
         $credentials = $request->validate([
             'email'    => 'required|email',
             'password' => 'required|string',
         ]);
 
-        // Panggil Service
         $result = $this->authService->attemptLogin(
-            $credentials, 
-            $request->ip(), 
+            $credentials,
+            $request->ip(),
             $request->userAgent()
         );
 
-        // Response
         return response()->json([
-            'token' => $result['token'],
-            'user'  => new LoginResource($result['user'])
+            'token'         => $result['token'],
+            'refresh_token' => $result['refresh_token'],
+            'user'          => new LoginResource($result['user'])
         ]);
     }
 
+    /**
+     * 🔁 Refresh Access Token
+     */
+    public function refresh(Request $request)
+    {
+        $request->validate([
+            'refresh_token' => 'required|string'
+        ]);
+
+        $result = $this->authService->refreshToken(
+            $request->refresh_token,
+            $request->ip(),
+            $request->userAgent()
+        );
+
+        return response()->json([
+            'token'         => $result['token'],
+            'refresh_token' => $result['refresh_token'],
+        ]);
+    }
+
+    /**
+     * 🚪 Logout (per device)
+     */
     public function logout(Request $request)
     {
-        if ($request->user()) {
-            $request->user()->currentAccessToken()->delete();
-        }
+        $request->validate([
+            'refresh_token' => 'required|string'
+        ]);
 
-        return response()->json(['message' => 'Berhasil logout']);
+        $this->authService->logout(
+            $request->user(),
+            $request->refresh_token
+        );
+
+        return response()->json([
+            'message' => 'Berhasil logout'
+        ]);
     }
 }

@@ -5,8 +5,6 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class CorsMiddleware
 {
@@ -14,60 +12,64 @@ class CorsMiddleware
     {
         $origin = $request->headers->get('Origin');
 
-        // Jika tidak ada Origin (akses langsung browser/Postman), biarkan lewat tanpa header CORS
+        // Jika tidak ada Origin (Postman, curl, same-origin)
         if (!$origin) {
             return $next($request);
         }
 
-        $host = parse_url($origin, PHP_URL_HOST);
+        $allowedOrigins = $this->allowedOrigins();
 
-        // ✅ DEV MODE
-        if (in_array($host, ['localhost', '127.0.0.1','192.168.0.118'])) {
-            return $this->handleAllowed($request, $next, $origin);
-        }
-
-        // ✅ PROD MODE (tenant based) dengan proteksi error
-       
-        try {
-            $cacheKey = "cors_allowed_domain:" . $host;
-
-            $isAllowed = \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDay(), function () use ($host) {
-                return DB::table('system_configurations')
-                    ->where('key', 'domain')
-                    ->where('value', $host)
-                    ->exists();
-            });
-
-            if (!$isAllowed) {
-                return response()->json(['message' => 'CORS forbidden'], 403);
-            }
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'CORS validation error'], 500);
+        if (!in_array($origin, $allowedOrigins, true)) {
+            return response()->json([
+                'message' => 'CORS forbidden'
+            ], 403);
         }
 
         return $this->handleAllowed($request, $next, $origin);
     }
 
+    /**
+     * Daftar origin yang diizinkan
+     */
+    private function allowedOrigins(): array
+    {
+        $origins = [];
+
+        // Frontend production (WAJIB set di config/app.php atau .env)
+        if (config('app.frontend_url')) {
+            $origins[] = rtrim(config('app.frontend_url'), '/');
+        }
+
+        // Development mode
+        if (config('app.debug')) {
+            $origins = array_merge($origins, [
+                'http://localhost:5173',
+                'http://127.0.0.1:5173',
+                'http://192.168.0.118:5173',
+            ]);
+        }
+
+        return $origins;
+    }
+
     private function handleAllowed(Request $request, Closure $next, string $origin): Response
     {
-        // Handle Preflight Request (OPTIONS)
+        $headers = [
+            'Access-Control-Allow-Origin'      => $origin,
+            'Access-Control-Allow-Methods'     => 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers'     => 'Content-Type, Authorization, X-Requested-With',
+            'Access-Control-Allow-Credentials' => 'true',
+        ];
+
+        // Preflight request
         if ($request->isMethod('OPTIONS')) {
-            return response('', 204)
-                ->header('Access-Control-Allow-Origin', $origin)
-                ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-                ->header('Access-Control-Allow-Credentials', 'true');
+            return response('', 204)->withHeaders($headers);
         }
 
         $response = $next($request);
 
-        // Tambahkan pengecekan apakah $response memiliki metode header
-        if (method_exists($response, 'header')) {
-            return $response
-                ->header('Access-Control-Allow-Origin', $origin)
-                ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-                ->header('Access-Control-Allow-Credentials', 'true');
+        foreach ($headers as $key => $value) {
+            $response->headers->set($key, $value);
         }
 
         return $response;

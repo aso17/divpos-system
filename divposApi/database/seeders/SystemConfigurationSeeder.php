@@ -17,13 +17,13 @@ class SystemConfigurationSeeder extends Seeder
             ],
             [
                 'key'         => 'logo_path',
-                'value'       => '/assets/imgApp/logo.webp',  
+                'value'       => 'imgApp/logo.webp',  
                 'type'        => 'file_path',
                 'description' => 'Logo utama aplikasi'
             ],
             [
                 'key'         => 'favicon_path',
-                'value'       => '/assets/imgApp/favicon.ico',
+                'value'       => 'imgApp/favicon.ico',
                 'type'        => 'file_path',
                 'description' => 'Icon kecil di browser'
             ],

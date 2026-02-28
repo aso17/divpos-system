@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             // Catat user siapa yang menyebabkan error
             $table->foreignId('user_id')->nullable()->constrained('Ms_users')->nullOnDelete();
-            // Catat tenant mana yang error
+            // Catat tenant mana yang errorphp
             $table->foreignId('tenant_id')->nullable()->constrained('Ms_tenants')->cascadeOnDelete();
             
             $table->string('error_code')->nullable();
