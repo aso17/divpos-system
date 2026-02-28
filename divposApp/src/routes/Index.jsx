@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
 import Dashboard from "../pages/dashboard/Dashboard";
 import UsersPage from "../pages/users/UsersList";
@@ -23,6 +23,7 @@ export default function AppRoutes() {
         {/* ================= PUBLIC ================= */}
         <Route element={<PublicRoute />}>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Route>
 
         {/* ================ PROTECTED ================ */}
@@ -128,6 +129,7 @@ export default function AppRoutes() {
                 </RequirePermission>
               }
             />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Route>
       </Routes>

@@ -15,6 +15,7 @@ export default function Login() {
   useEffect(() => {
     SystemService.getAppConfig()
       .then((response) => {
+        // console.log("App Config:", response.data);
         setConfig(response.data);
       })
       .catch(() => {});

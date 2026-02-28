@@ -1,4 +1,4 @@
-import api from "./api";
+import api from "./apiPublic";
 import { encrypt } from "../utils/Encryptions";
 
 const SystemService = {
@@ -10,6 +10,8 @@ const SystemService = {
       "primary_color",
       "favicon_path",
     ];
+
+    // Enkripsi keys agar aman di URL
     const encryptedKeys = neededKeys.map((key) => encrypt(key));
     return api.get("/app-config", {
       params: {

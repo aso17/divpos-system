@@ -12,7 +12,7 @@ import { useState, useRef, useEffect, use } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { assetUrl } from "../utils/Url";
-import { GetWithExpiry } from "../utils/SetWithExpiry";
+import { GetWithExpiry } from "../utils/Storage";
 
 export default function Topbar({ onToggleSidebar }) {
   const [open, setOpen] = useState(false);
@@ -25,11 +25,12 @@ export default function Topbar({ onToggleSidebar }) {
   const handleLogout = async () => {
     await logout();
     setOpen(false);
-    navigate("/login");
+    // navigate("/login");
   };
   // console.log("User di Topbar:", user);
   useEffect(() => {
     const storedUser = GetWithExpiry("user");
+    // console.log("Stored User in Topbar:", storedUser);
     setRoleName(storedUser?.role_name || "Owner");
 
     if (storedUser?.avatar) {

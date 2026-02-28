@@ -1,5 +1,5 @@
 import api from "./api";
-import { GetWithExpiry } from "../utils/SetWithExpiry";
+import { GetWithExpiry } from "../utils/Storage";
 import { encrypt } from "../utils/Encryptions";
 
 const getAuthInfo = () => {

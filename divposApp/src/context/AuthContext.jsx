@@ -1,92 +1,113 @@
-import { createContext, useContext, useEffect, useState, useRef } from "react";
 import {
-  login as loginApi,
-  logout as logoutApi,
-  getMe,
-  getMenus,
-} from "../services/AuthService";
-
-import { getProjectInfo } from "../services/projectService";
-import { SetWithExpiry } from "../utils/SetWithExpiry";
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+} from "react";
+import AuthService from "../services/AuthService";
+import { SetWithExpiry, GetWithExpiry, RemoveStorage } from "../utils/Storage";
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [menus, setMenus] = useState([]);
+  const [permissionMap, setPermissionMap] = useState({});
   const [loading, setLoading] = useState(true);
   const isInitialized = useRef(false);
-  const loadUser = async () => {
+
+  const logout = useCallback(async () => {
     try {
-      const { data } = await getMe();
-      setUser(data);
-      return data;
-    } catch (err) {
-      await logout();
-      return null;
-    }
-  };
-
-  const loadMenus = async () => {
-    try {
-      const { data } = await getMenus();
-      // console.log("Fetched menus:", data);
-      const menuData = data.menus || [];
-      setMenus(menuData);
-      return menuData;
-    } catch (err) {
-      setMenus([]);
-      return [];
-    }
-  };
-
-  const login = async (credentials) => {
-    setLoading(true);
-    try {
-      const { data } = await loginApi(credentials);
-
-      SetWithExpiry("access_token", data.token, 1440);
-      SetWithExpiry("user", data.user, 1440);
-      localStorage.setItem("tenant_name", data.user.tenant.slug);
-      // localStorage.setItem("role_name", data.user.role.name);
-      localStorage.setItem("tenant_logo_path", data.user.tenant.logo_path);
-      localStorage.setItem("tenant_code", data.user.tenant.code);
-
-      setUser(data.user);
-
-      await loadMenus();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await logoutApi();
+      await AuthService.logout();
     } catch (err) {
       console.error("Logout API failed", err);
     } finally {
-      [
+      const keysToClear = [
         "access_token",
-        "user",
+        "tenant_info",
         "tenant_name",
-        "tenant_logo_path",
-        "tenant_code",
         "last_allowed_route",
-      ].forEach((key) => localStorage.removeItem(key));
+      ];
+
+      keysToClear.forEach((key) => RemoveStorage(key));
 
       setUser(null);
       setMenus([]);
-
+      setPermissionMap({});
       isInitialized.current = false;
-      await getProjectInfo();
+
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
+  }, []);
+
+  // 🔥 Load user + menu + permission paralel
+  const loadInitialData = useCallback(async () => {
+    try {
+      const [userRes, menuRes] = await Promise.all([
+        AuthService.getMe(),
+        AuthService.getMenus(),
+      ]);
+
+      setUser(userRes.data);
+
+      const menuData = menuRes.data.menus || [];
+      const permissions = menuRes.data.permissions || {};
+
+      setMenus(menuData);
+      setPermissionMap(permissions);
+    } catch (err) {
+      console.error("Auth initialization failed:", err);
+      await logout();
+    } finally {
+      setLoading(false);
+    }
+  }, [logout]);
+
+  const login = async (credentials) => {
+    setLoading(true);
+
+    try {
+      const { data } = await AuthService.login(credentials, "");
+      console.log("Login successful:", data);
+      SetWithExpiry("access_token", data.token, 1440);
+      SetWithExpiry("refresh_token", data.refresh_token, 1440);
+      SetWithExpiry("user", data.user, 1440);
+
+      localStorage.setItem("tenant_name", data.user.tenant.slug);
+
+      const tenantInfo = {
+        name: data.user.tenant.slug,
+        logo: data.user.tenant.logo_path,
+        icon: data.user.tenant.icon_path,
+        code: data.user.tenant.code,
+        type: data.user.tenant.business_type,
+      };
+
+      SetWithExpiry("tenant_info", tenantInfo, 1440);
+
+      setUser(data.user);
+
+      const menuRes = await AuthService.getMenus();
+
+      setMenus(menuRes.data.menus || []);
+      setPermissionMap(menuRes.data.permissions || {});
+
+      return data;
+    } catch (error) {
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     if (isInitialized.current) return;
 
-    const token = localStorage.getItem("access_token");
+    const token = GetWithExpiry("access_token");
 
     if (!token) {
       setLoading(false);
@@ -94,27 +115,19 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    const initAuth = async () => {
-      try {
-        isInitialized.current = true;
-        await Promise.all([loadUser(), loadMenus()]);
-      } catch (err) {
-        console.error("Initialization failed", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initAuth();
-  }, []);
+    isInitialized.current = true;
+    loadInitialData();
+  }, [loadInitialData]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         menus,
+        permissionMap,
         loading,
         isAuthenticated: !!user,
+        businessType: user?.tenant?.business_type,
         login,
         logout,
       }}
@@ -124,4 +137,9 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
+
+  return context;
+};

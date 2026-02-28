@@ -3,31 +3,32 @@ import { useAuth } from "../context/AuthContext";
 
 export default function RequirePermission({
   permission = "view",
-  useRoute = null,
+  route = null,
   children,
 }) {
-  const { menus, loading } = useAuth();
+  const { permissionMap = {}, loading } = useAuth();
   const location = useLocation();
-
-  if (loading) return null;
-
-  const flatMenus = menus.flatMap((m) => [m, ...(m.children || [])]);
-  const pathToMatch = useRoute || location.pathname;
-  const current = flatMenus.find((m) => m.route === pathToMatch);
-  const allowedMenus = flatMenus.filter((m) => m.permissions?.view);
-  if (current && current.permissions?.view && !useRoute) {
-    localStorage.setItem("last_allowed_route", current.route);
+  // 🔥 TUNGGU DATA DIMUAT 🔥
+  if (loading) {
+    return <div></div>;
   }
+  const currentPath = route || location.pathname;
+  // Debug: Pastikan map terisi saat pengecekan
 
-  const lastAllowedRoute =
-    localStorage.getItem("last_allowed_route") ||
-    allowedMenus[0]?.route ||
-    "/dashboard";
+  // Cari route yang cocok (support dynamic route)
+  const matchedRoute = Object.keys(permissionMap).find((r) =>
+    currentPath.startsWith(r),
+  );
 
-  // Cek apakah menu ditemukan dan apakah user punya izin (view/create/update/etc)
-  if (!current || !current.permissions?.[permission]) {
-    console.warn(`Akses ditolak ke: ${pathToMatch}. Butuh izin: ${permission}`);
-    return <Navigate to={lastAllowedRoute} replace />;
+  // ⚡️ PERBAIKAN LOGIKA DI SINI ⚡️
+  // Cek apakah rute ada di map, dan apakah izin (view/create/dll) bernilai true
+  const routePermissions = permissionMap[matchedRoute];
+  const hasPermission =
+    routePermissions && routePermissions[permission] === true;
+
+  if (!hasPermission) {
+    console.warn(`Akses ditolak ke ${currentPath}. Butuh izin: ${permission}`);
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
