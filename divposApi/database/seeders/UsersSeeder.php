@@ -26,7 +26,7 @@ class UsersSeeder extends Seeder
             'LDR-001' => [ // Sesuai dengan code di TenantSeeder baru
                 [
                     'full_name' => 'Agus Solihin',
-                    'email'     => 'sa@laundrymakmur.test',
+                    'email'     => 'sa@lau.com',
                     'username'  => 'superadmin_ldr',
                     'password'  => Hash::make('P@ssword1234'),
                     'phone'     => '628111111111',

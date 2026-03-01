@@ -25,7 +25,7 @@ use App\Http\Controllers\{
 |--------------------------------------------------------------------------
 */
 Route::middleware('api-public')->group(function () {
-    Route::get('/project-info', [ProjectInfoController::class, 'show']);
+    // Route::get('/project-info', [ProjectInfoController::class, 'show']);
     Route::get('/app-config', [AppconfigController::class, 'show']);
 });
 

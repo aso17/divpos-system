@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AuthService;
+use App\Models\SystemConfiguration;
 use App\Http\Resources\LoginResource;
 use Illuminate\Http\Request;
 
@@ -34,9 +35,30 @@ class AuthController extends Controller
         return response()->json([
             'token'         => $result['token'],
             'refresh_token' => $result['refresh_token'],
-            'user'          => new LoginResource($result['user'])
+            'user'          => new LoginResource($result['user']),
+            'app_config'    => $this->getFormattedAppConfig(),
         ]);
     }
+
+    private function getFormattedAppConfig()
+    {
+        
+       $neededKeys = ["appName", "logo_path", "footer_text", "primary_color", "favicon_path"];
+        
+        $configs = SystemConfiguration::whereIn('key', $neededKeys)
+            ->pluck('value', 'key')
+            ->toArray();
+
+        // Formatting Path untuk Asset
+        foreach (['logo_path', 'favicon_path'] as $key) {
+            if (!empty($configs[$key])) {
+                $configs[$key] = asset("storage/" . ltrim($configs[$key], '/'));
+            }
+        }
+
+        return $configs;
+    }
+    
 
     /**
      * 🔁 Refresh Access Token
