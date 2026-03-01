@@ -13,7 +13,7 @@ const getAuthInfo = () => {
 const RoleService = {
   GetRolesByTenant: () => {
     const { tenantId } = getAuthInfo();
-    return api.get("/GetRolesByTenant", {
+    return api.get("/access-control/roles-by-tenant", {
       params: {
         tenant_id: encrypt(tenantId),
       },
@@ -22,7 +22,7 @@ const RoleService = {
 
   getRoles: (params = {}) => {
     const { tenantId } = getAuthInfo();
-    return api.get("/role", {
+    return api.get("/access-control/roles", {
       params: {
         tenant_id: encrypt(tenantId),
         ...params,
@@ -37,7 +37,7 @@ const RoleService = {
       tenant_id: tenantId,
       created_by: userLogin,
     };
-    return api.post("/role", finalPayload);
+    return api.post("/access-control/roles", finalPayload);
   },
 
   updateRole: (id, payload) => {
@@ -48,7 +48,7 @@ const RoleService = {
       updated_by: userLogin,
       _method: "PUT",
     };
-    return api.post(`/role/${id}`, finalPayload);
+    return api.post(`/roles/${id}`, finalPayload);
   },
   // RoleService.js
 
@@ -56,7 +56,7 @@ const RoleService = {
     const { tenantId } = getAuthInfo();
     const roleId = encrypt(id);
     const tenant_id = encrypt(tenantId);
-    return api.delete(`/role/${roleId}`, {
+    return api.delete(`/access-control/roles/${roleId}`, {
       params: { tenant_id: tenant_id },
     });
   },

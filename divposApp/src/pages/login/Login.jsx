@@ -52,10 +52,7 @@ export default function Login() {
         </div>
       )}
 
-      <AppHead
-        title={`Login | ${config?.appName || "Divpos"}`}
-        icon={config?.favicon_path}
-      />
+      <AppHead title={`Login`} icon={config?.favicon_path} />
 
       {/* Container */}
       <div className="relative w-full max-w-xs sm:max-w-sm">

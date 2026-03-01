@@ -1,23 +1,20 @@
 import { useMemo, useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-} from "@tanstack/react-table";
-import {
-  Pencil,
-  Trash2,
-  PlusSquare,
-  Shield,
-  X,
-  Search,
-  Lock,
-} from "lucide-react";
 
-// Import Components & Services
-import LoadingDots from "../../components/common/LoadingDots";
+// --- IMPORT ICON SPESIFIK (Tree-shaking) ---
+import Pencil from "lucide-react/dist/esm/icons/pencil";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
+import PlusSquare from "lucide-react/dist/esm/icons/plus-square";
+import Shield from "lucide-react/dist/esm/icons/shield";
+import X from "lucide-react/dist/esm/icons/x";
+import Search from "lucide-react/dist/esm/icons/search";
+import Lock from "lucide-react/dist/esm/icons/lock";
+import FileText from "lucide-react/dist/esm/icons/file-text";
+
+// --- IMPORT COMPONENTS & SERVICES ---
+import TableGeneric from "../../components/TableGeneric";
 import TablePagination from "../../components/TablePagination";
+import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import AppHead from "../../components/common/AppHead";
 import RolesService from "../../services/RoleService";
 import { encrypt } from "../../utils/Encryptions";
@@ -94,8 +91,9 @@ export default function RolesList() {
       const successMsg =
         res.data?.message || "Data role telah berhasil dihapus.";
       await showConfirm(successMsg, "Hapus Berhasil", "success");
-      setData((prevData) => prevData.filter((item) => item.id !== role.id));
-      setTotalCount((prev) => Math.max(0, prev - 1));
+
+      // Refresh data
+      fetchRoles();
     } catch (err) {
       const errorMsg = err.response?.data?.message || "Gagal menghapus role";
       showConfirm(errorMsg, "Gagal Hapus", "error");
@@ -108,7 +106,7 @@ export default function RolesList() {
         id: "no",
         header: "NO",
         cell: ({ row, table }) => {
-          const { pageIndex, pageSize } = table.options.state.pagination;
+          const { pageIndex, pageSize } = table.getState().pagination;
           return (
             <span className="text-slate-400 font-medium text-[10px]">
               {pageIndex * pageSize + row.index + 1}
@@ -206,33 +204,21 @@ export default function RolesList() {
     [navigate],
   );
 
-  const table = useReactTable({
-    data,
-    columns,
-    state: { pagination },
-    onPaginationChange: setPagination,
-    manualPagination: true,
-    autoResetPageIndex: false,
-    pageCount: Math.ceil(totalCount / pagination.pageSize),
-    rowCount: totalCount,
-    getCoreRowModel: getCoreRowModel(),
-  });
-
   return (
-    <div className="p-6 space-y-6 bg-slate-50/50 min-h-screen">
+    <div className="px-2 py-4 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-28 md:pb-6">
       <AppHead title="Role Management" />
 
       {/* Header Page */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200">
-            <Shield size={24} className="text-emerald-600" />
+      <div className="flex items-center justify-between gap-4 px-1">
+        <div className="flex items-center gap-2.5">
+          <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
+            <Shield size={20} className="text-emerald-600" />
           </div>
           <div>
-            <h1 className="text-xs font-black text-slate-800 uppercase tracking-tight leading-none">
+            <h1 className="text-[11px] md:text-sm font-black text-slate-800 uppercase leading-none">
               Role & Permission
             </h1>
-            <p className="text-xs text-slate-500 mt-1 font-medium">
+            <p className="hidden md:block text-[10px] text-slate-500 mt-1 font-medium">
               Konfigurasi tingkatan akses dan modul aplikasi
             </p>
           </div>
@@ -243,113 +229,168 @@ export default function RolesList() {
             setSelectedRole(null);
             setOpenModal(true);
           }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xxs font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 uppercase"
+          className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
         >
           <PlusSquare size={18} /> Tambah Role
         </button>
       </div>
 
       {/* Filter & Search */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">
-        <form
-          onSubmit={handleSearch}
-          className="flex items-center gap-2 w-full md:w-auto"
-        >
-          <div className="relative flex-1 md:w-80 group">
-            <Search
-              className="absolute left-3 top-2.5 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
-              size={16}
-            />
-            <input
-              className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-              placeholder="Cari nama role atau kode..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={handleReset}
-                className="absolute right-3 top-2.5 text-slate-400 hover:text-rose-500"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-          <button
-            type="submit"
-            className="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xxs font-bold hover:bg-slate-700 transition-all shadow-md"
-          >
-            CARI
-          </button>
-        </form>
-      </div>
-
-      {/* Table Section */}
-      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden relative min-h-[450px] flex flex-col">
-        <div className="overflow-x-auto grow relative">
-          {loading && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[2px]">
-              <LoadingDots overlay />
-            </div>
-          )}
-
-          <table className="w-full">
-            <thead>
-              {table.getHeaderGroups().map((hg) => (
-                <tr
-                  key={hg.id}
-                  className="bg-slate-50/50 border-b border-slate-100"
+      <div className="flex justify-start px-1">
+        <div className="bg-white p-2 rounded-2xl border border-slate-100 shadow-sm w-full md:w-auto md:min-w-[320px]">
+          <form onSubmit={handleSearch} className="flex items-center gap-1.5">
+            <div className="relative flex-1 group">
+              <Search
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
+                size={13}
+              />
+              <input
+                className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] outline-none focus:bg-white focus:border-emerald-500/50 transition-all placeholder:text-slate-400"
+                placeholder="Cari nama role atau kode..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
                 >
-                  {hg.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      className="px-6 py-4 text-[8px] font-black text-slate-400 uppercase tracking-[0.15em] text-left"
-                    >
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {table.getRowModel().rows.length > 0
-                ? table.getRowModel().rows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="hover:bg-emerald-50/30 transition-colors cursor-default group"
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="px-6 py-4 align-middle">
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                : !loading && (
-                    <tr>
-                      <td
-                        colSpan={columns.length}
-                        className="p-20 text-center text-slate-400 italic text-xs font-medium"
-                      >
-                        Belum ada data role yang tersedia
-                      </td>
-                    </tr>
-                  )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="p-4 bg-slate-50/50 border-t border-slate-100">
-          <TablePagination table={table} totalEntries={totalCount} />
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <button
+              type="submit"
+              className="bg-slate-900 text-white h-[32px] px-3 md:px-4 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-sm"
+            >
+              <Search size={14} className="md:hidden" />
+              <span className="hidden md:block">CARI</span>
+            </button>
+          </form>
         </div>
       </div>
+
+      {/* --- RESPONSIVE DATA VIEW --- */}
+      <ResponsiveDataView
+        data={data}
+        loading={loading}
+        emptyMessage="Belum ada data role tersedia"
+        renderMobileCard={(role) => (
+          <div
+            key={role.id}
+            className="bg-white rounded-[1.25rem] p-3 shadow-sm border border-slate-100 space-y-3 mx-1"
+          >
+            <div className="flex justify-between items-start gap-2">
+              <div className="space-y-0.5 flex-1">
+                <h3 className="text-[11px] font-black text-slate-800 uppercase leading-tight">
+                  {role.role_name}
+                </h3>
+                <span className="text-[7px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100 uppercase">
+                  ID: {role.code}
+                </span>
+              </div>
+              <div
+                className={`px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase border shrink-0 ${
+                  role.is_active
+                    ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                    : "bg-rose-50 text-rose-600 border-rose-100"
+                }`}
+              >
+                {role.is_active ? "Aktif" : "Nonaktif"}
+              </div>
+            </div>
+
+            <div className="space-y-2 py-2 border-y border-slate-50">
+              <div className="flex items-start gap-2">
+                <FileText
+                  size={10}
+                  className="text-slate-300 shrink-0 mt-0.5"
+                />
+                <p className="text-[9px] text-slate-500 italic">
+                  {role.description || "Tidak ada deskripsi spesifik"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => {
+                  const hashedId = encrypt(role.id);
+                  navigate(`/rolespermission/${hashedId}`, {
+                    state: {
+                      role_name: role.role_name,
+                      code: role.code,
+                    },
+                  });
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase active:scale-95 transition-all"
+              >
+                <Lock size={10} /> Permission
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedRole(role);
+                  setOpenModal(true);
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
+              >
+                <Pencil size={10} /> Edit
+              </button>
+              <button
+                onClick={() => handleDelete(role)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
+              >
+                <Trash2 size={10} /> Hapus
+              </button>
+            </div>
+          </div>
+        )}
+        renderDesktopTable={() => (
+          <TableGeneric
+            data={data}
+            columns={columns}
+            pagination={pagination}
+            setPagination={setPagination}
+            totalCount={totalCount}
+            loading={loading}
+            emptyMessage="Belum ada data role yang tersedia"
+          />
+        )}
+      />
+
+      {/* --- PAGINASI KHUSUS MOBILE --- */}
+      <div className="md:hidden mt-4">
+        <TablePagination
+          table={{
+            options: {
+              state: {
+                pagination: pagination,
+              },
+            },
+            setPageSize: (newSize) =>
+              setPagination((p) => ({ ...p, pageSize: newSize, pageIndex: 0 })),
+            setPageIndex: (newIndex) =>
+              setPagination((p) => ({ ...p, pageIndex: newIndex })),
+            previousPage: () =>
+              setPagination((p) => ({ ...p, pageIndex: p.pageIndex - 1 })),
+            nextPage: () =>
+              setPagination((p) => ({ ...p, pageIndex: p.pageIndex + 1 })),
+          }}
+          totalEntries={totalCount}
+        />
+      </div>
+
+      {/* Floating Action Button Mobile */}
+      <button
+        onClick={() => {
+          setSelectedRole(null);
+          setOpenModal(true);
+        }}
+        className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 border-4 border-white transition-all"
+      >
+        <PlusSquare size={20} />
+      </button>
 
       <RoleForm
         open={openModal}
@@ -361,8 +402,8 @@ export default function RolesList() {
               prev.map((r) => (r.id === newRole.id ? newRole : r)),
             );
           } else {
-            setData((prev) => [newRole, ...prev]);
-            setTotalCount((prev) => prev + 1);
+            setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+            fetchRoles();
           }
           setOpenModal(false);
         }}

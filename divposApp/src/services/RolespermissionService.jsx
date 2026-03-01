@@ -13,7 +13,7 @@ const getAuthInfo = () => {
 const RolespermissionService = {
   getRolePermissions: (roleId) => {
     const { tenantId } = getAuthInfo();
-    return api.get("/rolespermission", {
+    return api.get("/access-control/role-permissions", {
       params: {
         tenantid: encrypt(tenantId),
         roleid: encrypt(roleId),
@@ -30,7 +30,7 @@ const RolespermissionService = {
       created_by: userLogin,
     };
 
-    return api.post("/rolespermission", finalPayload);
+    return api.post("/access-control/role-permissions", finalPayload);
   },
 };
 

@@ -13,7 +13,7 @@ const getAuthInfo = () => {
 const TransactionService = {
   getInitData: (params = {}) => {
     const { tenantId } = getAuthInfo();
-    return api.get("/transaction/init-data", {
+    return api.get("/transactions/init-data", {
       params: {
         tenant_id: encrypt(tenantId),
         ...params,

@@ -11,7 +11,8 @@ const UsersService = {
   getUsers: (params = {}) => {
     const tenantId = getTenantId();
     const encriptedTenantId = encrypt(tenantId);
-    return api.get("/user", {
+
+    return api.get("/users", {
       params: {
         tenant_id: encriptedTenantId,
         ...params,
@@ -27,7 +28,7 @@ const UsersService = {
         payload.append("tenant_id", encriptedTenantId);
       }
 
-      return api.post("/user", payload, {
+      return api.post("/users", payload, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -44,7 +45,7 @@ const UsersService = {
 
     if (encriptedTenantId) formData.append("tenant_id", encriptedTenantId);
 
-    return api.post("/user", formData, {
+    return api.post("/users", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -88,7 +89,7 @@ const UsersService = {
       finalData.append("tenant_id", encriptedTenantId);
     }
 
-    return api.post(`/user/${encryptedUserId}`, finalData, {
+    return api.post(`/users/${encryptedUserId}`, finalData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -108,7 +109,7 @@ const UsersService = {
   },
   getUserById: (id) => {
     const tenantId = getTenantId();
-    return api.get(`/user/${id}`, {
+    return api.get(`/users/${id}`, {
       params: { tenant_id: tenantId },
     });
   },

@@ -1,14 +1,11 @@
 import { useEffect } from "react";
-
+import { GetWithExpiry } from "../../utils/Storage";
 export default function AppHead({ title, icon }) {
   useEffect(() => {
-    // 🔹 Ambil info dari localStorage, fallback ke "Application"
-    const projectName = localStorage.getItem("tenant_name") || "Application";
+    const projectName = GetWithExpiry("app")?.appName || "Divpos";
+    let iconPath = GetWithExpiry("app")?.icon || null;
+    const projectLogo = icon || iconPath || null;
 
-    // 🔹 🔥 LOGIKA ICON: Dari prop, jika kosong ambil dari localStorage key 'path_icon'
-    const projectLogo = icon || localStorage.getItem("path_icon");
-
-    // 🔹 Set document.title
     document.title = title ? `${title} | ${projectName}` : projectName;
 
     // 🔹 Update favicon
@@ -17,7 +14,6 @@ export default function AppHead({ title, icon }) {
     }
   }, [title, icon]);
 
-  // Fungsi helper untuk update DOM favicon
   const updateFavicon = (url) => {
     let link = document.querySelector("link[rel='icon']");
     if (!link) {
@@ -25,7 +21,7 @@ export default function AppHead({ title, icon }) {
       link.rel = "icon";
       document.head.appendChild(link);
     }
-    // Tambahkan timestamp untuk menghindari cache jika icon berubah dinamis
+
     link.href = `${url}?v=${new Date().getTime()}`;
   };
 

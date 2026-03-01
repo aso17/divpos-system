@@ -1,5 +1,3 @@
-// components/common/ResponsiveDataView.jsx
-
 import React from "react";
 // TAMBAHKAN BARIS INI:
 import LoadingDots from "./LoadingDots";
@@ -14,7 +12,8 @@ const ResponsiveDataView = ({
   return (
     <div className="relative min-h-[400px]">
       {/* View Mobile */}
-      <div className="md:hidden space-y-4 px-2 pb-20">
+      {/* PERBAIKAN: Hapus 'px-2' agar rapat ke pinggir layar */}
+      <div className="md:hidden space-y-4 pb-20">
         {data.length > 0
           ? data.map((item, index) => renderMobileCard(item, index))
           : !loading && (

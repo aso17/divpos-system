@@ -1,5 +1,4 @@
 import {
-  Menu,
   LogOut,
   User,
   Settings,
@@ -8,16 +7,14 @@ import {
   Search,
   CheckCircle2,
 } from "lucide-react";
-import { useState, useRef, useEffect, use } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
 import { assetUrl } from "../utils/Url";
 import { GetWithExpiry } from "../utils/Storage";
 
-export default function Topbar({ onToggleSidebar }) {
+export default function Topbar() {
   const [open, setOpen] = useState(false);
   const { logout, user } = useAuth();
-  const navigate = useNavigate();
   const dropdownRef = useRef(null);
   const [avatar, setAvatar] = useState(null);
   const [roleName, setRoleName] = useState(null);
@@ -25,19 +22,12 @@ export default function Topbar({ onToggleSidebar }) {
   const handleLogout = async () => {
     await logout();
     setOpen(false);
-    // navigate("/login");
   };
-  // console.log("User di Topbar:", user);
+
   useEffect(() => {
     const storedUser = GetWithExpiry("user");
-    // console.log("Stored User in Topbar:", storedUser);
     setRoleName(storedUser?.role_name || "Owner");
-
-    if (storedUser?.avatar) {
-      setAvatar(storedUser.avatar);
-    } else {
-      setAvatar(assetUrl("default-avatar.png"));
-    }
+    setAvatar(storedUser?.avatar || assetUrl("default-avatar.png"));
   }, [user]);
 
   useEffect(() => {
@@ -51,135 +41,107 @@ export default function Topbar({ onToggleSidebar }) {
   }, []);
 
   return (
-    <header className="h-20 bg-white/80 backdrop-blur-xl border-b border-slate-100 flex items-center justify-between px-4 md:px-8 sticky top-0 z-40 transition-all shadow-sm shadow-slate-200/20">
+    <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-slate-100 flex items-center justify-between px-4 md:px-8 sticky top-0 z-30 shadow-sm">
       {/* LEFT SECTION */}
-      <div className="flex items-center gap-4 md:gap-6 flex-1">
-        <button
-          onClick={onToggleSidebar}
-          className="p-2.5 rounded-xl bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-slate-100 shadow-sm active:scale-95 group"
-          title="Toggle Sidebar"
-        >
-          <Menu
-            size={20}
-            className="group-hover:rotate-90 transition-transform duration-300" // Rotate 90 derajat lebih clean untuk menu
-          />
-        </button>
-
-        {/* Search Bar - Lebih Premium */}
-        <div className="hidden lg:flex items-center gap-3 bg-slate-50 border border-slate-100 px-4 py-2.5 rounded-2xl w-full max-w-sm focus-within:ring-4 focus-within:ring-emerald-500/5 focus-within:border-emerald-500/40 focus-within:bg-white focus-within:shadow-lg focus-within:shadow-emerald-100/20 transition-all group">
+      <div className="flex items-center gap-4 flex-1">
+        {/* Search - Desktop Only */}
+        <div className="hidden md:flex items-center gap-3 bg-slate-50 border border-slate-100 px-4 py-2 rounded-xl w-full max-w-sm focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all group">
           <Search
-            size={18}
+            size={16}
             className="text-slate-400 group-focus-within:text-emerald-500 transition-colors"
           />
           <input
             type="text"
-            placeholder="Cari transaksi, produk, atau pelanggan..."
-            className="bg-transparent border-none outline-none text-[13px] font-medium text-slate-600 w-full placeholder:text-slate-400"
+            placeholder="Cari transaksi, produk, pelanggan..."
+            className="bg-transparent border-none outline-none text-sm text-slate-600 w-full placeholder:text-slate-400"
           />
-          <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-slate-200 bg-white px-1.5 font-sans text-[10px] font-bold text-slate-400 shadow-sm">
-            <span className="text-xs">⌘</span>K
-          </kbd>
         </div>
       </div>
 
       {/* RIGHT SECTION */}
-      <div className="flex items-center gap-2 md:gap-4">
-        {/* Notifikasi - Emerald Accent */}
-        <button className="p-2.5 rounded-xl text-slate-400 hover:bg-emerald-50/50 hover:text-emerald-600 transition-all relative group border border-transparent hover:border-emerald-100">
-          <Bell size={20} />
-          <span className="absolute top-2.5 right-3 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full shadow-sm animate-pulse"></span>
+      <div className="flex items-center gap-3">
+        {/* Notification */}
+        <button className="p-2 rounded-lg text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition relative">
+          <Bell size={18} />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 border-2 border-white rounded-full animate-pulse"></span>
         </button>
 
-        <div className="h-6 w-px bg-slate-200 mx-1 md:mx-2" />
+        {/* Divider */}
+        <div className="h-5 w-px bg-slate-200" />
 
-        {/* Profile Dropdown */}
+        {/* Profile */}
         <div className="relative" ref={dropdownRef}>
           <div
             onClick={() => setOpen(!open)}
-            className={`flex items-center gap-3 p-1 rounded-2xl cursor-pointer select-none transition-all border
-              ${open ? "bg-emerald-50/50 border-emerald-100 shadow-sm" : "border-transparent hover:bg-slate-50 hover:border-slate-100"}`}
+            className={`flex items-center gap-2 p-1 rounded-xl cursor-pointer transition border
+              ${
+                open
+                  ? "bg-emerald-50 border-emerald-100"
+                  : "border-transparent hover:bg-slate-50"
+              }`}
           >
             <div className="relative">
               <img
                 src={avatar}
-                className={`w-9 h-9 md:w-10 md:h-10 rounded-xl object-cover shadow-sm border-2 transition-all duration-300
-                  ${open ? "border-emerald-500 scale-105" : "border-white"}`}
+                className={`w-9 h-9 rounded-lg object-cover border-2 transition
+                  ${open ? "border-emerald-500" : "border-white"}`}
                 alt="User Avatar"
               />
-              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full shadow-sm"></div>
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></div>
             </div>
 
             <div className="hidden sm:block text-left">
-              <p className="text-[13px] font-black text-slate-800 leading-none">
+              <p className="text-sm font-semibold text-slate-800 leading-none">
                 {user?.full_name || "Divpos Admin"}
               </p>
-              <div className="flex items-center gap-1 mt-1">
-                <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">
-                  {roleName || "Owner"}
-                </p>
-                <CheckCircle2 size={10} className="text-emerald-500" />
-              </div>
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-1">
+                {roleName || "Owner"}
+              </p>
             </div>
 
             <ChevronDown
               size={14}
-              className={`text-slate-400 transition-all duration-300 mr-1 ${open ? "rotate-180 text-emerald-600" : ""}`}
+              className={`text-slate-400 transition ${
+                open ? "rotate-180 text-emerald-600" : ""
+              }`}
             />
           </div>
 
-          {/* Dropdown Menu Box - Lebih Mewah */}
+          {/* Dropdown */}
           <div
-            className={`absolute right-0 top-[calc(100%+12px)] w-64 bg-white border border-slate-100 rounded-[1.5rem] shadow-2xl z-50 overflow-hidden transform transition-all duration-300 origin-top-right
-              ${open ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-4 pointer-events-none"}`}
+            className={`absolute right-0 top-[calc(100%+10px)] w-60 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 overflow-hidden transform transition-all origin-top-right
+              ${
+                open
+                  ? "opacity-100 scale-100 translate-y-0"
+                  : "opacity-0 scale-95 -translate-y-3 pointer-events-none"
+              }`}
           >
-            {/* User Info Header */}
-            <div className="p-5 border-b border-slate-50 bg-gradient-to-br from-emerald-50/30 to-white">
-              <div className="flex items-center gap-3">
-                <div className="p-1 rounded-lg bg-white shadow-sm">
-                  <img
-                    src={avatar}
-                    className="w-10 h-10 rounded-md object-cover"
-                    alt="p"
-                  />
-                </div>
-                <div className="overflow-hidden">
-                  <p className="text-[12px] font-black text-slate-800 truncate">
-                    {user?.full_name}
-                  </p>
-                  <p className="text-[10px] font-medium text-slate-400 truncate lowercase italic">
-                    {user?.email || "admin@divposapp.com"}{" "}
-                    {/* Ganti ke Divpos */}
-                  </p>
-                </div>
-              </div>
+            <div className="p-4 border-b border-slate-50">
+              <p className="text-sm font-semibold text-slate-800">
+                {user?.full_name}
+              </p>
+              <p className="text-xs text-slate-400">{user?.email}</p>
             </div>
 
-            {/* Menu Links */}
             <div className="p-2">
-              <button className="flex items-center gap-3 w-full px-4 py-3 text-[13px] font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-all group">
-                <div className="p-1.5 rounded-lg bg-slate-50 group-hover:bg-white group-hover:shadow-sm transition-all text-slate-400 group-hover:text-emerald-600">
-                  <User size={16} />
-                </div>
+              <button className="flex items-center gap-3 w-full px-3 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition">
+                <User size={16} />
                 Profil Akun
               </button>
-              <button className="flex items-center gap-3 w-full px-4 py-3 text-[13px] font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-all group">
-                <div className="p-1.5 rounded-lg bg-slate-50 group-hover:bg-white group-hover:shadow-sm transition-all text-slate-400 group-hover:text-emerald-600">
-                  <Settings size={16} />
-                </div>
-                Pengaturan Sistem
+
+              <button className="flex items-center gap-3 w-full px-3 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition">
+                <Settings size={16} />
+                Pengaturan
               </button>
             </div>
 
-            {/* Logout Section */}
-            <div className="p-2 border-t border-slate-50 bg-slate-50/50">
+            <div className="p-2 border-t border-slate-50">
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-3 w-full px-4 py-3 text-[13px] text-red-500 hover:bg-red-50 rounded-xl transition-all font-black uppercase tracking-widest"
+                className="flex items-center gap-3 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition font-semibold"
               >
-                <div className="p-1.5 rounded-lg bg-red-100/50 text-red-600">
-                  <LogOut size={16} />
-                </div>
-                Log Out
+                <LogOut size={16} />
+                Logout
               </button>
             </div>
           </div>
