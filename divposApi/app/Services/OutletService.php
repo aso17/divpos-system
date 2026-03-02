@@ -57,6 +57,14 @@ class OutletService
         return DB::transaction(function () use ($data) {
             $tenantId = CryptoHelper::decrypt($data['tenant_id']);
             $created_by = CryptoHelper::decrypt($data['created_by']);
+                if (!$tenantId || !$created_by) {
+                    throw new \Exception("Tenant ID atau Created By tidak valid.");
+                }
+    
+                // Jika kode disediakan, pastikan formatnya benar
+            if (!$tenantId || !$created_by) {
+                throw new \Exception("Tenant ID atau Created By tidak valid.");
+            }
 
             // Jika kode kosong, generate otomatis
             $code = $data['code'] ?? $this->generateOutletCode($tenantId);
@@ -84,9 +92,15 @@ class OutletService
     public function updateOutlet($id, array $data)
     {
         return DB::transaction(function () use ($id, $data) {
+            $decryptedId = CryptoHelper::decrypt($id);
             $tenantId = CryptoHelper::decrypt($data['tenant_id']);
             $updated_by = CryptoHelper::decrypt($data['updated_by']);
             
+             if (!$decryptedId || !$tenantId || !$updated_by) {
+                throw new \Exception("ID atau Tenant ID tidak valid.");
+            }
+
+
             $payload = [
                 'name'           => $data['name'],
                 'phone'          => $data['phone'] ?? null,
@@ -99,7 +113,7 @@ class OutletService
             ];
 
             // Kode biasanya tidak diupdate untuk menjaga integritas data
-            return $this->outletRepo->update($id, $tenantId, $payload);
+            return $this->outletRepo->update($decryptedId, $tenantId, $payload);
         });
     }
 

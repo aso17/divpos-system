@@ -7,44 +7,24 @@ use App\Http\Resources\OutletResource;
 use App\Services\OutletService; 
 use App\Helpers\CryptoHelper; 
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB; // Tambahkan ini
 
 class OutletController extends Controller
 {
     protected $outletService;
-   
+    
     public function __construct(OutletService $outletService)
     {
         $this->outletService = $outletService;
     }
     
-    public function generatecode(Request $request)
-    {
-        if (!$request->filled('tenant_id')) {
-            return response()->json(['message' => 'tenant_id is required'], 422);
-        }
-
-        $decryptedTenantId = CryptoHelper::decrypt($request->tenant_id);
-
-        if (!$decryptedTenantId) {
-            return response()->json(['message' => 'Invalid tenant_id'], 403);
-        }
-
-        $code = $this->outletService->generateOutletCode($decryptedTenantId);
-
-        return response()->json(['code' => $code]);
-    }
+    // --- METHOD GENERATECODE DIHAPUS ---
 
     public function index(Request $request)
     {
-        if (!$request->filled('tenant_id')) {
-            return response()->json(['message' => 'tenant_id is required'], 422);
-        }
-
-        $query = $this->outletService->getAllOutlets($request->all());
-
-        if (!$query) {
-            return response()->json(['message' => 'Invalid tenant'], 403);
-        }
+       
+        $params = $request->all();
+        $query = $this->outletService->getAllOutlets($params);
 
         $perPage = (int) ($request->per_page ?? 10);
 
@@ -58,35 +38,59 @@ class OutletController extends Controller
 
     public function store(Request $request)
     {
+        // 1. Validasi Input (Code dihapus dari validasi, dan validasi tipe data lainnya)
         $validator = Validator::make($request->all(), [
             'tenant_id' => 'required',
             'name'      => 'required|string|min:3',
-            'code'      => 'required|string|unique:Ms_outlets,code',
-            'phone'     => 'required',
-            'city'      => 'required',
+            'phone'     => 'nullable|string',
+            'city'      => 'required|string',
             'address'   => 'required|min:10',
+            'is_active' => 'boolean',
+            'is_main_branch' => 'boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors(), 'message' => 'Validasi gagal'], 422);
         }
 
-        $data = $this->outletService->createOutlet($request->all());
+        try {
 
-        return response()->json([
-            'message' => 'Outlet berhasil dibuat',
-            'data'    => new OutletResource($data)
-        ], 201);
+            DB::beginTransaction();
+
+           $payload = $request->only([
+            'tenant_id', 
+            'name', 
+            'phone', 
+            'city', 
+            'address', 
+            'is_active', 
+            'is_main_branch',
+            'created_by'
+            ]);     
+           
+            $data = $this->outletService->createOutlet($payload);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Outlet berhasil dibuat',
+                'data'    => new OutletResource($data)
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Gagal membuat outlet: ' . $e->getMessage()], 500);
+        }
     }
 
     public function update(Request $request, $id)
     {
-        // Karena frontend kirim encrypted ID atau ID mentah, pastikan service bisa handle
         $validator = Validator::make($request->all(), [
             'tenant_id' => 'required',
             'name'      => 'required|string|min:3',
-            'phone'     => 'required',
-            'city'      => 'required',
+            'phone'     => 'nullable|string',
+            'city'      => 'required|string',
             'address'   => 'required|min:10',
         ]);
 
@@ -94,34 +98,62 @@ class OutletController extends Controller
             return response()->json(['errors' => $validator->errors(), 'message' => 'Validasi gagal'], 422);
         }
 
-        $updated = $this->outletService->updateOutlet($id, $request->all());
+        try {
+            
+            DB::beginTransaction();
+            $payload = $request->only([
+                'tenant_id', 
+                'name', 
+                'phone', 
+                'city', 
+                'address', 
+                'is_active', 
+                'is_main_branch',
+                'updated_by'
+            ]);  
+            $updated = $this->outletService->updateOutlet($id, $payload);
 
-        if (!$updated) {
-            return response()->json(['message' => 'Gagal mengupdate outlet atau data tidak ditemukan'], 404);
+            if (!$updated) {
+                throw new \Exception("Outlet tidak ditemukan.");
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Outlet berhasil diupdate',
+                'data'    => new OutletResource($updated)
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => $e->getMessage()], 500);
         }
-
-        return response()->json([
-            'message' => 'Outlet berhasil diupdate',
-            'data'    => new OutletResource($updated)
-        ]);
     }
 
     public function destroy(Request $request, $id)
     {
-        
-        $decryptedId = CryptoHelper::decrypt($id) ?? $id;
-        $decryptedTenantId = CryptoHelper::decrypt($request->tenant_id);
+        try {
+            $decryptedId = CryptoHelper::decrypt($id);
+            $decryptedTenantId = CryptoHelper::decrypt($request->query('tenant_id')); // Gunakan query
 
-        if (!$decryptedTenantId) {
-            return response()->json(['message' => 'Akses ditolak'], 403);
+            if (!$decryptedId || !$decryptedTenantId) {
+                throw new \Exception("Parameter tidak valid.");
+            }
+
+            $deleted = $this->outletService->deleteOutlet($decryptedId, $decryptedTenantId);
+
+            if (!$deleted) {
+                throw new \Exception("Data tidak ditemukan.");
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Outlet berhasil dihapus'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
         }
-
-        $deleted = $this->outletService->deleteOutlet($decryptedId, $decryptedTenantId);
-
-        if (!$deleted) {
-            return response()->json(['message' => 'Data tidak ditemukan atau sudah dihapus'], 404);
-        }
-
-        return response()->json(['message' => 'Outlet berhasil dihapus']);
     }
 }

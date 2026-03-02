@@ -3,7 +3,6 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\{
-    ProjectInfoController,
     AppconfigController,
     AuthController,
     MenuController,
@@ -14,6 +13,7 @@ use App\Http\Controllers\{
     MasterServiceController,
     PackageController,
     CategoryController,
+    EmployeeController,
     CustomerController,
     TransactionController,
     PaymentMethodController
@@ -81,8 +81,8 @@ Route::middleware(['api', 'auth:sanctum'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::apiResource('users', UserController::class);
+    Route::apiResource('employees', EmployeeController::class);
 
-    Route::get('/outlets/generate-code', [OutletController::class, 'generateCode']);
     Route::apiResource('outlets', OutletController::class);
 
     Route::apiResource('master-services', MasterServiceController::class);

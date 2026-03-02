@@ -9,51 +9,43 @@ return new class extends Migration
     public function up(): void
     {
        // ...
-        Schema::create('Ms_users', function (Blueprint $table) {
-        $table->bigIncrements('id'); 
-        
-        $table->string('full_name', 100);
-        $table->string('email', 150)->unique();
-        $table->string('username', 50)->unique()->nullable();
-        $table->string('password', 255); 
-        
-        $table->string('phone', 20)->nullable();
-        $table->string('avatar', 255)->nullable();     
+       Schema::create('Ms_users', function (Blueprint $table) {
+            $table->bigIncrements('id'); 
+            
+            // --- DATA AUTENTIKASI ---
+            $table->string('email', 150)->unique();
+            $table->string('username', 50)->unique()->nullable();
+            $table->string('password', 255); 
+            $table->string('avatar', 255)->nullable();    
 
-        // Status
-        $table->boolean('is_active')->default(true);       
-        $table->timestampTz('email_verified_at')->nullable();
+            // Status Login
+            $table->boolean('is_active')->default(true);       
+            $table->timestampTz('email_verified_at')->nullable();
 
-        // 🔐 Security enhancement
-        $table->unsignedTinyInteger('login_attempts')->default(0);
-        $table->timestampTz('locked_until')->nullable();
+            // 🔐 Security enhancement
+            $table->unsignedTinyInteger('login_attempts')->default(0);
+            $table->timestampTz('locked_until')->nullable();
 
-        // Activity tracking
-        $table->timestampTz('last_login_at')->nullable();
-        $table->string('last_login_ip', 45)->nullable(); 
-        $table->timestampTz('last_activity_at')->nullable();
-        
-        // Relation
-        $table->foreignId('role_id')
-            ->nullable()
-            ->constrained('Ms_roles')
-            ->nullOnDelete();
+            // Activity tracking
+            $table->timestampTz('last_login_at')->nullable();
+            $table->string('last_login_ip', 45)->nullable(); 
+            $table->timestampTz('last_activity_at')->nullable();
+            
+            // --- HAK AKSES ---
+            $table->foreignId('role_id')
+                ->nullable()
+                ->constrained('Ms_roles')
+                ->nullOnDelete();
+            
+            // Audit
+            $table->timestampsTz();
+            $table->softDeletesTz();
+            
+            // Index 
+            $table->index('email', 'idx_user_email');
+        });
 
-        $table->foreignId('tenant_id')
-            ->nullable()
-            ->constrained('Ms_tenants')
-            ->cascadeOnDelete();
-        
-        // Audit
-        $table->timestampsTz();
-        $table->softDeletesTz();
-        
-        // Index 
-        $table->index(['tenant_id', 'is_active'], 'idx_user_tenant_active');
-        $table->index(['tenant_id', 'role_id'], 'idx_user_tenant_role');
-        $table->index(['tenant_id', 'email'], 'idx_tenant_email');
-    });
-// ... sisa tabel lainnya tetap sama
+
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
             $table->string('email')->primary();

@@ -9,18 +9,29 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('Ms_employees', function (Blueprint $table) {
-            $table->id();
-            
-            // Relasi ke User (Identitas Login) - Dibuat UNIQUE untuk 1-to-1
-            $table->foreignId('user_id')->unique()->constrained('Ms_users')->cascadeOnDelete();
-            
+            $table->id();          
+            // Relasi ke User (Identitas Login) - Dibuat OPTIONAL (nullable)
+            // Dibuat unique() untuk 1-to-1 relasi
+            $table->foreignId('user_id')
+                  ->nullable() // Karyawan tidak wajib punya login
+                  ->unique()
+                  ->constrained('Ms_users')
+                  ->nullOnDelete(); // Jika user dihapus, user_id jadi NULL, data karyawan tetap ada
+      
             // Relasi ke Tenant (Perusahaan)
             $table->foreignId('tenant_id')->constrained('Ms_tenants')->cascadeOnDelete();
             
-            // Relasi ke Outlet (nullable untuk Admin Global)
+            // Relasi ke Outlet (nullable untuk Admin Global/Multi-outlet)
             $table->foreignId('outlet_id')->nullable()->constrained('Ms_outlets')->nullOnDelete();
             
-            // Role/Jabatan Spesifik (String atau foreign key ke Ms_roles)
+            // Kode unik karyawan/NIK
+            $table->string('employee_code', 20)->unique();
+            
+            // Data profil utama
+            $table->string('full_name', 100);
+            $table->string('phone', 20)->nullable();
+            
+            // Jabatan (Stylist, Barber, Washer, dll)
             $table->string('job_title', 50)->nullable();
             
             // Status Karyawan di Tenant tersebut
@@ -30,8 +41,7 @@ return new class extends Migration
             $table->softDeletes();
 
             // Index untuk mempercepat query laporan per tenant dan outlet
-            $table->index(['tenant_id', 'outlet_id'], 'idx_employee_tenant_outlet');
-            // user_id tidak perlu index terpisah karena sudah UNIQUE
+            $table->index(['tenant_id', 'outlet_id', 'is_active'], 'idx_employee_operational');
         });
     }
 
