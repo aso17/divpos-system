@@ -21,17 +21,9 @@ const OutletService = {
     });
   },
 
-  generateCode: () => {
-    const { tenantId } = getAuthInfo();
-    return api.get("/outlets/generatecode", {
-      params: {
-        tenant_id: encrypt(tenantId),
-      },
-    });
-  },
-
   createOutlet: (payload) => {
     const { tenantId, userLogin } = getAuthInfo();
+    console.log(tenantId, userLogin);
     const finalPayload = {
       ...payload,
       tenant_id: encrypt(tenantId),
@@ -41,6 +33,7 @@ const OutletService = {
   },
 
   updateOutlet: (id, payload) => {
+    const ID = encrypt(id);
     const { tenantId, userLogin } = getAuthInfo();
     const finalPayload = {
       ...payload,
@@ -48,7 +41,7 @@ const OutletService = {
       updated_by: encrypt(userLogin),
       _method: "PUT",
     };
-    return api.post(`/outlets/${id}`, finalPayload);
+    return api.post(`/outlets/${ID}`, finalPayload);
   },
   // OutletService.js
 

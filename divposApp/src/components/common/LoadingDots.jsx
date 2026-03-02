@@ -34,7 +34,7 @@ export default function LoadingDots({
 
       {!overlay && (
         <p className="mt-6 text-xs font-medium text-slate-400 tracking-widest animate-pulse">
-          {fullscreen ? "Loading System" : "Processing..."}
+          {fullscreen ? "Loading System" : "Loading..."}
         </p>
       )}
     </div>

@@ -5,7 +5,15 @@ import {
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import { ShieldCheck, ArrowLeft, CheckSquare, Layers } from "lucide-react";
+
+// --- ICON IMPORT ---
+import ShieldCheck from "lucide-react/dist/esm/icons/shield-check";
+import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left";
+import CheckSquare from "lucide-react/dist/esm/icons/check-square";
+import Layers from "lucide-react/dist/esm/icons/layers";
+import Save from "lucide-react/dist/esm/icons/save";
+
+// --- COMPONENTS ---
 import LoadingDots from "../../components/common/LoadingDots";
 import AppHead from "../../components/common/AppHead";
 import RolesService from "../../services/RolespermissionService";
@@ -115,10 +123,9 @@ export default function RolePermissionList() {
         cell: ({ row }) => (
           <button
             onClick={() => toggleRow(row.original.menu_id)}
-            className="p-1.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-            title="Pilih Baris"
+            className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors active:scale-90"
           >
-            <CheckSquare size={16} />
+            <CheckSquare size={18} />
           </button>
         ),
       },
@@ -126,12 +133,12 @@ export default function RolePermissionList() {
         accessorKey: "menu_name",
         header: "MENU / MODUL",
         cell: ({ row }) => (
-          <div className="flex flex-col py-1">
-            <span className="text-slate-800 font-bold text-[10px] uppercase tracking-wide">
+          <div className="flex flex-col py-1 min-w-[120px]">
+            <span className="text-slate-800 font-bold text-[10px] md:text-xs uppercase tracking-tight leading-tight">
               {row.original.menu_name}
             </span>
-            <span className="text-slate-400 text-[9px] font-mono lowercase opacity-70">
-              ID: {row.original.menu_id}
+            <span className="text-slate-400 text-[8px] font-mono opacity-60">
+              {row.original.menu_id}
             </span>
           </div>
         ),
@@ -145,33 +152,31 @@ export default function RolePermissionList() {
       ].map((field) => {
         const labels = {
           can_view: "view",
-          can_create: "create",
-          can_update: "update",
-          can_delete: "delete",
-          can_export: "export",
+          can_create: "add",
+          can_update: "edit",
+          can_delete: "del",
+          can_export: "out",
         };
         return {
           accessorKey: field,
           header: () => (
             <div
-              className="flex flex-col items-center gap-1 cursor-pointer group select-none"
+              className="flex flex-col items-center gap-1 cursor-pointer group py-2"
               onClick={() => toggleColumn(field)}
             >
-              <span className="group-hover:text-emerald-600 transition-colors uppercase">
+              <span className="text-[9px] font-black group-hover:text-emerald-600 transition-colors uppercase tracking-tighter">
                 {labels[field]}
               </span>
-              <div className="text-[7px] text-slate-300 group-hover:text-emerald-400 font-black tracking-tighter">
-                TOGGLE
-              </div>
+              <div className="w-1 h-1 rounded-full bg-slate-200 group-hover:bg-emerald-400" />
             </div>
           ),
           cell: ({ row }) => (
-            <div className="flex justify-center">
+            <div className="flex justify-center items-center">
               <input
                 type="checkbox"
                 checked={!!row.original[field]}
                 onChange={() => handleToggle(row.original.menu_id, field)}
-                className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer transition-all"
+                className="w-5 h-5 md:w-4 md:h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer transition-all"
               />
             </div>
           ),
@@ -189,61 +194,64 @@ export default function RolePermissionList() {
 
   if (loading && !roleInfo)
     return (
-      <div className="h-[400px] flex items-center justify-center bg-slate-50">
+      <div className="h-screen flex items-center justify-center bg-slate-50">
         <LoadingDots />
       </div>
     );
 
   return (
-    <div className="p-4 space-y-4 bg-slate-50 min-h-screen">
+    <div className="p-2 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-24 md:pb-6">
       <AppHead title={`Hak Akses - ${roleInfo?.role_name || "Role"}`} />
 
-      {/* HEADER SECTION - Emerald Theme */}
-      <div className="flex items-center justify-between bg-white p-4 rounded-sm shadow-sm border-t-4 border-emerald-500">
-        <div className="flex items-center gap-4">
+      {/* HEADER PAGE */}
+      <div className="flex items-center justify-between bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-slate-100">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-slate-50 rounded text-slate-500 transition-colors border border-slate-200 shadow-sm"
+            className="p-2 hover:bg-slate-50 rounded-xl text-slate-500 transition-all border border-slate-100 shadow-sm active:scale-90"
           >
             <ArrowLeft size={18} />
           </button>
-
           <div>
-            <h1 className="text-xs font-black uppercase tracking-tight text-slate-800 flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <ShieldCheck size={14} className="text-emerald-600" />
-              Peran:{" "}
-              <span className="text-emerald-600 text-[12px]">
-                {roleInfo?.role_name}
-              </span>
-            </h1>
-            <p className="text-[8px] text-slate-400 font-bold tracking-widest uppercase mt-0.5">
+              <h1 className="text-[10px] md:text-xs font-black uppercase tracking-tight text-slate-800">
+                ROLE:{" "}
+                <span className="text-emerald-600">{roleInfo?.role_name}</span>
+              </h1>
+            </div>
+            <p className="text-[8px] text-slate-400 font-bold tracking-widest uppercase hidden md:block">
               Matrix Kontrol Akses Sistem
             </p>
           </div>
         </div>
-        <SubmitButton
-          onClick={handleSave}
-          isSubmitting={isSubmitting}
-          label="Simpan Hak Akses"
-          fullWidth={false}
-          className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-200"
-        />
+
+        <div className="hidden md:block">
+          <SubmitButton
+            onClick={handleSave}
+            isSubmitting={isSubmitting}
+            label="Simpan Perubahan"
+            className="text-[10px]  uppercase py-2 px-6 rounded-xl bg-emerald-600  hover:bg-emerald-700 shadow-lg transition-all"
+          />
+        </div>
       </div>
 
-      {/* MATRIX TABLE */}
-      <div className="bg-white border border-slate-200 rounded-sm shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* TABLE MATRIX CONTAINER */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full border-collapse">
-            <thead className="sticky top-0 z-10">
+            <thead>
               {table.getHeaderGroups().map((hg) => (
                 <tr
                   key={hg.id}
-                  className="bg-slate-50 border-b border-slate-200"
+                  className="bg-slate-50/80 border-b border-slate-100"
                 >
-                  {hg.headers.map((header) => (
+                  {hg.headers.map((header, idx) => (
                     <th
                       key={header.id}
-                      className="px-4 py-4 font-bold text-center text-[10px] text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0"
+                      className={`px-3 py-4 font-black text-center text-[9px] text-slate-400 uppercase tracking-widest 
+                        ${idx === 1 ? "sticky left-0 z-20 bg-slate-50 shadow-[2px_0_5px_rgba(0,0,0,0.05)]" : ""}
+                      `}
                     >
                       {flexRender(
                         header.column.columnDef.header,
@@ -254,7 +262,7 @@ export default function RolePermissionList() {
                 </tr>
               ))}
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-50">
               {(() => {
                 let lastModuleId = null;
                 return table.getRowModel().rows.map((row) => {
@@ -265,25 +273,27 @@ export default function RolePermissionList() {
                   return (
                     <React.Fragment key={row.id}>
                       {showGroupHeader && (
-                        <tr className="bg-emerald-50/30">
+                        <tr className="bg-emerald-50/40">
                           <td
                             colSpan={columns.length}
-                            className="px-4 py-2.5 border-y border-emerald-100 shadow-inner"
+                            className="px-4 py-2 border-y border-emerald-100/50"
                           >
                             <div className="flex items-center gap-2 text-emerald-700">
-                              <Layers size={14} className="opacity-70" />
-                              <span className="font-black text-[9px] tracking-[0.25em] uppercase">
+                              <Layers size={12} className="opacity-50" />
+                              <span className="font-black text-[9px] tracking-[0.2em] uppercase">
                                 Modul: {module_name}
                               </span>
                             </div>
                           </td>
                         </tr>
                       )}
-                      <tr className="hover:bg-emerald-50/20 transition-colors group">
-                        {row.getVisibleCells().map((cell) => (
+                      <tr className="hover:bg-slate-50 transition-colors group">
+                        {row.getVisibleCells().map((cell, idx) => (
                           <td
                             key={cell.id}
-                            className="px-4 py-2 border-r border-slate-50 last:border-0 align-middle"
+                            className={`px-3 py-3 align-middle border-r border-slate-50 last:border-0
+                              ${idx === 1 ? "sticky left-0 z-10 bg-white group-hover:bg-slate-50 shadow-[2px_0_5px_rgba(0,0,0,0.05)]" : ""}
+                            `}
                           >
                             {flexRender(
                               cell.column.columnDef.cell,
@@ -299,6 +309,26 @@ export default function RolePermissionList() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Floating Save Button Mobile */}
+      <div className="md:hidden fixed bottom-6 left-0 right-0 px-4 z-30">
+        <button
+          disabled={isSubmitting}
+          onClick={handleSave}
+          className="w-full bg-emerald-600 text-white rounded-2xl py-4 shadow-[0_10px_25px_-5px_rgba(16,185,129,0.4)] flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50 border border-emerald-500/50"
+        >
+          {isSubmitting ? (
+            <LoadingDots color="white" />
+          ) : (
+            <>
+              <Save size={18} className="animate-pulse" />
+              <span className="text-xs font-black uppercase tracking-[0.15em]">
+                Simpan Perubahan
+              </span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

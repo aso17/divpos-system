@@ -12,13 +12,13 @@ export default function OutletForm({
   onSuccess,
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  // Hapus state isGeneratingCode karena kita tidak generate di FE lagi
 
   const { values, errors, handleChange, validate, setValues, setErrors } =
     useFormValidation(
       {
         name: "",
-        code: "",
+        // code: "", <-- HAPUS INI
         phone: "",
         email: "",
         address: "",
@@ -27,7 +27,7 @@ export default function OutletForm({
         is_main_branch: false,
       },
       {
-        // 1. Nama Outlet: Wajib, minimal 3 karakter, aman dari tag HTML & SQL Injection
+        // 1. Nama Outlet
         name: [
           (v) => rules.required(v, "Nama Outlet wajib diisi"),
           (v) => rules.minLength(v, 3, "Nama minimal 3 karakter"),
@@ -35,10 +35,9 @@ export default function OutletForm({
           (v) => rules.safeString(v),
         ],
 
-        // 2. Kode Outlet: Cukup pastikan ada nilainya (karena di-lock/disabled)
-        code: [(v) => rules.required(v, "Kode wajib ada")],
+        // 2. Kode Outlet dihapus dari validasi FE
 
-        // 3. Telepon: Pakai format Indonesia (08... / 628...)
+        // 3. Telepon
         phone: [
           (v) => rules.required(v, "Nomor telepon wajib diisi"),
           (v) =>
@@ -47,17 +46,17 @@ export default function OutletForm({
             rules.noLetters(v, "Nomor telepon tidak boleh mengandung huruf"),
         ],
 
-        // 4. Email: Opsional, tapi kalau diisi harus format email bener
+        // 4. Email
         email: [(v) => (v ? rules.email(v, "Format email salah") : null)],
 
-        // 5. Kota: Wajib diisi & aman dari karakter aneh
+        // 5. Kota
         city: [
           (v) => rules.required(v, "Kota wajib diisi"),
           (v) => rules.noHtml(v),
           (v) => rules.safeString(v),
         ],
 
-        // 6. Alamat: Wajib diisi & minimal 10 karakter biar jelas
+        // 6. Alamat
         address: [
           (v) => rules.required(v, "Alamat wajib diisi"),
           (v) => rules.minLength(v, 10, "Alamat minimal 10 karakter"),
@@ -66,19 +65,7 @@ export default function OutletForm({
       },
     );
 
-  const generaAutoCode = async () => {
-    try {
-      setIsGeneratingCode(true);
-      const res = await OutletService.generateCode();
-      const newCode = res.data?.code;
-      handleChange("code", newCode);
-    } catch (err) {
-      console.error("Error generating auto code:", err);
-      triggerToast("Gagal generate kode otomatis", "error");
-    } finally {
-      setIsGeneratingCode(false);
-    }
-  };
+  // HAPUS FUNGSI generaAutoCode
 
   useEffect(() => {
     if (!open) return;
@@ -87,7 +74,7 @@ export default function OutletForm({
       // Inisialisasi Mode Edit
       setValues({
         name: initialData.name || "",
-        code: initialData.code || "",
+        // code: initialData.code || "", <-- HAPUS INI
         phone: initialData.phone || "",
         email: initialData.email || "",
         address: initialData.address || "",
@@ -101,7 +88,7 @@ export default function OutletForm({
       // Inisialisasi Mode Tambah
       setValues({
         name: "",
-        code: "AUTO-GENERATING...",
+        // code: "", <-- HAPUS INI
         phone: "",
         email: "",
         address: "",
@@ -109,7 +96,7 @@ export default function OutletForm({
         is_active: true,
         is_main_branch: false,
       });
-      generaAutoCode();
+      // HAPUS PEMANGGILAN generaAutoCode()
     }
     setErrors({});
   }, [open, initialData]);
@@ -120,7 +107,6 @@ export default function OutletForm({
 
     const payload = {
       ...values,
-
       is_active: values.is_active ? 1 : 0,
       is_main_branch: values.is_main_branch ? 1 : 0,
     };
@@ -162,10 +148,8 @@ export default function OutletForm({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-sm">
-      {/* Border Atas Emerald */}
       <div className="bg-white rounded-sm w-full max-w-lg shadow-2xl overflow-hidden border-t-4 border-emerald-500 animate-in fade-in zoom-in duration-200">
         <div className="p-6 overflow-y-auto max-h-[90vh]">
-          {/* Header dengan Ikon Emerald */}
           <h2 className="text-xs font-bold mb-6 text-slate-700 uppercase tracking-wider border-b pb-3 flex items-center gap-2">
             <span className="p-1 bg-emerald-50 text-emerald-600 rounded">
               🏢
@@ -177,39 +161,20 @@ export default function OutletForm({
             onSubmit={handleSubmit}
             className="flex flex-col gap-4 text-xxs"
           >
-            {/* Row 1: Nama & Kode */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-1">
-                <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
-                  Nama Outlet <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={values.name}
-                  onChange={(e) => handleChange("name", e.target.value)}
-                  className={`${inputClasses({ error: !!errors.name })} focus:border-emerald-500 focus:ring-emerald-500/20`}
-                  placeholder="Contoh: Pusat Jakarta"
-                />
-                {errors.name && (
-                  <p className="text-[10px] text-red-500 mt-1">{errors.name}</p>
-                )}
-              </div>
-
-              <div className="col-span-1">
-                <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
-                  Kode Outlet <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={values.code}
-                  disabled={true}
-                  className={`${inputClasses({ error: !!errors.code })} bg-slate-50 font-mono text-emerald-600 font-bold cursor-not-allowed`}
-                  placeholder="OTL-XXXX"
-                />
-                {isGeneratingCode && (
-                  <p className="text-[8px] text-emerald-400 mt-1 animate-pulse italic">
-                    Generating code...
-                  </p>
-                )}
-              </div>
+            {/* Hapus Row 1: Nama & Kode. Ganti jadi Nama saja */}
+            <div>
+              <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
+                Nama Outlet <span className="text-red-500">*</span>
+              </label>
+              <input
+                value={values.name}
+                onChange={(e) => handleChange("name", e.target.value)}
+                className={`${inputClasses({ error: !!errors.name })} focus:border-emerald-500 focus:ring-emerald-500/20`}
+                placeholder="Contoh: Pusat Jakarta"
+              />
+              {errors.name && (
+                <p className="text-[10px] text-red-500 mt-1">{errors.name}</p>
+              )}
             </div>
 
             {/* Row 2: Telepon & Email */}

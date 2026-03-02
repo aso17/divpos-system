@@ -5,6 +5,7 @@ import UsersPage from "../pages/users/UsersList";
 import RolePage from "../pages/Roles/RolesList";
 import PackagePage from "../pages//package/PackageList";
 import OutletPage from "../pages/outlets/OutletList";
+import EmployeePage from "../pages/employees/EmployeeList";
 import CategoryPage from "../pages/category/CategoryList";
 import LayananPage from "../pages/masterservice/MasterServiceList";
 import PaymentMethodPage from "../pages/paymentMethod/PaymentMethodList";
@@ -63,6 +64,14 @@ export default function AppRoutes() {
               element={
                 <RequirePermission permission="view">
                   <OutletPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/employees"
+              element={
+                <RequirePermission permission="view">
+                  <EmployeePage />
                 </RequirePermission>
               }
             />

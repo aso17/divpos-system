@@ -116,7 +116,7 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
         <SubmitButton
           isSubmitting={isSubmitting}
           label="Masuk"
-          loadingLabel=""
+          loadingLabel="Logging in..."
           className="w-full py-2.5 rounded-xl 
                      text-xs sm:text-sm font-semibold 
                      shadow-md active:scale-[0.98] 
