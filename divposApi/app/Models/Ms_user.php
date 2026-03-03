@@ -17,9 +17,7 @@ class Ms_user extends Authenticatable
         'phone',
         'avatar',
         'password',
-        'is_active',
         'role_id',
-        'tenant_id',
         'last_login_at',
         'last_login_ip',
     ];
@@ -31,7 +29,6 @@ class Ms_user extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'last_login_at'     => 'datetime',
-            'is_active'         => 'boolean',
             'password'          => 'hashed', // biar auto-hash
         ];
     }
@@ -40,12 +37,13 @@ class Ms_user extends Authenticatable
     {
         return $this->belongsTo(Ms_role::class, 'role_id');
     }
+    
+    public function employee() {
 
-    public function tenant()
-    {
-        return $this->belongsTo(Ms_tenant::class, 'tenant_id');
+     return $this->hasOne(Ms_employee::class, 'user_id');
+
     }
-
+  
 
     public function refreshTokens()
 {

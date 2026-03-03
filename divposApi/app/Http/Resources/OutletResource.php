@@ -11,8 +11,8 @@ class OutletResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'tenant_id' => $this->tenant_id,
+            'id' =>  CryptoHelper::encrypt($this->id),
+            'tenant_id' =>  CryptoHelper::encrypt($this->tenant_id),
             'name' => $this->name,
             'code' => $this->code,
             'phone' => $this->phone,

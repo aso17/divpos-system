@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('avatar', 255)->nullable();    
 
             // Status Login
-            $table->boolean('is_active')->default(true);       
+            
             $table->timestampTz('email_verified_at')->nullable();
 
             // 🔐 Security enhancement

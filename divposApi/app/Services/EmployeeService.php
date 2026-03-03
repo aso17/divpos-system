@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Models\Ms_user;
+use App\Models\Ms_employee;
+
 use App\Repositories\EmployeeRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use App\Helpers\CryptoHelper;
 
 class EmployeeService
 {
@@ -21,69 +24,121 @@ class EmployeeService
         return $this->employeeRepository->getAll($params['tenant_id'], $params['keyword'] ?? null);
     }
 
-    public function createEmployee(array $data)
-    {
-        return DB::transaction(function () use ($data) {
-            
-            // --- LOGIKA AUTO GENERATE NIK ---
-            $tenantId = $data['tenant_id'];
-            $lastEmployee = $this->employeeRepository->getLatestByTenant($tenantId);
-            
-            // Format: [TenantID]-YYYY-0001
-            $year = date('Y');
-            $prefix = $tenantId . '-' . $year . '-';
-            
-            if (!$lastEmployee) {
-                $newNumber = 1;
+    /**
+ * CREATE EMPLOYEE
+ */
+public function createEmployee(array $data,$CreatedBy)
+{
+    return DB::transaction(function () use ($data,$CreatedBy) {
+        $userId = null;
+
+        // 1. Handle Logic User Login (Data role_id sudah didekripsi oleh Request)
+        if ($data['has_login'] ?? false) {
+            $user = Ms_user::create([
+                'email'      => $data['email'],
+                'password'   => Hash::make($data['password']),
+                'role_id'    => $data['role_id'] ?? null, // Langsung pakai
+                'created_by' => $CreatedBy,
+            ]);
+            $userId = $user->id;
+        }
+
+        // 2. Generate Employee Code
+        $year = date('y');
+        $tenantIdPadded = str_pad($data['tenant_id'], 3, '0', STR_PAD_LEFT);
+
+        $lastEmployee = Ms_employee::where('tenant_id', $data['tenant_id'])
+            ->latest('id')
+            ->lockForUpdate()
+            ->first();
+
+        $lastSequence = 0;
+        if ($lastEmployee && $lastEmployee->employee_code) {
+            $lastSequence = (int) substr($lastEmployee->employee_code, -4);
+        }
+
+        $sequence = str_pad($lastSequence + 1, 4, '0', STR_PAD_LEFT);
+        $employeeCode = $year . $tenantIdPadded . $sequence;
+
+        // 3. Create Employee Profile (Data outlet_id sudah didekripsi oleh Request)
+        return Ms_employee::create([
+            'user_id'       => $userId,
+            'tenant_id'     => $data['tenant_id'],
+            'outlet_id'     => $data['outlet_id'] ?? null, // Langsung pakai
+            'employee_code' => $employeeCode,
+            'full_name'     => $data['full_name'],
+            'phone'         => $data['phone'] ?? null,
+            'job_title'     => $data['job_title'] ?? null,
+            'is_active'     => $data['is_active'] ?? true,
+            'created_by'    => $CreatedBy,
+        ]);
+    });
+}
+
+/**
+ * UPDATE EMPLOYEE
+ */
+    public function updateEmployee($id, $tenantId, $updatedBy, array $data)
+{
+    return DB::transaction(function () use ($id, $tenantId, $updatedBy, $data) {
+        
+        // 1. Pastikan ID didekripsi (Double Protection)
+        $realId = is_numeric($id) ? $id : CryptoHelper::decrypt($id);
+
+        $employee = Ms_employee::where('id', $realId)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        // 2. Logic Akun Login (Ms_user)
+        $hasLogin = filter_var($data['has_login'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        if ($hasLogin) {
+            if ($employee->user_id) {
+                // UPDATE USER LAMA
+                $user = Ms_user::find($employee->user_id);
+                if ($user) {
+                    $userData = [
+                        'email'      => $data['email'],
+                        'role_id'    => $data['role_id'] ?? null,
+                        'updated_by' => $updatedBy,
+                    ];
+                    if (!empty($data['password'])) {
+                        $userData['password'] = Hash::make($data['password']);
+                    }
+                    $user->update($userData);
+                }
             } else {
-                // Ambil nomor urut dari NIK terakhir
-                $lastCode = $lastEmployee->employee_code;
-                $lastNumber = (int)str_replace($prefix, '', $lastCode);
-                $newNumber = $lastNumber + 1;
+                // BUAT USER BARU
+                $newUser = Ms_user::create([
+                    'email'      => $data['email'],
+                    'password'   => Hash::make($data['password'] ?? 'password123'),
+                    'role_id'    => $data['role_id'] ?? null,
+                    'created_by' => $updatedBy,
+                ]);
+                $employee->user_id = $newUser->id;
             }
+        } else {
             
-            $data['employee_code'] = $prefix . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
-            // --------------------------------
+            if ($employee->user_id) {
+                Ms_user::where('id', $employee->user_id)->delete();
+                $employee->user_id = null;
+                }
+        }
 
-            // Handle User Login jika dicentang
-            if ($data['has_login'] ?? false) {
-                $user = Ms_user::create([
-                    'name' => $data['full_name'],
-                    'email' => $data['email'],
-                    'password' => Hash::make($data['password']),
-                    'role_id' => $data['role_id'],
-                    'tenant_id' => $tenantId,
-                ]);
-                $data['user_id'] = $user->id;
-            }
+        // 3. Update Profil Karyawan
+        $employee->update([
+            'full_name'  => $data['full_name'],
+            'phone'      => $data['phone'] ?? null,
+            'job_title'  => $data['job_title'] ?? null,
+            'is_active'  => $data['is_active'] ?? true,
+            'outlet_id'  => $data['outlet_id'] ?? null, 
+            'updated_by' => $updatedBy,
+            'user_id'    => $employee->user_id, // Gunakan hasil logic di atas
+        ]);
 
-            return $this->employeeRepository->create($data);
-        });
-    }
-
-    public function updateEmployee($id, $tenantId, array $data)
-    {
-        return DB::transaction(function () use ($id, $tenantId, $data) {
-            $employee = $this->employeeRepository->findById($id, $tenantId);
-            if (!$employee) return null;
-
-            // Handle update User Login jika ada
-            if ($employee->user_id && ($data['has_login'] ?? false)) {
-                $employee->user()->update([
-                    'email' => $data['email'],
-                    'password' => $data['password'] ? Hash::make($data['password']) : $employee->user->password,
-                    'role_id' => $data['role_id'],
-                ]);
-            } elseif (!($data['has_login'] ?? false) && $employee->user_id) {
-                // Jika akses login dicabut, hapus user
-                $employee->user()->delete();
-                $data['user_id'] = null;
-            }
-
-            return $this->employeeRepository->update($id, $data);
-        });
-    }
-
+        return $employee->load(['user', 'outlet']);
+    });
+}
     public function deleteEmployee($id, $tenantId)
     {
         $employee = $this->employeeRepository->findById($id, $tenantId);

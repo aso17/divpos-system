@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Employee extends Model
+class Ms_employee extends Model
 {
     use HasFactory, SoftDeletes;
 
@@ -23,6 +23,8 @@ class Employee extends Model
         'phone',
         'job_title',
         'is_active',
+        'created_by',
+        'updated_by',   
     ];
 
     // Casting untuk tipe data tertentu

@@ -44,10 +44,10 @@ Route::prefix('auth')->middleware('api')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
 
-        Route::post('/logout', [AuthController::class, 'logout']);
-        Route::get('/me', fn (Request $request) => 
-            $request->user()->load('tenant')
-        );
+    Route::post('/logout', [AuthController::class, 'logout']);
+       Route::get('/me', function (Request $request) {
+        return $request->user()->load(['employee.tenant', 'employee.outlet']);
+    });
 
         Route::get('/menus', [MenuController::class, 'menus']);
     });

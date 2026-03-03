@@ -6,40 +6,51 @@ use App\Models\Ms_user;
 
 class UserRepository
 {
-    public function findActiveUserByEmail(string $email)
+   public function findActiveUserByEmail(string $email)
     {
-       
         return Ms_user::select(
-                'id', 
-                'full_name', 
-                'email', 
-                'password', 
-                'role_id', 
-                'avatar', 
-                'tenant_id'
+                'Ms_users.id', 
+                'Ms_users.email', 
+                'Ms_users.password', 
+                'Ms_users.role_id', 
+                'Ms_users.avatar',
+                'Ms_employees.full_name',
+                'Ms_employees.tenant_id',
+                'Ms_employees.is_active' ,
+                'Ms_tenants.slug as tenant_slug',
+                'Ms_tenants.code as tenant_code',
+                'Ms_tenants.logo_path as tenant_logo'
             )
-            ->with([
-                'tenant:id,slug,logo_path,code', 
-                'role:id,role_name'
-            ])
-            ->where('email', $email)
-            ->where('is_active', true)
+            ->join('Ms_employees', 'Ms_users.id', '=', 'Ms_employees.user_id')
+            ->join('Ms_tenants', 'Ms_employees.tenant_id', '=', 'Ms_tenants.id') // Join ke tenant lewat employee
+            ->with(['role:id,role_name'])
+            ->where('Ms_users.email', $email)
+            ->where('Ms_employees.is_active', true)
             ->first();
     }
-    
 
-
-    public function getBaseUserQuery(int $tenantId)
+   public function getBaseUserQuery(int $tenantId)
     {
         return Ms_user::select(
-            'id','full_name','email','username','phone',
-            'is_active','role_id','tenant_id','avatar','created_at'
-        )
-        ->with(['role:id,role_name,code', 'tenant:id,slug,code'])
-        ->where('is_active', true)
-        ->where('tenant_id', $tenantId);
+                'Ms_users.id',
+                'Ms_users.email',
+                'Ms_users.username',
+                'Ms_users.role_id',
+                'Ms_users.avatar',
+                'Ms_users.created_at',
+                // Data dari join Ms_employees
+                'Ms_employees.full_name', 
+                'Ms_employees.phone',
+                'Ms_employees.tenant_id',
+                'Ms_employees.is_active' // Ambil status aktif dari sini
+            )
+            ->join('Ms_employees', 'Ms_users.id', '=', 'Ms_employees.user_id')
+            ->with(['role:id,role_name,code'])
+            // Filter berdasarkan tenant si karyawan
+            ->where('Ms_employees.tenant_id', $tenantId)
+            // Jika Mas ingin query dasar ini hanya menampilkan yang aktif:
+            ->where('Ms_employees.is_active', true);
     }
-
    public function findByIdAndTenant(int $id, int $tenantId)
     {
         return Ms_user::where('id', $id)

@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Services\EmployeeService;
+use App\Models\Ms_employee;
 use App\Http\Resources\EmployeeResource;
+use App\Http\Requests\EmployeeRequest;
 use App\Helpers\CryptoHelper;
+use Illuminate\Support\Facades\Auth;
 
 class EmployeeController extends Controller
 {
@@ -25,7 +28,6 @@ class EmployeeController extends Controller
             'tenant_id' => $tenantId,
             'keyword' => $request->query('keyword'),
         ];
-
         $query = $this->employeeService->getAllEmployees($params);
         $perPage = (int) ($request->per_page ?? 10);
         $employees = $query->paginate($perPage);
@@ -33,66 +35,66 @@ class EmployeeController extends Controller
         return EmployeeResource::collection($employees);
     }
 
-    public function store(Request $request)
+    public function store(EmployeeRequest $request)
     {
         try {
-            $decryptedTenantId = CryptoHelper::decrypt($request->tenant_id);
-            if (!$decryptedTenantId) throw new \Exception("Tenant tidak valid.");
+           
+            $payload = $request->validated();
+            $user = Auth::user();
+            $payload['tenant_id'] = $user->employee?->tenant_id;    
+            $payload['created_by'] = $user->id;
+            $userId = $user->id;
 
-            // Validasi Input (NIK tidak perlu divalidasi karena di-generate BE)
-            $request->validate([
-                'full_name' => 'required|string|max:100',
-                'outlet_id' => 'nullable|integer',
-                'has_login' => 'boolean',
-                'email' => 'required_if:has_login,1|email|unique:Ms_users,email',
-                'password' => 'required_if:has_login,1|min:6',
-                'role_id' => 'required_if:has_login,1|integer',
-            ]);
-
-            $payload = $request->all();
-            $payload['tenant_id'] = $decryptedTenantId;
-
-            $employee = $this->employeeService->createEmployee($payload);
+            if (!$payload['tenant_id']) {
+                throw new \Exception("Akses ditolak: Anda tidak terhubung ke Tenant manapun.");
+            }
+            $employee = $this->employeeService->createEmployee($payload, $userId);
+            
+            $employee->load(['user', 'outlet']);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Karyawan berhasil ditambahkan',
-                'data' => new EmployeeResource($employee),
+                'data'    => new EmployeeResource($employee),
             ], 201);
+
         } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function update(Request $request, $id)
-    {
-        try {
-            $decryptedId = CryptoHelper::decrypt($id);
-            $decryptedTenantId = CryptoHelper::decrypt($request->tenant_id);
-            if (!$decryptedId || !$decryptedTenantId) throw new \Exception("ID tidak valid.");
-
-            $request->validate([
-                'full_name' => 'required|string|max:100',
-                'email' => "required_if:has_login,1|email|unique:Ms_users,email," . ($request->user_id ? CryptoHelper::decrypt($request->user_id) : 'NULL'),
-            ]);
-
-            $payload = $request->all();
-            $payload['tenant_id'] = $decryptedTenantId;
-
-            $employee = $this->employeeService->updateEmployee($decryptedId, $decryptedTenantId, $payload);
-
-            if (!$employee) return response()->json(['message' => 'Karyawan tidak ditemukan'], 404);
-
+            // Berikan pesan error yang lebih informatif
             return response()->json([
-                'success' => true,
-                'message' => 'Karyawan berhasil diupdate',
-                'data' => new EmployeeResource($employee),
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
+                'success' => false,
+                'message' => 'Gagal menambahkan karyawan: ' . $e->getMessage()
+            ], 500);
         }
     }
 
+   public function update(EmployeeRequest $request, $id)
+{
+    try {
+       
+        $payload = $request->validated();        
+        $user = Auth::user();
+        $tenantId = $user->employee->tenant_id;
+        $userId = $user->id;
+      
+        $updatedEmployee = $this->employeeService->updateEmployee($payload['id'], $tenantId, $userId, $payload);
+
+        $updatedEmployee->refresh();
+        $updatedEmployee->load(['user', 'outlet']);
+
+        return response()->json([
+            'success' => true,
+            'user_id' => $userId,
+            'message' => 'Data karyawan ' . $updatedEmployee->full_name . ' berhasil diperbarui',
+            'data'    => new EmployeeResource($updatedEmployee),
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal memperbarui data: ' . $e->getMessage()
+        ], 500);
+    }
+}
     public function destroy(Request $request, $id)
     {
         try {

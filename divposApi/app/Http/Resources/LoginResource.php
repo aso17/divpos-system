@@ -4,38 +4,41 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
+use App\Helpers\CryptoHelper;
 
 class LoginResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
         return [
-            'id'        => $this->id,
-            'full_name' => $this->full_name,
+            'id'        => CryptoHelper::encrypt($this->id),
+            // Langsung ambil dari hasil join (tidak perlu lewat relasi ->employee)
+            'full_name' => $this->full_name ?? 'User', 
             'email'     => $this->email,
-            'role_name' => $this->role->role_name ?? 'User', 
-            'tenant_id' => $this->tenant_id,
+            'username'  => $this->username,
+            'role_name' => $this->role->role_name ?? null,            
+            // Ambil tenant_id hasil join
+            'tenant_id' => $this->tenant_id ? CryptoHelper::encrypt($this->tenant_id) : null,
+            
             'avatar'    => $this->avatar 
                 ? asset('storage/' . $this->avatar) 
-                : null,
-            
+                : asset('assets/images/default-avatar.png'),
 
-            // Gunakan conditional loading untuk tenant
-            'tenant' => $this->whenLoaded('tenant', function() {
+            // Mapping data Tenant dari hasil alias Join (tenant_slug, tenant_code, dll)
+            'tenant' => [
+                'id'    => CryptoHelper::encrypt($this->tenant_id),
+                'slug'  => $this->tenant_slug, // Sesuai alias di query
+                'code'  => $this->tenant_code, // Sesuai alias di query
+                'logo'  => $this->tenant_logo 
+                           ? asset('storage/' . $this->tenant_logo) 
+                           : null,
+            ],
+
+            // Outlet tetap gunakan 'when' jika ada relasi outlet yang di-load
+            'outlet' => $this->when($this->relationLoaded('employee') && $this->employee->outlet_id, function() {
                 return [
-                    'id'        => $this->tenant_id,
-                    'slug'      => $this->tenant->slug,
-                    'code'      => $this->tenant->code,
-                    'name'      => $this->tenant->name ?? null, // Tambahkan name jika perlu
-                    'logo_path' => $this->tenant->logo_path
-                        ? asset('storage/' . $this->tenant->logo_path)
-                        : null,
+                    'id'   => CryptoHelper::encrypt($this->employee->outlet_id),
+                    'name' => $this->employee->outlet->name ?? null,
                 ];
             }),
         ];

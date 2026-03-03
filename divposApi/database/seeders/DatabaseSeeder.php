@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
                 RoleMenuPermissionSeeder::class,
                 SystemConfigurationSeeder::class,
                 UsersSeeder::class,
+                EmployeeSeeder::class,
             ]);
 
         }
