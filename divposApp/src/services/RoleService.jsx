@@ -15,7 +15,7 @@ const RoleService = {
     const { tenantId } = getAuthInfo();
     return api.get("/access-control/roles-by-tenant", {
       params: {
-        tenant_id: encrypt(tenantId),
+        tenant_id: tenantId,
       },
     });
   },

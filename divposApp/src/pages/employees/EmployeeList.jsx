@@ -76,19 +76,6 @@ export default function EmployeesList() {
     setSelectedEmployee(null);
   };
 
-  const handleFormSuccess = (dataEmployee) => {
-    if (selectedEmployee) {
-      // MODE EDIT: Update baris data di state tanpa fetch ulang
-      setData((prev) =>
-        prev.map((e) => (e.id === dataEmployee.id ? dataEmployee : e)),
-      );
-    } else {
-      // MODE TAMBAH: Kembali ke halaman pertama dan fetch ulang data
-      setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-      fetchEmployees();
-    }
-    handleCloseForm();
-  };
   // -------------------------
 
   const handleSearch = (e) => {
@@ -115,12 +102,14 @@ export default function EmployeesList() {
 
     try {
       const res = await EmployeeService.deleteEmployee(employee.id);
+      setData((prevEmployees) =>
+        prevEmployees.filter((item) => item.id !== employee.id),
+      );
+      // -------------------------
+
       const successMsg =
         res.data?.message || "Data karyawan telah berhasil dihapus.";
       await showConfirm(successMsg, "Hapus Berhasil", "success");
-
-      // Refresh data setelah hapus
-      fetchEmployees();
     } catch (err) {
       const errorMsg =
         err.response?.data?.message || "Gagal menghapus karyawan";
@@ -399,24 +388,31 @@ export default function EmployeesList() {
       <EmployeeForm
         open={openModal}
         initialData={selectedEmployee}
-        onClose={() => setOpenModal(false)}
+        onClose={handleCloseForm}
         onSuccess={(dataEmployee) => {
           if (selectedEmployee) {
-            // MODE EDIT: Update baris data di state tanpa fetch ulang
-            setData((prevEmployees) =>
-              prevEmployees.map((e) =>
-                e.id === dataEmployee.id ? dataEmployee : e,
+            // --- MODE EDIT ---
+            setData((prev) =>
+              prev.map((item) =>
+                String(item.id) === String(dataEmployee.id)
+                  ? dataEmployee
+                  : item,
               ),
             );
           } else {
-            // MODE TAMBAH: Kembali ke halaman pertama dan fetch ulang data
+            // --- MODE TAMBAH ---
+            // 1. Masukkan data baru ke baris paling atas secara instan
+            setData((prev) => [dataEmployee, ...prev]);
+
+            // 2. Reset ke halaman 1 agar data baru terlihat
             setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-            fetchEmployees();
+
+            // 3. Update total count agar paginasi tidak ngaco
+            setTotalCount((prev) => prev + 1);
           }
-          // Tutup modal setelah aksi sukses
-          setOpenModal(false);
-          // Reset data yang dipilih
-          setSelectedEmployee(null);
+
+          // Tutup modal dan bersihkan seleksi
+          handleCloseForm();
         }}
       />
     </div>

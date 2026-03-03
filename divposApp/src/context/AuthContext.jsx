@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await AuthService.login(credentials, "");
-
+      console.log("Login successful, response data:", data);
       SetWithExpiry("access_token", data.token, 1440);
       SetWithExpiry("refresh_token", data.refresh_token, 1440);
       SetWithExpiry("user", data.user, 1440);

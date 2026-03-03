@@ -1,34 +1,31 @@
 import api from "./api";
 import { GetWithExpiry } from "../utils/Storage";
 import { encrypt } from "../utils/Encryptions";
-
-const getTenantId = () => {
+const getAuthInfo = () => {
   const user = GetWithExpiry("user");
-  return user?.tenant_id || null;
+  return {
+    tenantId: user?.tenant_id || null,
+    userLogin: user ? user.id : null,
+  };
 };
 
 const EmployeeService = {
   getEmployees: (params = {}) => {
-    const tenantId = getTenantId();
-    const encryptedTenantId = encrypt(tenantId);
-
+    const { tenantId } = getAuthInfo();
     return api.get("/employees", {
       params: {
-        tenant_id: encryptedTenantId,
+        tenant_id: tenantId,
         ...params,
       },
     });
   },
 
   createEmployee: (payload) => {
-    const tenantId = getTenantId();
-    const encryptedTenantId = encrypt(tenantId);
-
-    // Konversi payload ke FormData untuk mendukung data kompleks dan file jika ada
+    console.log("Creating employee with payload:", payload);
+    const { tenantId, userLogin } = getAuthInfo();
     const formData = new FormData();
     Object.keys(payload).forEach((key) => {
       if (payload[key] !== null && payload[key] !== undefined) {
-        // Konversi boolean ke 0/1 untuk database
         if (typeof payload[key] === "boolean") {
           formData.append(key, payload[key] ? 1 : 0);
         } else {
@@ -37,7 +34,8 @@ const EmployeeService = {
       }
     });
 
-    if (encryptedTenantId) formData.append("tenant_id", encryptedTenantId);
+    if (tenantId) formData.append("tenant_id", tenantId);
+    if (userLogin) formData.append("created_by", userLogin);
 
     return api.post("/employees", formData, {
       headers: {
@@ -47,12 +45,10 @@ const EmployeeService = {
   },
 
   updateEmployee: (id, payload) => {
-    const tenantId = getTenantId();
-    const encryptedTenantId = encrypt(tenantId);
-    const encryptedEmployeeId = encrypt(id);
+    const { tenantId, userLogin } = getAuthInfo();
 
     const formData = new FormData();
-    formData.append("_method", "PUT"); // Laravel PUT spoofing
+    formData.append("_method", "PUT");
 
     Object.entries(payload).forEach(([key, value]) => {
       if (value === null || value === undefined) return;
@@ -66,11 +62,14 @@ const EmployeeService = {
       }
     });
 
-    if (encryptedTenantId && !formData.has("tenant_id")) {
-      formData.append("tenant_id", encryptedTenantId);
+    if (tenantId && !formData.has("tenant_id")) {
+      formData.append("tenant_id", tenantId);
+    }
+    if (userLogin && !formData.has("updated_by")) {
+      formData.append("updated_by", userLogin);
     }
 
-    return api.post(`/employees/${encryptedEmployeeId}`, formData, {
+    return api.post(`/employees/${id}`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -78,25 +77,19 @@ const EmployeeService = {
   },
 
   deleteEmployee: (id) => {
-    const tenantId = getTenantId();
-    const encryptedEmployeeId = encrypt(id);
-    const encryptedTenantId = encrypt(tenantId);
-
-    return api.delete(`/employees/${encryptedEmployeeId}`, {
+    const { tenantId } = getAuthInfo();
+    return api.delete(`/employees/${id}`, {
       params: {
-        tenant_id: encryptedTenantId,
+        tenant_id: tenantId,
       },
     });
   },
 
   getEmployeeById: (id) => {
-    const tenantId = getTenantId();
-    const encryptedTenantId = encrypt(tenantId);
-    const encryptedEmployeeId = encrypt(id);
-
-    return api.get(`/employees/${encryptedEmployeeId}`, {
+    const { tenantId } = getAuthInfo();
+    return api.get(`/employees/${id}`, {
       params: {
-        tenant_id: encryptedTenantId,
+        tenant_id: tenantId,
       },
     });
   },

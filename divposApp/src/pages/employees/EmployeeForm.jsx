@@ -16,13 +16,11 @@ export default function EmployeeForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [roles, setRoles] = useState([]);
   const [outlets, setOutlets] = useState([]);
-  const [hasLogin, setHasLogin] = useState(false);
 
   const { values, errors, handleChange, validate, setValues, setErrors } =
     useFormValidation(
       {
         full_name: "",
-        // employee_code dihapus dari initial state karena di-generate BE
         phone: "",
         job_title: "",
         outlet_id: "",
@@ -33,26 +31,53 @@ export default function EmployeeForm({
         is_active: true,
       },
       {
-        full_name: [(v) => rules.required(v, "Nama wajib diisi")],
-        // employee_code: [], // Validasi NIK dihapus
+        full_name: [
+          (v) => rules.required(v, "Nama lengkap wajib diisi"),
+          (v) => rules.noHtml(v), // Cegah XSS di nama
+          (v) => rules.safeString(v), // Cegah karakter SQL berbahaya
+        ],
+        phone: [
+          (v) => rules.required(v, "Nomor telepon wajib diisi"),
+          (v) => rules.noLetters(v, "Nomor telepon hanya boleh angka"),
+          (v) => rules.phoneID(v), // Otomatis bersihkan spasi/- dan cek format 08/628
+        ],
+        job_title: [
+          (v) => rules.required(v, "Jabatan wajib diisi"),
+          (v) => rules.noHtml(v), // Perbaikan: dibungkus arrow function agar tidak error
+          (v) => rules.safeString(v),
+        ],
         email: [
-          (v, data) => (data.has_login && !v ? "Email wajib diisi" : null),
-          (v) => (v && !rules.email(v) ? "Format email tidak valid" : null),
+          // Rule 1: Wajib jika akses login dicentang
+          (v, data) =>
+            data.has_login && !v ? "Email wajib diisi untuk akses login" : null,
+          // Rule 2: Cek format (otomatis melakukan .trim() di dalam rules.email)
+          (v) => rules.email(v),
         ],
         password: [
           (v, data) => {
+            // Wajib hanya untuk karyawan baru dengan akses login
             if (data.has_login && !initialData && !v)
               return "Password wajib diisi";
+            // Jika diisi (baik edit/baru), minimal 6 karakter
             if (v && v.length < 6) return "Minimal 6 karakter";
             return null;
           },
+          (v) => (v ? rules.safeString(v) : null), // Tambahan keamanan
         ],
         role_id: [
-          (v, data) => (data.has_login && !v ? "Role wajib dipilih" : null),
+          (v, data) =>
+            data.has_login && !v
+              ? "Role wajib dipilih untuk akses login"
+              : null,
+        ],
+        outlet_id: [
+          // Opsional, tapi tetap kita amankan dari input aneh
+          (v) => rules.noHtml(v),
         ],
       },
     );
 
+  // 1. Fetch data pendukung saat modal buka
   useEffect(() => {
     if (open) {
       RoleService.GetRolesByTenant().then((res) =>
@@ -64,28 +89,25 @@ export default function EmployeeForm({
     }
   }, [open]);
 
+  // 2. Sinkronisasi Data Awal (Edit mode)
   useEffect(() => {
     if (!open) return;
 
     if (initialData) {
-      const hasLoginAccess = !!initialData.user_id;
       setValues({
         full_name: initialData.full_name || "",
-        // employee_code tidak di-set di sini
         phone: initialData.phone || "",
         job_title: initialData.job_title || "",
-        outlet_id: initialData.outlet_id || "",
-        has_login: hasLoginAccess,
-        email: initialData.user?.email || "",
+        outlet_id: initialData.outlet?.id || "",
+        has_login: !!initialData.has_login,
+        email: initialData.email || "",
         password: "",
-        role_id: initialData.user?.role_id || "",
-        is_active: initialData.is_active == 1 || initialData.is_active === true,
+        role_id: initialData.role_id || "",
+        is_active: initialData.is_active === true,
       });
-      setHasLogin(hasLoginAccess);
     } else {
       setValues({
         full_name: "",
-        // employee_code: "", // Dihapus
         phone: "",
         job_title: "",
         outlet_id: "",
@@ -95,7 +117,6 @@ export default function EmployeeForm({
         role_id: "",
         is_active: true,
       });
-      setHasLogin(false);
     }
     setErrors({});
   }, [open, initialData, setValues, setErrors]);
@@ -103,26 +124,20 @@ export default function EmployeeForm({
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
-    if (!validate()) return;
 
-    const payload = {
-      ...values,
-      has_login: hasLogin,
-    };
+    // validate() akan mengirim seluruh 'values' ke fungsi validator di atas
+    if (!validate()) return;
 
     try {
       setIsSubmitting(true);
       let response;
 
       if (initialData?.id) {
-        response = await EmployeeService.updateEmployee(
-          initialData.id,
-          payload,
-        );
+        response = await EmployeeService.updateEmployee(initialData.id, values);
       } else {
-        response = await EmployeeService.createEmployee(payload);
+        response = await EmployeeService.createEmployee(values);
       }
-
+      console.log("API Response:", response);
       triggerToast(response.data?.message, "success");
       onSuccess?.(response.data?.data);
       onClose();
@@ -133,11 +148,11 @@ export default function EmployeeForm({
     }
   };
 
+  // console.log("Form values:", initialData);
+
   const triggerToast = (message, type) => {
     window.dispatchEvent(
-      new CustomEvent("global-toast", {
-        detail: { message, type },
-      }),
+      new CustomEvent("global-toast", { detail: { message, type } }),
     );
   };
 
@@ -154,11 +169,6 @@ export default function EmployeeForm({
           onSubmit={handleSubmit}
           className="grid grid-cols-2 gap-4 text-xxs"
         >
-          {/* DATA PROFIL KARYAWAN */}
-          <div className="col-span-2 text-sm font-bold text-slate-700">
-            Data Diri
-          </div>
-
           <div className="col-span-2">
             <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
               Nama Lengkap
@@ -173,8 +183,6 @@ export default function EmployeeForm({
             )}
           </div>
 
-          {/* INPUT NIK DIHAPUS DARI SINI */}
-
           <div className="col-span-1">
             <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
               Phone
@@ -184,6 +192,9 @@ export default function EmployeeForm({
               onChange={(e) => handleChange("phone", e.target.value)}
               className={inputClasses()}
             />
+            {errors.phone && (
+              <p className="text-red-500 text-[10px]">{errors.phone}</p>
+            )}
           </div>
 
           <div className="col-span-1">
@@ -195,6 +206,10 @@ export default function EmployeeForm({
               onChange={(e) => handleChange("job_title", e.target.value)}
               className={inputClasses()}
             />
+
+            {errors.job_title && (
+              <p className="text-red-500 text-[10px]">{errors.job_title}</p>
+            )}
           </div>
 
           <div className="col-span-1">
@@ -229,16 +244,13 @@ export default function EmployeeForm({
             </label>
           </div>
 
-          {/* OPSI LOGIN - PENTING */}
+          {/* OPSI LOGIN */}
           <div className="col-span-2 border-t pt-4 mt-2">
             <label className="flex items-center gap-2 cursor-pointer group p-3 bg-slate-50 rounded-lg border">
               <input
                 type="checkbox"
-                checked={hasLogin}
-                onChange={(e) => {
-                  setHasLogin(e.target.checked);
-                  handleChange("has_login", e.target.checked);
-                }}
+                checked={values.has_login}
+                onChange={(e) => handleChange("has_login", e.target.checked)}
                 className="w-4 h-4 rounded text-emerald-600"
               />
               <span className="text-emerald-700 font-bold uppercase text-[10px]">
@@ -247,8 +259,7 @@ export default function EmployeeForm({
             </label>
           </div>
 
-          {/* FIELD LOGIN - Tampil jika hasLogin true */}
-          {hasLogin && (
+          {values.has_login && (
             <>
               <div className="col-span-1">
                 <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
@@ -308,7 +319,7 @@ export default function EmployeeForm({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-[10px] font-black uppercase bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-500 hover:text-white rounded-lg transition-all"
+              className="px-4 py-2 text-[10px] font-black uppercase bg-rose-50 text-rose-600 border border-rose-100 rounded-lg"
             >
               Cancel
             </button>
@@ -317,7 +328,7 @@ export default function EmployeeForm({
               label={initialData ? "Update" : "Save"}
               loadingLabel="Memproses..."
               fullWidth={false}
-              className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-emerald-600 text-white"
             />
           </div>
         </form>

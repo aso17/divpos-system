@@ -5,24 +5,22 @@ const SECRET_KEY = import.meta.env.VITE_APP_SECRET_KEY;
 export const encrypt = (id) => {
   if (!id) return "";
 
-  // 1. Derivasi Key yang kuat (SHA256)
+  // 1. Derivasi Key & IV Statis (Harus sama dengan PHP)
   const key = CryptoJS.SHA256(SECRET_KEY);
+  // Ambil 16 karakter pertama dari hash secret key sebagai IV
+  const iv = CryptoJS.enc.Utf8.parse(
+    CryptoJS.SHA256(SECRET_KEY).toString().substring(0, 16),
+  );
 
-  // 2. Generate IV Acak (16 bytes) - INI KUNCI KEAMANANNYA
-  const iv = CryptoJS.lib.WordArray.random(16);
-
-  // 3. Encrypt
+  // 2. Encrypt
   const encrypted = CryptoJS.AES.encrypt(id.toString(), key, {
     iv: iv,
     mode: CryptoJS.mode.CBC,
     padding: CryptoJS.pad.Pkcs7,
   });
 
-  // 4. Gabungkan IV + Ciphertext (agar backend tahu IV mana yang dipakai)
-  const combined = iv.concat(encrypted.ciphertext);
-
-  // 5. Convert ke Base64 URL Safe
-  return combined
+  // 3. Convert ke Base64 URL Safe (Tanpa gabung IV)
+  return encrypted.ciphertext
     .toString(CryptoJS.enc.Base64)
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
@@ -33,18 +31,14 @@ export const decrypt = (cipherText) => {
   if (!cipherText) return "";
   try {
     const key = CryptoJS.SHA256(SECRET_KEY);
+    const iv = CryptoJS.enc.Utf8.parse(
+      CryptoJS.SHA256(SECRET_KEY).toString().substring(0, 16),
+    );
 
-    // Kembalikan ke Base64 standar
     let base64 = cipherText.replace(/-/g, "+").replace(/_/g, "/");
     while (base64.length % 4) base64 += "=";
 
-    const rawData = CryptoJS.enc.Base64.parse(base64);
-
-    // Ambil 16 byte pertama sebagai IV, sisanya adalah ciphertext
-    const iv = CryptoJS.lib.WordArray.create(rawData.words.slice(0, 4));
-    const ciphertext = CryptoJS.lib.WordArray.create(rawData.words.slice(4));
-
-    const decrypted = CryptoJS.AES.decrypt({ ciphertext: ciphertext }, key, {
+    const decrypted = CryptoJS.AES.decrypt(base64, key, {
       iv: iv,
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7,
@@ -52,6 +46,7 @@ export const decrypt = (cipherText) => {
 
     return decrypted.toString(CryptoJS.enc.Utf8);
   } catch (e) {
+    console.error("Decryption failed:", e);
     return "";
   }
 };

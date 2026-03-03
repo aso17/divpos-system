@@ -6,7 +6,7 @@ const getAuthInfo = () => {
   const user = GetWithExpiry("user");
   return {
     tenantId: user?.tenant_id || null,
-    userLogin: user ? `${user.id}-${user.full_name}` : "system",
+    userLogin: user ? user.id : null,
   };
 };
 
@@ -15,7 +15,7 @@ const OutletService = {
     const { tenantId } = getAuthInfo();
     return api.get("/outlets", {
       params: {
-        tenant_id: encrypt(tenantId),
+        tenant_id: tenantId,
         ...params,
       },
     });
@@ -23,11 +23,10 @@ const OutletService = {
 
   createOutlet: (payload) => {
     const { tenantId, userLogin } = getAuthInfo();
-    console.log(tenantId, userLogin);
     const finalPayload = {
       ...payload,
-      tenant_id: encrypt(tenantId),
-      created_by: encrypt(userLogin),
+      tenant_id: tenantId,
+      created_by: userLogin,
     };
     return api.post("/outlets", finalPayload);
   },
@@ -37,8 +36,8 @@ const OutletService = {
     const { tenantId, userLogin } = getAuthInfo();
     const finalPayload = {
       ...payload,
-      tenant_id: encrypt(tenantId),
-      updated_by: encrypt(userLogin),
+      tenant_id: tenantId,
+      updated_by: userLogin,
       _method: "PUT",
     };
     return api.post(`/outlets/${ID}`, finalPayload);
@@ -47,9 +46,8 @@ const OutletService = {
 
   deleteOutlet: (id) => {
     const { tenantId } = getAuthInfo();
-    const OutletId = encrypt(id);
-    const tenant_id = encrypt(tenantId);
-    return api.delete(`/outlets/${OutletId}`, {
+    const tenant_id = tenantId;
+    return api.delete(`/outlets/${id}`, {
       params: { tenant_id: tenant_id },
     });
   },

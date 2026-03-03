@@ -1,5 +1,8 @@
 export const rules = {
-  required: (value, message = "This field is required") => {
+  /**
+   * ✅ Wajib diisi
+   */
+  required: (value, message = "Field ini wajib diisi") => {
     if (
       value === null ||
       value === undefined ||
@@ -11,50 +14,66 @@ export const rules = {
     return null;
   },
 
-  noHtml: (
-    value,
-    message = "Karakter < > tidak diizinkan untuk alasan keamanan",
-  ) => {
+  /**
+   * 🛡️ Anti-XSS: Melarang tag HTML atau karakter kurung siku
+   */
+  noHtml: (value, message = "Karakter < > tidak diizinkan") => {
     if (!value) return null;
-    // Regex mendeteksi keberadaan tag <...>
-    const regex = /<[^>]*>/;
+    // Deteksi tag lengkap maupun karakter siku tunggal
+    const regex = /[<>]/;
     if (regex.test(value)) {
       return message;
     }
     return null;
   },
 
-  safeString: (value, message = "Input mengandung karakter yang dilarang") => {
+  /**
+   * 🛡️ Anti-SQL Injection: Melarang karakter berbahaya
+   */
+  safeString: (
+    value,
+    message = "Input mengandung karakter yang dilarang (; ' \" --)",
+  ) => {
     if (!value) return null;
-    // Melarang karakter yang sering dipakai SQL Injection seperti: ; -- ' "
+    // Melarang karakter ; ' " dan double dash -- yang sering dipakai SQLi
     const forbidden = /[;'"\-\-]/;
     if (forbidden.test(value)) {
       return message;
     }
     return null;
   },
-  email: (value, message = "Invalid email format") => {
+
+  /**
+   * 📧 Email: Dengan Auto-Trim (Menangani spasi tidak sengaja)
+   */
+  email: (value, message = "Format email tidak valid") => {
     if (!value) return null;
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!regex.test(value)) {
+
+    // Lakukan trim di sini agar spasi di awal/akhir tidak merusak validasi
+    const cleanEmail = typeof value === "string" ? value.trim() : value;
+    const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+    if (!regex.test(cleanEmail)) {
       return message;
     }
     return null;
   },
 
+  /**
+   * 📏 Panjang Minimum
+   */
   minLength: (value, length, message) => {
     if (!value || value.length < length) {
-      return message || `Minimum ${length} characters`;
+      return message || `Minimal ${length} karakter`;
     }
     return null;
   },
 
   /**
-   * ❌ No letters allowed (only numbers & symbols)
+   * ❌ No Letters: Hanya angka dan simbol (Cocok untuk input numerik murni)
    */
-  noLetters: (value, message = "Letters are not allowed") => {
+  noLetters: (value, message = "Karakter huruf tidak diizinkan") => {
     if (!value) return null;
-
     const regex = /^[^a-zA-Z]+$/;
     if (!regex.test(value)) {
       return message;
@@ -63,32 +82,25 @@ export const rules = {
   },
 
   /**
-   * Password must contain:
-   * - Uppercase
-   * - Lowercase
-   * - Number
-   * - Special character
+   * 🔐 Password Kuat: Besar, kecil, angka, simbol
    */
   strongPassword: (
     value,
     minLength = 8,
-    message = "Password must contain uppercase, lowercase, number, and special character",
+    message = "Password harus mengandung huruf besar, kecil, angka, dan karakter spesial",
   ) => {
-    if (!value) return message;
-
+    if (!value) return null;
     const regex = new RegExp(
       `^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&]).{${minLength},}$`,
     );
-
     if (!regex.test(value)) {
       return message;
     }
-
     return null;
   },
 
   /**
-   * 📎 File must be image
+   * 📎 Validasi Tipe File
    */
   fileType: (
     file,
@@ -96,64 +108,57 @@ export const rules = {
     message,
   ) => {
     if (!file) return null;
-
     if (!allowedTypes.includes(file.type)) {
       return (
         message ||
-        `File must be one of: ${allowedTypes.map((t) => t.split("/")[1]).join(", ")}`
+        `Format file harus: ${allowedTypes.map((t) => t.split("/")[1]).join(", ")}`
       );
     }
-
     return null;
   },
 
   /**
-   * 📏 File size max (bytes)
+   * 📏 Ukuran File Maksimal
    */
   fileSize: (file, maxSize, message) => {
     if (!file) return null;
-
     if (file.size > maxSize) {
       return (
-        message ||
-        `File size must be less than ${Math.round(maxSize / 1024 / 1024)}MB`
+        message || `Ukuran file maksimal ${Math.round(maxSize / 1024 / 1024)}MB`
       );
     }
-
     return null;
   },
 
   /**
-   * 🔤 Only alphanumeric + dot + underscore (for username)
+   * 🔤 Username: Alfanumerik, titik, dan underscore
    */
   username: (
     value,
-    message = "Username may only contain letters, numbers, . and _",
+    message = "Username hanya boleh huruf, angka, titik, dan underscore",
   ) => {
     if (!value) return null;
-
     const regex = /^[a-zA-Z0-9._]+$/;
     if (!regex.test(value)) {
       return message;
     }
-
     return null;
   },
 
   /**
-   * 📱 Indonesian phone number (08 / 628)
+   * 📱 Indonesian Phone: 08 atau 628 (Anti-Spasi & Anti-Strip)
    */
   phoneID: (
     value,
-    message = "Phone must start with 08 or 628 and contain 10–14 digits",
+    message = "Nomor harus diawali 08 atau 628 (10-14 digit)",
   ) => {
     if (!value) return null;
-
+    // Bersihkan karakter non-angka dulu (seperti spasi atau -) sebelum dicek regex
+    const cleanPhone = String(value).replace(/\D/g, "");
     const regex = /^(08|628)[0-9]{8,12}$/;
-    if (!regex.test(value)) {
+    if (!regex.test(cleanPhone)) {
       return message;
     }
-
     return null;
   },
 };
