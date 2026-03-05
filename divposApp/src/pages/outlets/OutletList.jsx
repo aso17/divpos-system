@@ -13,6 +13,7 @@ import {
   Search,
   MapPin,
   Phone,
+  Filter,
 } from "lucide-react";
 
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
@@ -28,6 +29,7 @@ export default function OutletList() {
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState(""); // State baru untuk filter
   const [openModal, setOpenModal] = useState(false);
   const [selectedOutlet, setSelectedOutlet] = useState(null);
 
@@ -39,8 +41,9 @@ export default function OutletList() {
           page: pagination.pageIndex + 1,
           per_page: pagination.pageSize,
           keyword: activeSearch,
+          is_active: filterStatus, // Kirim filter ke backend
         });
-
+        console.log("Fetched Outlets:", res.data);
         if (isMounted) {
           setData(res.data?.data || []);
           setTotalCount(Number(res.data?.meta?.total || 0));
@@ -49,12 +52,12 @@ export default function OutletList() {
         const errorMsg =
           error.response?.data?.message ||
           "Terjadi kesalahan saat mengambil data outlet";
-        showConfirm(errorMsg, "Gagal Mengambil Data", "error");
+        console.error(errorMsg); // Pastikan fungsi showConfirm tersedia di scope global/context
       } finally {
         if (isMounted) setLoading(false);
       }
     },
-    [pagination.pageIndex, pagination.pageSize, activeSearch],
+    [pagination.pageIndex, pagination.pageSize, activeSearch, filterStatus],
   );
 
   useEffect(() => {
@@ -74,10 +77,12 @@ export default function OutletList() {
   const handleReset = () => {
     setSearchTerm("");
     setActiveSearch("");
+    setFilterStatus("");
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
   const handleDelete = async (outlet) => {
+    // Logic: Gunakan showConfirm yang konsisten dengan modul User
     const setuju = await showConfirm(
       `Apakah anda yakin ingin menghapus outlet ${outlet.name}?`,
       "Konfirmasi Hapus",
@@ -89,17 +94,19 @@ export default function OutletList() {
 
     try {
       const res = await OutletService.deleteOutlet(outlet.id);
-      const successMsg =
-        res.data?.message || "Data outlet telah berhasil dihapus.";
-
+      const successMsg = res.data?.message || "Outlet telah berhasil dihapus.";
       await showConfirm(successMsg, "Hapus Berhasil", "success");
 
-      setData((prevData) => prevData.filter((item) => item.id !== outlet.id));
+      if (data.length === 1 && pagination.pageIndex > 0) {
+        setPagination((prev) => ({ ...prev, pageIndex: prev.pageIndex - 1 }));
+      } else {
+        // Filter state lokal agar UI langsung update tanpa loading spinner (Performa)
+        setData((prevData) => prevData.filter((item) => item.id !== outlet.id));
+      }
+
       setTotalCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
-      const errorMsg =
-        err.response?.data?.message ||
-        "Terjadi kesalahan server saat menghapus outlet";
+      const errorMsg = err.response?.data?.message || "Gagal menghapus data";
       showConfirm(errorMsg, "Gagal Hapus", "error");
     }
   };
@@ -123,9 +130,16 @@ export default function OutletList() {
         header: "OUTLET / CABANG",
         cell: ({ row }) => (
           <div className="flex flex-col py-1">
-            <span className="text-slate-800 font-bold text-xxs uppercase tracking-tight">
-              {row.original.name}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-800 font-black text-[11px] uppercase tracking-tight">
+                {row.original.name}
+              </span>
+              {row.original.is_main_branch && (
+                <span className="bg-amber-100 text-amber-700 text-[7px] px-1.5 py-0.5 rounded font-black uppercase">
+                  Pusat
+                </span>
+              )}
+            </div>
             <span className="text-emerald-600 font-mono text-[9px] font-bold">
               #{row.original.code}
             </span>
@@ -134,12 +148,12 @@ export default function OutletList() {
       },
       {
         accessorKey: "address",
-        header: "ALAMAT & KONTAK",
+        header: "LOKASI & KONTAK",
         cell: ({ row }) => (
           <div className="flex flex-col gap-1 py-1">
             <span className="text-slate-500 italic truncate max-w-[200px] flex items-center gap-1.5 text-[10px]">
               <MapPin size={12} className="text-slate-300" />{" "}
-              {row.original.address || "-"}
+              {row.original.city || row.original.address || "-"}
             </span>
             <span className="text-slate-400 flex items-center gap-1.5 font-medium text-[10px]">
               <Phone size={12} className="text-slate-300" />{" "}
@@ -227,7 +241,7 @@ export default function OutletList() {
               Master Outlet
             </h1>
             <p className="hidden md:block text-[10px] text-slate-500 mt-1 font-medium">
-              Kelola lokasi dan kontak cabang laundry
+              Kelola lokasi dan kontak cabang
             </p>
           </div>
         </div>
@@ -242,19 +256,50 @@ export default function OutletList() {
           <PlusSquare size={18} /> Tambah Cabang
         </button>
       </div>
+      {/* --- Search & Filter Section --- */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 p-2 md:p-3">
+        {/* 1. Filter Dropdown (Limit Status) */}
+        <div className="bg-white px-3 rounded-2xl border border-slate-100 shadow-sm flex items-center group focus-within:border-emerald-500/50 transition-all w-fit self-start h-[52px] md:h-[46px]">
+          {/* Bagian Icon */}
+          <div className="pr-2 text-slate-400 group-focus-within:text-emerald-600 border-r border-slate-50 mr-2 shrink-0">
+            <Filter size={15} className="md:w-3.5 md:h-3.5" />
+          </div>
 
-      {/* --- Search Section (Anti-Molor) --- */}
-      <div className="flex justify-start px-1">
-        <div className="bg-white p-2 rounded-2xl border border-slate-100 shadow-sm w-full md:w-auto md:min-w-[320px]">
-          <form onSubmit={handleSearch} className="flex items-center gap-1.5">
+          {/* Bagian Select */}
+          <div className="flex flex-col pr-1">
+            <label className="text-[9px] md:text-[7px] font-black text-slate-400 uppercase leading-none mb-1">
+              Limit Status
+            </label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="bg-transparent text-[11px] md:text-[10px] font-black text-slate-700 outline-none cursor-pointer  w-auto min-w-[100px] md:min-w-[90px]"
+            >
+              <option value="">All</option>
+              <option value="true">Operational</option>
+              <option value="false">Tutup</option>
+            </select>
+          </div>
+        </div>
+
+        {/* 2. Box Search (Input Utama) */}
+        <div className="bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm flex-1 md:max-w-[450px] flex items-center h-[52px] md:h-[46px]">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setActiveSearch(searchTerm);
+              setPagination((p) => ({ ...p, pageIndex: 0 }));
+            }}
+            className="flex items-center gap-1.5 w-full"
+          >
             <div className="relative flex-1 group">
               <Search
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
-                size={13}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
+                size={14}
               />
               <input
-                className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] outline-none focus:bg-white focus:border-emerald-500/50 transition-all placeholder:text-slate-400"
-                placeholder="Cari nama atau kode..."
+                className="w-full pl-9 pr-8 py-2 md:py-1.5 bg-slate-50 border border-transparent rounded-xl md:rounded-lg text-[12px] md:text-[11px] outline-none focus:bg-white focus:border-emerald-500/20 transition-all placeholder:text-slate-400 font-bold text-slate-700"
+                placeholder="Cari nama atau kode outlet..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -264,23 +309,21 @@ export default function OutletList() {
                   onClick={handleReset}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
                 >
-                  <X size={14} />
+                  <X size={16} className="md:w-3.5 md:h-3.5" />
                 </button>
               )}
             </div>
 
+            {/* 3. Tombol CARI */}
             <button
               type="submit"
-              className="bg-slate-900 text-white h-[32px] px-3 md:px-4 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-sm"
+              className="bg-slate-900 text-white h-[40px] md:h-[34px] px-5 md:px-6 rounded-xl md:rounded-lg text-[10px] md:text-[9px] font-black uppercase tracking-wider shadow-md hover:bg-black active:scale-95 transition-all flex items-center justify-center shrink-0"
             >
-              <Search size={14} className="md:hidden" />
-              <span className="hidden md:block">CARI</span>
+              CARI
             </button>
           </form>
         </div>
       </div>
-
-      {/* --- Responsive Data View Outlet --- */}
       <ResponsiveDataView
         data={data}
         loading={loading}
@@ -292,9 +335,16 @@ export default function OutletList() {
           >
             <div className="flex justify-between items-start gap-2">
               <div className="space-y-0.5 flex-1">
-                <h3 className="text-[11px] font-black text-slate-800 uppercase leading-tight">
-                  {outlet.name}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-[11px] font-black text-slate-800 uppercase leading-tight">
+                    {outlet.name}
+                  </h3>
+                  {outlet.is_main_branch && (
+                    <span className="bg-amber-100 text-amber-700 text-[6px] px-1 rounded font-bold uppercase">
+                      Pusat
+                    </span>
+                  )}
+                </div>
                 <span className="text-[7px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100 uppercase">
                   #{outlet.code}
                 </span>
@@ -305,12 +355,11 @@ export default function OutletList() {
                 {outlet.is_active ? "Operasional" : "Tutup"}
               </div>
             </div>
-
             <div className="space-y-2 py-2 border-y border-slate-50">
               <div className="flex items-center gap-2">
                 <MapPin size={10} className="text-slate-300 shrink-0" />
                 <p className="text-[9px] text-slate-500 italic truncate">
-                  {outlet.address || "Alamat tidak tersedia"}
+                  {outlet.city || outlet.address || "Alamat tidak tersedia"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -320,20 +369,19 @@ export default function OutletList() {
                 </p>
               </div>
             </div>
-
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => {
                   setSelectedOutlet(outlet);
                   setOpenModal(true);
                 }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 transition-all"
               >
                 <Pencil size={10} /> Edit
               </button>
               <button
                 onClick={() => handleDelete(outlet)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 transition-all"
               >
                 <Trash2 size={10} /> Hapus
               </button>
@@ -396,7 +444,7 @@ export default function OutletList() {
           setSelectedOutlet(null);
           setOpenModal(true);
         }}
-        className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 border-4 border-white transition-all"
+        className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 border-4 border-white transition-all active:scale-90"
       >
         <PlusSquare size={20} />
       </button>

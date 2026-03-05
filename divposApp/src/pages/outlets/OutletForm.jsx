@@ -12,91 +12,68 @@ export default function OutletForm({
   onSuccess,
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Hapus state isGeneratingCode karena kita tidak generate di FE lagi
 
   const { values, errors, handleChange, validate, setValues, setErrors } =
     useFormValidation(
       {
         name: "",
-        // code: "", <-- HAPUS INI
         phone: "",
-        email: "",
         address: "",
         city: "",
+        description: "", // Penyesuaian Table: Tambah description
         is_active: true,
         is_main_branch: false,
       },
       {
-        // 1. Nama Outlet
         name: [
           (v) => rules.required(v, "Nama Outlet wajib diisi"),
           (v) => rules.minLength(v, 3, "Nama minimal 3 karakter"),
           (v) => rules.noHtml(v),
           (v) => rules.safeString(v),
         ],
-
-        // 2. Kode Outlet dihapus dari validasi FE
-
-        // 3. Telepon
         phone: [
           (v) => rules.required(v, "Nomor telepon wajib diisi"),
-          (v) =>
-            rules.phoneID(v, "Format HP Indonesia tidak valid (08xxx/628xxx)"),
-          (v) =>
-            rules.noLetters(v, "Nomor telepon tidak boleh mengandung huruf"),
+          (v) => rules.phoneID(v, "Format HP tidak valid"),
+          (v) => rules.noLetters(v),
         ],
-
-        // 4. Email
-        email: [(v) => (v ? rules.email(v, "Format email salah") : null)],
-
-        // 5. Kota
         city: [
           (v) => rules.required(v, "Kota wajib diisi"),
           (v) => rules.noHtml(v),
-          (v) => rules.safeString(v),
         ],
-
-        // 6. Alamat
         address: [
           (v) => rules.required(v, "Alamat wajib diisi"),
           (v) => rules.minLength(v, 10, "Alamat minimal 10 karakter"),
-          (v) => rules.noHtml(v),
         ],
+        // Description opsional sesuai model
       },
     );
 
-  // HAPUS FUNGSI generaAutoCode
+  console.log("Current Values:", initialData);
 
   useEffect(() => {
     if (!open) return;
-
     if (initialData) {
-      // Inisialisasi Mode Edit
       setValues({
         name: initialData.name || "",
-        // code: initialData.code || "", <-- HAPUS INI
         phone: initialData.phone || "",
-        email: initialData.email || "",
         address: initialData.address || "",
         city: initialData.city || "",
+        description: initialData.description || "", // Penyesuaian Table
         is_active: initialData.is_active == 1 || initialData.is_active === true,
         is_main_branch:
           initialData.is_main_branch == 1 ||
           initialData.is_main_branch === true,
       });
     } else {
-      // Inisialisasi Mode Tambah
       setValues({
         name: "",
-        // code: "", <-- HAPUS INI
         phone: "",
-        email: "",
         address: "",
         city: "",
+        description: "",
         is_active: true,
         is_main_branch: false,
       });
-      // HAPUS PEMANGGILAN generaAutoCode()
     }
     setErrors({});
   }, [open, initialData]);
@@ -161,7 +138,7 @@ export default function OutletForm({
             onSubmit={handleSubmit}
             className="flex flex-col gap-4 text-xxs"
           >
-            {/* Hapus Row 1: Nama & Kode. Ganti jadi Nama saja */}
+            {/* Nama Outlet */}
             <div>
               <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
                 Nama Outlet <span className="text-red-500">*</span>
@@ -169,7 +146,7 @@ export default function OutletForm({
               <input
                 value={values.name}
                 onChange={(e) => handleChange("name", e.target.value)}
-                className={`${inputClasses({ error: !!errors.name })} focus:border-emerald-500 focus:ring-emerald-500/20`}
+                className={inputClasses({ error: !!errors.name })}
                 placeholder="Contoh: Pusat Jakarta"
               />
               {errors.name && (
@@ -177,7 +154,7 @@ export default function OutletForm({
               )}
             </div>
 
-            {/* Row 2: Telepon & Email */}
+            {/* Row 2: Telepon & Kota */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
@@ -186,7 +163,7 @@ export default function OutletForm({
                 <input
                   value={values.phone}
                   onChange={(e) => handleChange("phone", e.target.value)}
-                  className={`${inputClasses({ error: !!errors.phone })} focus:border-emerald-500 focus:ring-emerald-500/20`}
+                  className={inputClasses({ error: !!errors.phone })}
                   placeholder="0812..."
                 />
                 {errors.phone && (
@@ -198,27 +175,30 @@ export default function OutletForm({
 
               <div>
                 <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
-                  Email Cabang
+                  Kota <span className="text-red-500">*</span>
                 </label>
                 <input
-                  value={values.email}
-                  onChange={(e) => handleChange("email", e.target.value)}
-                  className={`${inputClasses({ error: !!errors.email })} focus:border-emerald-500 focus:ring-emerald-500/20`}
-                  placeholder="outlet@mail.com"
+                  value={values.city}
+                  onChange={(e) => handleChange("city", e.target.value)}
+                  className={inputClasses({ error: !!errors.city })}
+                  placeholder="Jakarta Selatan"
                 />
+                {errors.city && (
+                  <p className="text-[10px] text-red-500 mt-1">{errors.city}</p>
+                )}
               </div>
             </div>
 
-            {/* Row 3: Kota */}
+            {/* Row 3: Description (Penyesuaian Table) */}
             <div>
               <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
-                Kota <span className="text-red-500">*</span>
+                Deskripsi / Keterangan
               </label>
               <input
-                value={values.city}
-                onChange={(e) => handleChange("city", e.target.value)}
-                className={`${inputClasses({ error: !!errors.city })} focus:border-emerald-500 focus:ring-emerald-500/20`}
-                placeholder="Jakarta Selatan"
+                value={values.description}
+                onChange={(e) => handleChange("description", e.target.value)}
+                className={inputClasses({ error: false })}
+                placeholder="Keterangan outlet..."
               />
             </div>
 
@@ -230,9 +210,14 @@ export default function OutletForm({
               <textarea
                 value={values.address}
                 onChange={(e) => handleChange("address", e.target.value)}
-                className={`${inputClasses({ error: !!errors.address })} min-h-[60px] py-2 focus:border-emerald-500 focus:ring-emerald-500/20`}
+                className={`${inputClasses({ error: !!errors.address })} min-h-[60px] py-2`}
                 placeholder="Jl. Merdeka No. 1..."
               />
+              {errors.address && (
+                <p className="text-[10px] text-red-500 mt-1">
+                  {errors.address}
+                </p>
+              )}
             </div>
 
             {/* Row 5: Checkboxes */}
@@ -242,9 +227,9 @@ export default function OutletForm({
                   type="checkbox"
                   checked={values.is_active}
                   onChange={(e) => handleChange("is_active", e.target.checked)}
-                  className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500"
                 />
-                <span className="text-slate-600 font-bold uppercase text-[9px] group-hover:text-emerald-600 transition-colors">
+                <span className="text-slate-600 font-bold uppercase text-[9px]">
                   Outlet Aktif
                 </span>
               </label>
@@ -256,15 +241,15 @@ export default function OutletForm({
                   onChange={(e) =>
                     handleChange("is_main_branch", e.target.checked)
                   }
-                  className="w-3.5 h-3.5 rounded text-orange-600 focus:ring-orange-500 cursor-pointer"
+                  className="w-3.5 h-3.5 rounded text-orange-600 focus:ring-orange-500"
                 />
-                <span className="text-slate-600 font-bold uppercase text-[9px] group-hover:text-orange-600 transition-colors">
+                <span className="text-slate-600 font-bold uppercase text-[9px]">
                   Cabang Pusat
                 </span>
               </label>
             </div>
 
-            {/* Footer: Buttons */}
+            {/* Footer Buttons */}
             <div className="flex justify-end gap-2 pt-4">
               <button
                 type="button"

@@ -27,7 +27,6 @@ export default function Topbar() {
 
   useEffect(() => {
     const storedUser = GetWithExpiry("user");
-    console.log("Loaded user from storage:", storedUser);
     setRoleName(storedUser?.role?.name || "");
     setFullName(storedUser?.full_name || "");
     setAvatar(storedUser?.avatar || assetUrl("default-avatar.png"));

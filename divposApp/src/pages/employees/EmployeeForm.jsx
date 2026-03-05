@@ -90,6 +90,7 @@ export default function EmployeeForm({
   }, [open]);
 
   // 2. Sinkronisasi Data Awal (Edit mode)
+  console.log("Initial Data for EmployeeForm:", initialData);
   useEffect(() => {
     if (!open) return;
 
@@ -102,7 +103,7 @@ export default function EmployeeForm({
         has_login: !!initialData.has_login,
         email: initialData.email || "",
         password: "",
-        role_id: initialData.role_id || "",
+        role_id: initialData.role.id || "",
         is_active: initialData.is_active === true,
       });
     } else {
@@ -147,8 +148,6 @@ export default function EmployeeForm({
       setIsSubmitting(false);
     }
   };
-
-  // console.log("Form values:", initialData);
 
   const triggerToast = (message, type) => {
     window.dispatchEvent(

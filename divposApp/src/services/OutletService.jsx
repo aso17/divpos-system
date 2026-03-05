@@ -32,7 +32,6 @@ const OutletService = {
   },
 
   updateOutlet: (id, payload) => {
-    const ID = encrypt(id);
     const { tenantId, userLogin } = getAuthInfo();
     const finalPayload = {
       ...payload,
@@ -40,7 +39,7 @@ const OutletService = {
       updated_by: userLogin,
       _method: "PUT",
     };
-    return api.post(`/outlets/${ID}`, finalPayload);
+    return api.post(`/outlets/${id}`, finalPayload);
   },
   // OutletService.js
 

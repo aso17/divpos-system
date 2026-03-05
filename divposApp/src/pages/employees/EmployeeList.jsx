@@ -29,7 +29,7 @@ export default function EmployeesList() {
 
   // --- STATE UNTUK MODAL ---
   const [openModal, setOpenModal] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState(null); // null = mode tambah, objek = mode edit
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
@@ -391,7 +391,6 @@ export default function EmployeesList() {
         onClose={handleCloseForm}
         onSuccess={(dataEmployee) => {
           if (selectedEmployee) {
-            // --- MODE EDIT ---
             setData((prev) =>
               prev.map((item) =>
                 String(item.id) === String(dataEmployee.id)
@@ -400,18 +399,11 @@ export default function EmployeesList() {
               ),
             );
           } else {
-            // --- MODE TAMBAH ---
-            // 1. Masukkan data baru ke baris paling atas secara instan
             setData((prev) => [dataEmployee, ...prev]);
 
-            // 2. Reset ke halaman 1 agar data baru terlihat
             setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-
-            // 3. Update total count agar paginasi tidak ngaco
             setTotalCount((prev) => prev + 1);
           }
-
-          // Tutup modal dan bersihkan seleksi
           handleCloseForm();
         }}
       />
