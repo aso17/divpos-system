@@ -2,8 +2,7 @@
 
 namespace App\Services;
 
-use App\Repositories\UserRepository;
-use App\Models\UserRefreshToken;
+use App\Repositories\AuthRepository;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
@@ -12,58 +11,52 @@ use Illuminate\Support\Facades\DB;
 
 class AuthService
 {
-    protected $userRepo;
+    protected $authRepo;
 
-    public function __construct(UserRepository $userRepo)
+    public function __construct(AuthRepository $authRepo)
     {
-        $this->userRepo = $userRepo;
+        $this->authRepo = $authRepo;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | LOGIN
-    |--------------------------------------------------------------------------
-    */
 
     public function attemptLogin(array $credentials, string $ip, string $userAgent)
     {
         $throttleKey = Str::lower($credentials['email']) . '|' . $ip;
 
-        // 🔒 Rate Limit
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
-
             throw ValidationException::withMessages([
                 'message' => ["Terlalu banyak percobaan. Coba lagi dalam $seconds detik."]
             ]);
         }
 
-        $user = $this->userRepo->findActiveUserByEmail($credentials['email']);
+        $user = $this->authRepo->findForAuthentication($credentials['email']);
 
+        // 1. Validasi Kredensial
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
             RateLimiter::hit($throttleKey, 60);
+            throw ValidationException::withMessages(['message' => ['Email atau password salah.']]);
+        }
 
-            throw ValidationException::withMessages([
-                'message' => ['Email atau password salah.']
-            ]);
+        // 2. Validasi Status Aktif User & Tenant
+        if (!$user->user_active) {
+            throw ValidationException::withMessages(['message' => ['Akun Anda telah dinonaktifkan.']]);
+        }
+
+        if ($user->tenant_id && !$user->tenant_active) {
+            throw ValidationException::withMessages(['message' => ['Layanan bisnis Anda sedang ditangguhkan.']]);
         }
 
         RateLimiter::clear($throttleKey);
-
-        $this->userRepo->updateLoginInfo($user, $ip);
+        $this->authRepo->updateLoginMetadata($user->id, $ip);
 
         return DB::transaction(function () use ($user, $ip, $userAgent) {
-
-            // 🔐 Access Token (Sanctum)
             $accessToken = $user->createToken($userAgent ?: 'web-device')->plainTextToken;
-
-            // 🔁 Refresh Token
             $plainRefreshToken = Str::random(64);
 
-            UserRefreshToken::create([
+            $this->authRepo->storeRefreshToken([
                 'user_id'     => $user->id,
-                'token'       => hash('sha256', $plainRefreshToken),
-                'device_name' => $userAgent ?: 'web-device',
+                'plain_token' => $plainRefreshToken,
+                'device_name' => Str::limit($userAgent, 255) ?: 'web-device',
                 'ip_address'  => $ip,
                 'user_agent'  => $userAgent,
                 'expires_at'  => now()->addDays(7),
@@ -77,45 +70,33 @@ class AuthService
         });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | REFRESH TOKEN
-    |--------------------------------------------------------------------------
-    */
-
     public function refreshToken(string $refreshToken, string $ip, string $userAgent)
     {
-        $hashed = hash('sha256', $refreshToken);
+        $tokenRecord = $this->authRepo->findValidRefreshToken($refreshToken);
 
-        $tokenRecord = UserRefreshToken::where('token', $hashed)
-            ->whereNull('revoked_at')
-            ->where('expires_at', '>', now())
-            ->first();
-
-        if (!$tokenRecord) {
-            throw ValidationException::withMessages([
-                'message' => ['Refresh token tidak valid atau expired.']
-            ]);
+        if (!$tokenRecord || !$tokenRecord->user) {
+            throw ValidationException::withMessages(['message' => ['Sesi tidak valid atau telah berakhir.']]);
         }
 
         $user = $tokenRecord->user;
 
         return DB::transaction(function () use ($user, $tokenRecord, $ip, $userAgent) {
+            // Hapus token akses yang sekarang saja, agar device lain tidak ter-logout
+            $user->currentAccessToken()?->delete();
 
-            // 🧹 Optional: hapus semua access token lama
-            $user->tokens()->delete();
-
-            // 🔐 Generate access token baru
             $newAccessToken = $user->createToken($userAgent ?: 'web-device')->plainTextToken;
-
-            // 🔁 Rotate refresh token (Security Best Practice)
             $newPlainRefreshToken = Str::random(64);
 
-            $tokenRecord->update([
-                'token'      => hash('sha256', $newPlainRefreshToken),
-                'ip_address' => $ip,
-                'user_agent' => $userAgent,
-                'expires_at' => now()->addDays(7),
+            // Rotate Token: Revoke yang lama, buat yang baru
+            $tokenRecord->update(['revoked_at' => now()]);
+            
+            $this->authRepo->storeRefreshToken([
+                'user_id'     => $user->id,
+                'plain_token' => $newPlainRefreshToken,
+                'device_name' => Str::limit($userAgent, 255) ?: 'web-device',
+                'ip_address'  => $ip,
+                'user_agent'  => $userAgent,
+                'expires_at'  => now()->addDays(7),
             ]);
 
             return [
@@ -125,28 +106,11 @@ class AuthService
         });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | LOGOUT (PER DEVICE)
-    |--------------------------------------------------------------------------
-    */
-
     public function logout($user, string $refreshToken)
     {
-        $hashed = hash('sha256', $refreshToken);
-
-        DB::transaction(function () use ($user, $hashed) {
-
-            // Hapus access token aktif
+        DB::transaction(function () use ($user, $refreshToken) {
             $user->currentAccessToken()?->delete();
-
-            // Revoke refresh token device ini saja
-            UserRefreshToken::where('user_id', $user->id)
-                ->where('token', $hashed)
-                ->whereNull('revoked_at')
-                ->update([
-                    'revoked_at' => now()
-                ]);
+            $this->authRepo->revokeRefreshToken($user->id, $refreshToken);
         });
     }
 }

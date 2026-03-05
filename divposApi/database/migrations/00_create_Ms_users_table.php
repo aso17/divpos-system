@@ -8,21 +8,27 @@ return new class extends Migration
 {
     public function up(): void
     {
-       // ...
-       Schema::create('Ms_users', function (Blueprint $table) {
-            $table->bigIncrements('id'); 
-            
+        Schema::create('Ms_users', function (Blueprint $table) {
+            $table->id(); // Shorthand untuk bigIncrements('id')
+
+            // --- PENTING: Penanda Bisnis ---
+            // Kita buat nullable agar tidak bentrok 'telur vs ayam' saat registrasi owner
+            $table->foreignId('tenant_id')
+                  ->nullable()
+                  ->index(); // Cukup index saja, constrained opsional jika urutan migrasinya sulit
+
             // --- DATA AUTENTIKASI ---
             $table->string('email', 150)->unique();
             $table->string('username', 50)->unique()->nullable();
             $table->string('password', 255); 
             $table->string('avatar', 255)->nullable();    
 
-            // Status Login
+            // Status Login (Tambah index untuk filter cepat)
+            $table->boolean('is_active')->default(true)->index();
             
             $table->timestampTz('email_verified_at')->nullable();
 
-            // 🔐 Security enhancement
+            // 🔐 Security enhancement (Sudah Bagus)
             $table->unsignedTinyInteger('login_attempts')->default(0);
             $table->timestampTz('locked_until')->nullable();
 
@@ -32,27 +38,24 @@ return new class extends Migration
             $table->timestampTz('last_activity_at')->nullable();
             
             // --- HAK AKSES ---
-            $table->foreignId('role_id')
-                ->nullable()
-                ->constrained('Ms_roles')
-                ->nullOnDelete();
+           $table->foreignId('role_id')->nullable()->index();
             
             // Audit
             $table->timestampsTz();
             $table->softDeletesTz();
             
-            // Index 
-            $table->index('email', 'idx_user_email');
+            // Note: Tidak perlu $table->index('email') secara manual karena unique() 
+            // di PostgreSQL/MySQL sudah otomatis membuat index B-Tree.
         });
 
-
-
+        // Tabel password_reset_tokens (Sudah Tepat)
         Schema::create('password_reset_tokens', function (Blueprint $table) {
             $table->string('email')->primary();
             $table->string('token');
             $table->timestamp('created_at')->nullable();
         });
 
+        // Tabel log_user_login (Sudah Tepat)
         Schema::create('log_user_login', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')

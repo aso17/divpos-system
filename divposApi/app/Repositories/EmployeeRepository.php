@@ -3,43 +3,45 @@
 namespace App\Repositories;
 
 use App\Models\Ms_employee;
+use App\Models\Ms_user;
 
 class EmployeeRepository
 {
-   public function getAll($tenantId, $keyword = null)
+    public function getAll($tenantId, $keyword = null)
     {
-       
-        $query = Ms_employee::select(
-                'Ms_employees.id',
+        $query = Ms_user::select(
+                'Ms_users.id as user_id', 
+                'Ms_users.email as user_email',
+                'Ms_users.role_id as user_role_id',
+                'Ms_users.tenant_id',
+                'Ms_employees.id as employee_id', 
                 'Ms_employees.employee_code',
                 'Ms_employees.full_name',
                 'Ms_employees.job_title',
                 'Ms_employees.phone',
-                'Ms_employees.is_active',
-                'Ms_employees.user_id',
-                'Ms_outlets.name as outlet_name', 
+                'Ms_employees.is_active as employee_active',
                 'Ms_outlets.id as outlet_id',
-                'Ms_users.email as user_email',
-                'Ms_users.role_id as user_role_id',
-
+                'Ms_outlets.name as outlet_name', 
+                'Ms_roles.role_name',
+                'Ms_roles.code as role_code'
             )
+            // Gunakan LEFT JOIN agar jika data di tabel sebelah kosong (seperti employee), baris tetap muncul
+            ->leftJoin('Ms_employees', 'Ms_users.id', '=', 'Ms_employees.user_id')
             ->leftJoin('Ms_outlets', 'Ms_employees.outlet_id', '=', 'Ms_outlets.id')
-            ->leftJoin('Ms_users', 'Ms_employees.user_id', '=', 'Ms_users.id')
-            ->where('Ms_employees.tenant_id', $tenantId);
+            ->leftJoin('Ms_roles', 'Ms_users.role_id', '=', 'Ms_roles.id')
+            ->where('Ms_users.tenant_id', $tenantId)
+            ->whereNull('Ms_users.deleted_at');
 
-        
         if ($keyword) {
             $query->where(function($q) use ($keyword) {
-                // Gunakan kolom spesifik dengan prefix tabel agar tidak ambigu
-                $q->where('Ms_employees.full_name', 'like', "$keyword%") // Index friendly (kiri ke kanan)
-                ->orWhere('Ms_employees.employee_code', 'like', "$keyword%")
-                ->orWhere('Ms_employees.job_title', 'like', "%$keyword%")
-                ->orWhere('Ms_users.email', 'like', "%$keyword%"); // Bisa cari berdasarkan email juga
+                $q->where('Ms_employees.full_name', 'ilike', "%$keyword%") 
+                ->orWhere('Ms_users.email', 'ilike', "%$keyword%")
+                ->orWhere('Ms_employees.employee_code', 'ilike', "%$keyword%")
+                ->orWhere('Ms_roles.role_name', 'ilike', "%$keyword%");
             });
         }
 
-        // 4. Selalu tambahkan sorting agar index terpakai maksimal
-        return $query->orderBy('Ms_employees.created_at', 'desc');
+        return $query->orderBy('Ms_users.created_at', 'desc');
     }
 
     public function findById($id, $tenantId)

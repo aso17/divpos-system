@@ -10,38 +10,44 @@ return new class extends Migration
     {
         Schema::create('Ms_employees', function (Blueprint $table) {
             $table->id();          
-            // Relasi ke User (Identitas Login) - Dibuat OPTIONAL (nullable)
-            // Dibuat unique() untuk 1-to-1 relasi
+            
+            // Relasi ke User (1-to-1 relasi)
             $table->foreignId('user_id')
-                  ->nullable() // Karyawan tidak wajib punya login
+                  ->nullable() 
                   ->unique()
                   ->constrained('Ms_users')
-                  ->nullOnDelete(); // Jika user dihapus, user_id jadi NULL, data karyawan tetap ada
+                  ->nullOnDelete(); 
       
-            // Relasi ke Tenant (Perusahaan)
+            // Relasi ke Tenant (Wajib)
             $table->foreignId('tenant_id')->constrained('Ms_tenants')->cascadeOnDelete();
             
-            // Relasi ke Outlet (nullable untuk Admin Global/Multi-outlet)
+            // Relasi ke Outlet (Nullable untuk Owner/Manager Area)
             $table->foreignId('outlet_id')->nullable()->constrained('Ms_outlets')->nullOnDelete();
             
-            // Kode unik karyawan/NIK
+            // Kode unik karyawan (Gunakan index untuk pencarian cepat)
             $table->string('employee_code', 20)->unique();
             
-            // Data profil utama
+            // Profil
             $table->string('full_name', 100);
             $table->string('phone', 20)->nullable();
-            
-            // Jabatan (Stylist, Barber, Washer, dll)
             $table->string('job_title', 50)->nullable();
             
-            // Status Karyawan di Tenant tersebut
-            $table->boolean('is_active')->default(true);
+            // Status (Gunakan index untuk filter operasional)
+            $table->boolean('is_active')->default(true)->index();
             
-            $table->timestamps();
-            $table->softDeletes();
+            // Audit - Gunakan Tz agar seragam dengan tabel lainnya
+            $table->timestampsTz();
+            $table->softDeletesTz();
 
-            // Index untuk mempercepat query laporan per tenant dan outlet
-            $table->index(['tenant_id', 'outlet_id', 'is_active'], 'idx_employee_operational');
+            /* -------------------------------------------------------------------------- */
+            /* INDEXING UNTUK PERFORMANCE 100K DATA                                      */
+            /* -------------------------------------------------------------------------- */
+            
+            // Index yang Mas buat sudah benar, tapi tambahkan urutan yang paling sering di-query
+            $table->index(['tenant_id', 'outlet_id', 'is_active'], 'idx_emp_operational');
+            
+            // Index tambahan jika Mas sering mencari karyawan berdasarkan nama di dashboard
+            $table->index('full_name', 'idx_emp_name');
         });
     }
 

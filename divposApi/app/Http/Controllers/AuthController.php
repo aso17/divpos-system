@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\AuthService;
 use App\Models\SystemConfiguration;
-use App\Http\Resources\LoginResource;
+use App\Http\Resources\AuthResource;
 use Illuminate\Http\Request;
 
 class AuthController extends Controller
@@ -32,33 +32,46 @@ class AuthController extends Controller
             $request->userAgent()
         );
 
-        return response()->json([
-            'token'         => $result['token'],
-            'refresh_token' => $result['refresh_token'],
-            'user'          => new LoginResource($result['user']),
-            'app_config'    => $this->getFormattedAppConfig(),
-        ]);
+       
+
+    return response()->json([
+        'token'         => $result['token'],
+        'refresh_token' => $result['refresh_token'],
+        'user'          => new AuthResource($result['user']),
+        'app_config'    => $this->getFormattedAppConfig(), 
+    ]);
+       
     }
 
-    private function getFormattedAppConfig()
+   private function getFormattedAppConfig()
     {
-        
-       $neededKeys = ["appName", "logo_path", "footer_text", "primary_color", "favicon_path"];
-        
-        $configs = SystemConfiguration::whereIn('key', $neededKeys)
-            ->pluck('value', 'key')
-            ->toArray();
+       
+        return \Illuminate\Support\Facades\Cache::remember('system_app_configs_final', 86400, function() {
+            $neededKeys = ["appName", "logo_path", "footer_text", "primary_color", "favicon_path"];
+            
+            $rawConfigs = \App\Models\SystemConfiguration::whereIn('key', $neededKeys)
+                ->pluck('value', 'key')
+                ->toArray();
 
-        // Formatting Path untuk Asset
-        foreach (['logo_path', 'favicon_path'] as $key) {
-            if (!empty($configs[$key])) {
-                $configs[$key] = asset("storage/" . ltrim($configs[$key], '/'));
+            $formatted = [];
+
+            foreach ($neededKeys as $key) {
+                $value = $rawConfigs[$key] ?? null;
+
+                // Logic Formatting disatukan di sini
+                if (in_array($key, ['logo_path', 'favicon_path'])) {
+                    $formatted[$key] = !empty($value) 
+                        ? asset("storage/" . ltrim($value, '/'))
+                        : asset("assets/images/default-{$key}.png");
+                } else {
+                    $formatted[$key] = $value ?? ($key === 'primary_color' ? '#3B82F6' : null);
+                }
             }
-        }
 
-        return $configs;
+            return $formatted;
+        });
     }
-    
+        
 
     /**
      * 🔁 Refresh Access Token

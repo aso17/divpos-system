@@ -23,7 +23,7 @@ class RoleService
         return $this->roleRepo->getActiveRoles((int)$tenantId);
     }
 
-    public function getPaginatedRoles(array $params)
+    public function getRoles(array $params)
     {
         $tenantId = CryptoHelper::decrypt($params['tenant_id'] ?? null);
         if (!$tenantId) return null;

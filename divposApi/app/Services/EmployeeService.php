@@ -27,44 +27,50 @@ class EmployeeService
     /**
  * CREATE EMPLOYEE
  */
-public function createEmployee(array $data,$CreatedBy)
+ public function createEmployee(array $data, $CreatedBy)
 {
-    return DB::transaction(function () use ($data,$CreatedBy) {
-        $userId = null;
+    return DB::transaction(function () use ($data, $CreatedBy) {
+        $tenantId = $data['tenant_id'];
+        $year = date('y'); // 26
 
-        // 1. Handle Logic User Login (Data role_id sudah didekripsi oleh Request)
-        if ($data['has_login'] ?? false) {
+        $lastEmployee = Ms_employee::where('tenant_id', $tenantId)
+            ->whereNotNull('employee_code')
+            ->orderBy('employee_code', 'desc') // Database akan pakai index untuk sorting cepat
+            ->lockForUpdate()
+            ->first();
+
+        $lastSequence = 0;
+        
+        // Cek apakah kode terakhir cocok dengan tahun sekarang (YY)
+        if ($lastEmployee && str_starts_with($lastEmployee->employee_code, $year)) {
+            // Ambil 4 digit terakhir
+            $lastSequence = (int) substr((string)$lastEmployee->employee_code, -4);
+        }
+
+        // 2. GENERATE KODE BARU
+        $nextSequence = $lastSequence + 1;
+        $tenantIdPadded = str_pad($tenantId, 3, '0', STR_PAD_LEFT);
+        $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
+        
+        $employeeCode = $year . $tenantIdPadded . $sequencePadded;
+
+        // 3. LOGIC USER LOGIN (Tetap sama)
+        $userId = null;
+        if (filter_var($data['has_login'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $user = Ms_user::create([
                 'email'      => $data['email'],
                 'password'   => Hash::make($data['password']),
-                'role_id'    => $data['role_id'] ?? null, // Langsung pakai
+                'role_id'    => $data['role_id'] ?? null,
                 'created_by' => $CreatedBy,
             ]);
             $userId = $user->id;
         }
 
-        // 2. Generate Employee Code
-        $year = date('y');
-        $tenantIdPadded = str_pad($data['tenant_id'], 3, '0', STR_PAD_LEFT);
-
-        $lastEmployee = Ms_employee::where('tenant_id', $data['tenant_id'])
-            ->latest('id')
-            ->lockForUpdate()
-            ->first();
-
-        $lastSequence = 0;
-        if ($lastEmployee && $lastEmployee->employee_code) {
-            $lastSequence = (int) substr($lastEmployee->employee_code, -4);
-        }
-
-        $sequence = str_pad($lastSequence + 1, 4, '0', STR_PAD_LEFT);
-        $employeeCode = $year . $tenantIdPadded . $sequence;
-
-        // 3. Create Employee Profile (Data outlet_id sudah didekripsi oleh Request)
+        // 4. INSERT KARYAWAN
         return Ms_employee::create([
             'user_id'       => $userId,
-            'tenant_id'     => $data['tenant_id'],
-            'outlet_id'     => $data['outlet_id'] ?? null, // Langsung pakai
+            'tenant_id'     => $tenantId,
+            'outlet_id'     => $data['outlet_id'] ?? null,
             'employee_code' => $employeeCode,
             'full_name'     => $data['full_name'],
             'phone'         => $data['phone'] ?? null,

@@ -29,27 +29,38 @@ class UserRepository
             ->first();
     }
 
-   public function getBaseUserQuery(int $tenantId)
+  public function getBaseUserQuery(int $tenantId)
     {
-        return Ms_user::select(
+        return Ms_user::query()
+            ->select([
                 'Ms_users.id',
                 'Ms_users.email',
                 'Ms_users.username',
                 'Ms_users.role_id',
+                'Ms_users.tenant_id', // Tambahkan ini untuk debugging
                 'Ms_users.avatar',
-                'Ms_users.created_at',
-                // Data dari join Ms_employees
+                'Ms_users.created_at',              
                 'Ms_employees.full_name', 
                 'Ms_employees.phone',
-                'Ms_employees.tenant_id',
-                'Ms_employees.is_active' // Ambil status aktif dari sini
-            )
-            ->join('Ms_employees', 'Ms_users.id', '=', 'Ms_employees.user_id')
-            ->with(['role:id,role_name,code'])
-            // Filter berdasarkan tenant si karyawan
-            ->where('Ms_employees.tenant_id', $tenantId)
-            // Jika Mas ingin query dasar ini hanya menampilkan yang aktif:
-            ->where('Ms_employees.is_active', true);
+                'Ms_employees.is_active as employee_status',
+                'Ms_roles.role_name',
+                'Ms_roles.code as role_code'
+            ])
+            // Gunakan leftJoin agar User tetap muncul walau data Employee belum ada
+            ->leftJoin('Ms_employees', function($join) use ($tenantId) {
+                $join->on('Ms_users.id', '=', 'Ms_employees.user_id')
+                    ->where('Ms_employees.tenant_id', '=', $tenantId);
+            })
+            // Join ke roles (Gunakan leftJoin jika ada kemungkinan role belum diset)
+            ->leftJoin('Ms_roles', function($join) use ($tenantId) {
+                $join->on('Ms_users.role_id', '=', 'Ms_roles.id')
+                    ->where('Ms_roles.tenant_id', '=', $tenantId); 
+            })
+            // Filter Utama: Cukup di tabel Users saja untuk keamanan
+            ->where('Ms_users.tenant_id', $tenantId)
+            // Jika ingin melihat semua user (termasuk yang non-aktif), matikan baris ini:
+            // ->where('Ms_employees.is_active', true) 
+            ->orderBy('Ms_users.created_at', 'desc');
     }
    public function findByIdAndTenant(int $id, int $tenantId)
     {

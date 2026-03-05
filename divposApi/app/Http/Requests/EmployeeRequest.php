@@ -107,7 +107,7 @@ class EmployeeRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'full_name.regex' => 'Nama tidak boleh mengandung URL atau karakter aneh, Mas.',
+            'full_name.regex' => 'Nama tidak boleh mengandung URL',
             'job_title.not_regex' => 'Jabatan tidak boleh mengandung link/URL.',
             'outlet_id.exists' => 'Outlet tidak valid atau bukan milik bisnis Anda.',
             'email.unique' => 'Email ini sudah terdaftar untuk pengguna lain.',

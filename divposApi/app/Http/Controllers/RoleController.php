@@ -23,14 +23,25 @@ protected $roleService;
     
     public function index(Request $request)
     {
-        $query = $this->roleService->getPaginatedRoles($request->all());
+        // 1. Validasi Input
+        $request->validate([
+            'tenant_id' => 'required|string',
+            'per_page'  => 'nullable|integer|min:1',
+            'keyword'   => 'nullable|string'
+        ]);
+
+        // 2. Panggil Service (Logic dekripsi & query ada di sana)
+        $query = $this->roleService->getRoles($request->all());
 
         if (!$query) {
-            return response()->json(['message' => 'Invalid Tenant'], 403);
+            return response()->json(['message' => 'Invalid or Unauthorized Tenant'], 403);
         }
 
-        $perPage = $request->per_page ?? 10;
+        // 3. Handle Pagination
+        $perPage = (int) $request->input('per_page', 10);
         $roles = $query->paginate($perPage);
+
+        // 4. Return Resource (Sesuai gaya Mas)
         return RoleResource::collection($roles)->response()->getData(true);
     }
 

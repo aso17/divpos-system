@@ -16,36 +16,41 @@ class UserService
         $this->userRepo = $userRepo;
     }
 
-    public function getAllUsers(array $params)
+   public function getAllUsers(array $params)
     {
-        // 1. Logika Dekripsi (Business Logic)
+        // 1. Logika Dekripsi Tenant ID
         $tenantId = CryptoHelper::decrypt($params['tenant_id'] ?? null);
+        
         if (!$tenantId || !is_numeric($tenantId)) {
             return null;
         }
 
-        // 2. Panggil Base Query dari Repo
+        // 2. Ambil Base Query (Join: Ms_users + Ms_employees + Ms_roles)
         $query = $this->userRepo->getBaseUserQuery((int)$tenantId);
 
-        // 3. Logika Filter Keyword
+        // 3. Logika Filter Keyword (Gunakan Alias Tabel agar tidak Ambigus)
         if (!empty($params['keyword'])) {
             $q = $params['keyword'];
             $query->where(function ($w) use ($q) {
-                $w->where('full_name', 'like', "%{$q}%")
-                  ->orWhere('email', 'like', "%{$q}%")
-                  ->orWhere('username', 'like', "%{$q}%");
+                // Pakai ILIKE untuk PostgreSQL agar case-insensitive
+                $w->where('Ms_employees.full_name', 'ILIKE', "%{$q}%")
+                ->orWhere('Ms_users.email', 'ILIKE', "%{$q}%")
+                ->orWhere('Ms_users.username', 'ILIKE', "%{$q}%")
+                ->orWhere('Ms_employees.phone', 'LIKE', "%{$q}%");
             });
         }
 
-        // 4. Logika Filter Role (Dekripsi lagi)
+        // 4. Logika Filter Role (Jika ada filter role dari UI)
         if (!empty($params['role_id'])) {
             $roleId = CryptoHelper::decrypt($params['role_id']);
             if ($roleId && is_numeric($roleId)) {
-                $query->where('role_id', $roleId);
+                // Spesifik merujuk ke kolom role_id di tabel users
+                $query->where('Ms_users.role_id', $roleId);
             }
         }
 
-        return $query->orderByDesc('id');
+        // 5. Sorting (Terbaru di atas)
+        return $query->orderByDesc('Ms_users.created_at');
     }
 
 

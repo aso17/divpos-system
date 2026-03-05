@@ -4,85 +4,78 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Faker\Factory as Faker; 
+use Illuminate\Support\Str;
 
 class EmployeeSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Ambil Tenant & User yang sudah dibuat di seeder sebelumnya
-        $tenantLdr = DB::table('Ms_tenants')->where('code', 'LDR-001')->first();
-        $tenantSln = DB::table('Ms_tenants')->where('code', 'SLN-001')->first();
+        // 1. Ambil SEMUA Tenant yang terdaftar
+        $tenants = DB::table('Ms_tenants')->get();
 
-        $userSa = DB::table('Ms_users')->where('username', 'superadmin_ldr')->first();
-        $userOwner = DB::table('Ms_users')->where('username', 'owner_sln')->first();
-
-        if (!$tenantLdr || !$userSa) {
-            $this->command->error("Data Tenant atau User belum ada. Jalankan UsersSeeder dulu!");
+        if ($tenants->isEmpty()) {
+            $this->command->error("Tidak ada Tenant ditemukan! Jalankan TenantSeeder dulu.");
             return;
         }
 
-        // 2. Data Employee Utama (Manual)
-        $employees = [
-            [
-                'user_id'       => $userSa->id,
-                'tenant_id'     => $tenantLdr->id,
-                'outlet_id'     => null, // Super Admin biasanya Global
-                'employee_code' => 'EMP-1-0001',
-                'full_name'     => 'Agus Solihin',
-                'phone'         => '628111111111',
-                'job_title'     => 'CEO / Founder',
-                'is_active'     => true,
-            ],
-            [
-                'user_id'       => $userOwner->id,
-                'tenant_id'     => $tenantSln->id,
-                'outlet_id'     => null,
-                'employee_code' => 'EMP-2-0001',
-                'full_name'     => 'Owner Salon',
-                'phone'         => '628222222222',
-                'job_title'     => 'Owner',
-                'is_active'     => true,
-            ],
-        ];
+        $faker = Faker::create('id_ID');
+        $batchSize = 2500; 
+        $year = date('y');
+        $now = now();
 
-        foreach ($employees as $emp) {
-            DB::table('Ms_employees')->updateOrInsert(
-                ['user_id' => $emp['user_id']], 
-                array_merge($emp, ['created_at' => now(), 'updated_at' => now()])
-            );
-        }
+        foreach ($tenants as $tenant) {
+            $this->command->info("--- Memproses Tenant: {$tenant->name} ({$tenant->code}) ---");
 
-        // 3. Generate Fake Employee untuk 10.000 User Fake tadi
-        $this->command->info("Menghubungkan 10.000 fake users ke Ms_employees...");
-        
-        // Ambil ID users yang belum punya employee (kecuali yang utama tadi)
-        $fakeUsers = DB::table('Ms_users')
-            ->whereNotIn('id', [$userSa->id, $userOwner->id])
-            ->pluck('id');
+            // 2. Cari User yang milik tenant ini dan BELUM jadi employee
+            $userIds = DB::table('Ms_users')
+                ->where('tenant_id', $tenant->id)
+                ->whereNotExists(function ($query) {
+                    $query->select(DB::raw(1))
+                          ->from('Ms_employees')
+                          ->whereRaw('"Ms_employees"."user_id" = "Ms_users"."id"');
+                })
+                ->pluck('id');
 
-        $batchSize = 1000;
-        $total = count($fakeUsers);
-
-        foreach ($fakeUsers->chunk($batchSize) as $index => $chunk) {
-            $dataBatch = [];
-            foreach ($chunk as $idx => $userId) {
-                $dataBatch[] = [
-                    'user_id'       => $userId,
-                    'tenant_id'     => $tenantLdr->id,
-                    'outlet_id'     => null,
-                    'employee_code' => 'EMP-' . $tenantLdr->id . '-' . str_pad(($index * $batchSize) + $idx + 2, 5, '0', STR_PAD_LEFT),
-                    'full_name'     => fake()->name(),
-                    'phone'         => fake()->phoneNumber(),
-                    'job_title'     => 'Staff',
-                    'is_active'     => true,
-                    'created_at'    => now(),
-                    'updated_at'    => now(),
-                ];
+            $total = count($userIds);
+            if ($total === 0) {
+                $this->command->warn("Semua user di tenant {$tenant->name} sudah jadi employee.");
+                continue;
             }
-            DB::table('Ms_employees')->insert($dataBatch);
-            $this->command->comment("Batch Employee " . ($index + 1) . " berhasil...");
+
+            $this->command->info("Menghubungkan $total user ke Ms_employees untuk tenant ini...");
+            $tenantIdPadded = str_pad($tenant->id, 3, '0', STR_PAD_LEFT);
+
+            // 3. Proses Batching per Tenant
+            foreach ($userIds->chunk($batchSize) as $chunkIndex => $chunk) {
+                $dataBatch = [];
+                foreach ($chunk as $idx => $userId) {
+                    $sequence = ($chunkIndex * $batchSize) + $idx + 1;
+                    $employeeCode = $year . $tenantIdPadded . str_pad($sequence, 6, '0', STR_PAD_LEFT);
+
+                    $dataBatch[] = [
+                        'user_id'       => $userId,
+                        'tenant_id'     => $tenant->id,
+                        'outlet_id'     => null,
+                        'employee_code' => $employeeCode,
+                        'full_name'     => $faker->name(),
+                        'phone'         => '08' . $faker->numerify('##########'),
+                        'job_title'     => 'Staff',
+                        'is_active'     => true,
+                        'created_at'    => $now,
+                        'updated_at'    => $now,
+                    ];
+                }
+
+                DB::transaction(function () use ($dataBatch) {
+                    DB::table('Ms_employees')->insert($dataBatch);
+                });
+
+                $progress = min(($chunkIndex + 1) * $batchSize, $total);
+                $this->command->comment("Progress [{$tenant->code}]: $progress / $total...");
+            }
         }
 
-        $this->command->info("Selesai! Sekarang semua User sudah punya profil Employee.");
+        $this->command->info("🔥 BERHASIL! Semua tenant sekarang punya data employee masing-masing.");
     }
 }

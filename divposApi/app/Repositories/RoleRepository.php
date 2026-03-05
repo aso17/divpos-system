@@ -9,10 +9,22 @@ class RoleRepository
     /**
      * Query dasar yang selalu terfilter berdasarkan tenant_id
      */
-    public function getBaseQuery(int $tenantId)
-    {
-        return Ms_role::where('tenant_id', $tenantId);
-    }
+ public function getBaseQuery(int $tenantId)
+{
+    return Ms_role::query()
+        ->select([
+            'id', 
+            'tenant_id', 
+            'role_name', 
+            'code', 
+            'description', 
+            'is_active',
+            'created_at'
+        ])
+        ->where('tenant_id', $tenantId)      
+        ->where('is_active', true)      
+        ->orderBy('role_name', 'asc');
+}
 
     /**
      * Untuk dropdown: hanya role aktif

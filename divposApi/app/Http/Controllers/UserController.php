@@ -19,27 +19,30 @@ class UserController extends Controller
        
     }
     
-    // GET /user
+  // GET /user
     public function index(Request $request)
     {
+        // 1. Validasi awal (tenant_id wajib ada)
         if (!$request->filled('tenant_id')) {
             return response()->json(['message' => 'tenant_id is required'], 422);
         }
 
+        // 2. Panggil Service (Dekripsi terjadi di dalam sana)
         $query = $this->userService->getAllUsers($request->all());
 
+        // 3. Jika dekripsi gagal atau tenant tidak valid
         if (!$query) {
-            return response()->json(['message' => 'Invalid tenant'], 403);
+            return response()->json(['message' => 'Invalid or Unauthorized Tenant'], 403);
         }
 
-        $perPage = (int) ($request->per_page ?? 10);
+        // 4. Handle Pagination secara otomatis
+        $perPage = (int) $request->input('per_page', 10);
+        
+        // Laravel sudah pintar, jika ada ?page= di URL, paginate() otomatis menyesuaikan
+        $users = $query->paginate($perPage);
 
-        if ($request->filled('page')) {
-            $users = $query->paginate($perPage);
-            return UserResource::collection($users); 
-        }
-
-        return UserResource::collection($query->get());
+        // 5. Kembalikan Resource (Semua ID akan otomatis ter-enkripsi lagi di sini)
+        return UserResource::collection($users);
     }
 
 

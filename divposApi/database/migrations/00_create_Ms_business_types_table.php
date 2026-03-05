@@ -12,11 +12,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('Ms_business_types', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 50)->unique(); // Contoh: 'LAUNDRY', 'SALON'
-            $table->string('code', 20)->unique(); // Contoh: 'LDR', 'SLN'
-            $table->timestamps();
-        });
+        $table->id();
+        $table->string('name', 50)->unique(); // 'LAUNDRY'
+        $table->string('code', 20)->unique(); // 'LDR'
+        $table->string('slug', 60)->unique(); // Untuk URL ramah SEO: 'laundry-services'
+        $table->text('description')->nullable(); // Penjelasan singkat
+        $table->boolean('is_active')->default(true)->index(); // Kontrol aktif/nonaktif
+        $table->timestamps();
+    });
         
     }
 
