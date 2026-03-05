@@ -49,7 +49,7 @@ class AuthController extends Controller
         return \Illuminate\Support\Facades\Cache::remember('system_app_configs_final', 86400, function() {
             $neededKeys = ["appName", "logo_path", "footer_text", "primary_color", "favicon_path"];
             
-            $rawConfigs = \App\Models\SystemConfiguration::whereIn('key', $neededKeys)
+            $rawConfigs = SystemConfiguration::whereIn('key', $neededKeys)
                 ->pluck('value', 'key')
                 ->toArray();
 

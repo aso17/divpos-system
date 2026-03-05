@@ -1,25 +1,31 @@
 <?php
+
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+// Pindahkan urutan use agar Authenticatable paling atas
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens; 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Ms_user extends Authenticatable
 {
-    use HasFactory, Notifiable, HasApiTokens, SoftDeletes;
+    // Gunakan Trait yang dibutuhkan
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $table = 'Ms_users';
 
     protected $fillable = [
-        'tenant_id', // <--- TAMBAHKAN INI (Sangat Penting untuk SaaS)
+        'tenant_id',
         'role_id',
         'email',
         'username',
         'password',
-        'full_name', // Opsional jika data utama ada di Ms_employee
+        'full_name',
         'phone',
         'avatar',
         'is_active',
@@ -35,37 +41,38 @@ class Ms_user extends Authenticatable
         'remember_token',
     ];
 
+    /**
+     * Laravel 11 style casting
+     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'last_login_at'     => 'datetime',
-            'locked_until'      => 'datetime', // Cast baru sesuai migrasi
+            'locked_until'      => 'datetime',
             'is_active'         => 'boolean',
             'password'          => 'hashed', 
         ];
     }
 
-    /* -------------------------------------------------------------------------- */
-    /* RELATIONSHIPS (The Backbone of Your SaaS)                                  */
-    /* -------------------------------------------------------------------------- */
+    /* --- RELATIONSHIPS --- */
 
-    public function tenant()
+    public function tenant(): BelongsTo
     {
         return $this->belongsTo(Ms_tenant::class, 'tenant_id');
     }
 
-    public function role()
+    public function role(): BelongsTo
     {
         return $this->belongsTo(Ms_role::class, 'role_id');
     }
     
-    public function employee() 
+    public function employee(): HasOne
     {
         return $this->hasOne(Ms_employee::class, 'user_id');
     }
 
-    public function refreshTokens()
+    public function refreshTokens(): HasMany
     {
         return $this->hasMany(UserRefreshToken::class, 'user_id');
     }

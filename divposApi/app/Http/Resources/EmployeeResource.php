@@ -8,44 +8,42 @@ use App\Helpers\CryptoHelper;
 
 class EmployeeResource extends JsonResource
 {
-    public function toArray(Request $request): array
-    {
-        return [
-            /**
-             * 🛡️ ID Utama
-             * Prioritaskan employee_id. Jika null (belum punya profil karyawan), 
-             * gunakan user_id agar frontend tetap punya key unik untuk list.
-             */
-            'id' => $this->employee_id 
-                    ? CryptoHelper::encrypt($this->employee_id) 
-                    : CryptoHelper::encrypt($this->user_id), 
-            
-            // 👤 Informasi Dasar (Gunakan fallback jika data employee null)
-            'full_name'     => $this->full_name ?? 'User Administratif',
-            'employee_code' => $this->employee_code ?? '-',
-            'phone'         => $this->phone ?? '-',
-            'job_title'     => $this->job_title ?? ($this->role_name ?? 'Staff'),
-            'is_active'     => (bool) ($this->employee_active ?? true),
-            
-            // 📍 Data Outlet (Berdasarkan alias join Ms_outlets)
-            'outlet' => [
-                'id'   => $this->outlet_id ? CryptoHelper::encrypt($this->outlet_id) : null,
-                'name' => $this->outlet_name ?? 'Pusat/Global', 
+   public function toArray(Request $request): array
+{
+   
+    // Logic: Cek apakah data berasal dari Join atau Model Relation
+    $roleName = $this->role_name ?? ($this->user->role->role_name ?? 'No Role');
+    $roleCode = $this->role_code ?? ($this->user->role->code ?? 'NONE');
+    $roleId   = $this->user_role_id ?? ($this->user->role_id ?? null);
+    $email    = $this->user_email ?? ($this->user->email ?? null);
+    $outletName = $this->outlet_name ?? ($this->outlet->name ?? 'Pusat/Global');
+
+    return [
+        'id'            => $this->employee_id ? CryptoHelper::encrypt($this->employee_id) : CryptoHelper::encrypt($this->id), 
+        'full_name'     => $this->full_name ?? 'User Administratif',
+        'employee_code' => $this->employee_code ?? '-',
+        'phone'         => $this->phone ?? '-',
+        'job_title'     => $this->job_title ?? ($roleName),
+        'is_active'     => (bool) ($this->employee_active ?? $this->is_active ?? true),
+        
+        'has_login'   => $this->user_id ? true : false,
+        'user_id'     => CryptoHelper::encrypt($this->user_id),
+        'email'       => $email,
+        
+        'role' => [
+            'id'   => $roleId ? CryptoHelper::encrypt($roleId) : null,
+            'name' => $roleName,
+            'code' => $roleCode,
             ],
-            
-            // 🔐 Akun Login (Data pasti ada karena base query dari Ms_user)
-            'has_login'   => true,
-            'user_id'     => CryptoHelper::encrypt($this->user_id),
-            'email'       => $this->user_email,
-            
-            // 🛡️ Data Role (Hasil Join Ms_roles)
-            'role' => [
-                'id'   => $this->user_role_id ? CryptoHelper::encrypt($this->user_role_id) : null,
-                'name' => $this->role_name ?? 'No Role',
-                'code' => $this->role_code ?? 'NONE',
-            ],
-            
-            'created_at' => $this->created_at ? $this->created_at->format('Y-m-d H:i:s') : null,
-        ];
-    }
+        
+        'outlet' => [
+            'id'   => ($this->outlet_id) ? CryptoHelper::encrypt($this->outlet_id) : null,
+            'name' => $outletName, 
+        ],
+        
+        'created_at' => $this->employee_created_at 
+            ? \Carbon\Carbon::parse($this->employee_created_at)->format('Y-m-d H:i:s') 
+            : ($this->created_at ? $this->created_at->format('Y-m-d H:i:s') : null),
+    ];
+}
 }

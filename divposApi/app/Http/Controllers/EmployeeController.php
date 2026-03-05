@@ -50,7 +50,7 @@ class EmployeeController extends Controller
             }
             $employee = $this->employeeService->createEmployee($payload, $userId);
             
-            $employee->load(['user', 'outlet']);
+            $employee->load(['user.role', 'outlet']);
 
             return response()->json([
                 'success' => true,
@@ -74,12 +74,10 @@ class EmployeeController extends Controller
         $payload = $request->validated();        
         $user = Auth::user();
         $tenantId = $user->employee->tenant_id;
-        $userId = $user->id;
-      
+        $userId = $user->id; 
         $updatedEmployee = $this->employeeService->updateEmployee($payload['id'], $tenantId, $userId, $payload);
-
         $updatedEmployee->refresh();
-        $updatedEmployee->load(['user', 'outlet']);
+        $updatedEmployee->load(['user.role', 'outlet']);
 
         return response()->json([
             'success' => true,

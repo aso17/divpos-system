@@ -10,43 +10,50 @@ return new class extends Migration
     {
         Schema::create('Ms_employees', function (Blueprint $table) {
             $table->id();          
-            
-            // Relasi ke User (1-to-1 relasi)
             $table->foreignId('user_id')
                   ->nullable() 
                   ->unique()
                   ->constrained('Ms_users')
                   ->nullOnDelete(); 
       
-            // Relasi ke Tenant (Wajib)
+            // Relasi ke Tenant (Wajib: Pemisah data antar bisnis LAUNDRY, SALON, dll)
             $table->foreignId('tenant_id')->constrained('Ms_tenants')->cascadeOnDelete();
             
-            // Relasi ke Outlet (Nullable untuk Owner/Manager Area)
+            // Relasi ke Outlet (Nullable: Untuk posisi manager yang pegang banyak outlet)
             $table->foreignId('outlet_id')->nullable()->constrained('Ms_outlets')->nullOnDelete();
             
-            // Kode unik karyawan (Gunakan index untuk pencarian cepat)
-            $table->string('employee_code', 20)->unique();
+            // 🎯 PENANDA TAHUN: Untuk optimasi generate kode (Point Seek)
+            $table->unsignedSmallInteger('year');
+
+            // KODE KARYAWAN: Kita hapus ->unique() global, ganti ke Composite Unique di bawah
+            $table->string('employee_code', 20);
             
             // Profil
             $table->string('full_name', 100);
             $table->string('phone', 20)->nullable();
             $table->string('job_title', 50)->nullable();
             
-            // Status (Gunakan index untuk filter operasional)
+            // Status Operasional
             $table->boolean('is_active')->default(true)->index();
             
-            // Audit - Gunakan Tz agar seragam dengan tabel lainnya
+            // Audit - Menggunakan Timezone (Tz) sesuai standar pgsql Mas
             $table->timestampsTz();
             $table->softDeletesTz();
 
             /* -------------------------------------------------------------------------- */
-            /* INDEXING UNTUK PERFORMANCE 100K DATA                                      */
+            /* INDEXING & CONSTRAINTS UNTUK SKALA BESAR                                   */
             /* -------------------------------------------------------------------------- */
             
-            // Index yang Mas buat sudah benar, tapi tambahkan urutan yang paling sering di-query
+            // 🛡️ MULTITENANT UNIQUE: Kode boleh sama antar Tenant, tapi wajib beda di satu Tenant
+            $table->unique(['tenant_id', 'employee_code'], 'unique_emp_code_per_tenant');
+
+            // 🚀 GENERATE CODE INDEX: Mencari kode terakhir berdasarkan Tahun & Tenant
+            $table->index(['tenant_id', 'year', 'employee_code'], 'idx_emp_year_lookup');
+            
+            // 📊 OPERATIONAL INDEX: Untuk list karyawan di dashboard outlet
             $table->index(['tenant_id', 'outlet_id', 'is_active'], 'idx_emp_operational');
             
-            // Index tambahan jika Mas sering mencari karyawan berdasarkan nama di dashboard
+            // 🔍 SEARCH INDEX: Pencarian nama karyawan
             $table->index('full_name', 'idx_emp_name');
         });
     }

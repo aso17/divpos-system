@@ -38,12 +38,19 @@ class AuthService
         }
 
         // 2. Validasi Status Aktif User & Tenant
+      
         if (!$user->user_active) {
-            throw ValidationException::withMessages(['message' => ['Akun Anda telah dinonaktifkan.']]);
+            throw ValidationException::withMessages([
+                'message' => ['Akun Anda telah dinonaktifkan.']
+            ]);
         }
 
-        if ($user->tenant_id && !$user->tenant_active) {
-            throw ValidationException::withMessages(['message' => ['Layanan bisnis Anda sedang ditangguhkan.']]);
+        $currentTenantId = $user->user_tenant_id ?? $user->employee_tenant_id;
+
+        if ($currentTenantId && !$user->tenant_active) {
+            throw ValidationException::withMessages([
+                'message' => ['Layanan bisnis ' . ($user->tenant_name ?? '') . ' sedang ditangguhkan.']
+            ]);
         }
 
         RateLimiter::clear($throttleKey);

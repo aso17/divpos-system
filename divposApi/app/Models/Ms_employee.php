@@ -23,18 +23,22 @@ class Ms_employee extends Model
         'phone',
         'job_title',
         'is_active',
+        'year',
         'created_by',
         'updated_by',   
     ];
 
+    
     // Casting untuk tipe data tertentu
     protected $casts = [
         'is_active' => 'boolean',
         'created_at' => 'datetime',
+        'year' => 'integer',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
-    ];
-
+        ];
+        
+    protected $dateFormat = 'Y-m-d H:i:sO';
     // --- RELASI ---
 
     // Karyawan memiliki satu user (login)

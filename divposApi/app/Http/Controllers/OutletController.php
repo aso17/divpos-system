@@ -3,157 +3,137 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Resources\OutletResource;
 use App\Services\OutletService; 
+use App\Services\LogDbErrorService; 
 use App\Helpers\CryptoHelper; 
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB; // Tambahkan ini
+use App\Http\Requests\OutletRequest;
+use Illuminate\Support\Facades\DB; 
 
 class OutletController extends Controller
 {
     protected $outletService;
-    
-    public function __construct(OutletService $outletService)
+    protected $logService;
+
+    public function __construct(OutletService $outletService, LogDbErrorService $logService)
     {
         $this->outletService = $outletService;
+        $this->logService = $logService;    
     }
-    
-    // --- METHOD GENERATECODE DIHAPUS ---
-
     public function index(Request $request)
     {
        
-        $params = $request->all();
+        $user = Auth::user();
+        $tenantId = $user->employee?->tenant_id;
+
+        if (!$tenantId) {
+            return response()->json(['message' => 'Unauthorized: Tenant not found.'], 403);
+        }
+
+        $params = array_merge($request->all(), [
+            'tenant_id' => $tenantId 
+        ]);
+
         $query = $this->outletService->getAllOutlets($params);
-
-        $perPage = (int) ($request->per_page ?? 10);
-
-        if ($request->filled('page')) {
-            $data = $query->paginate($perPage);
-            return OutletResource::collection($data); 
+        $perPage = (int) $request->get('per_page', 10);
+        if ($perPage > 100) $perPage = 100;
+        if ($request->filled('page') || $request->has('per_page')) {
+            $data = $query->paginate($perPage)->withQueryString();
+            return OutletResource::collection($data);
         }
-
-        return OutletResource::collection($query->get());
+        return OutletResource::collection($query->limit(50)->get());
     }
 
-    public function store(Request $request)
-    {
-        // 1. Validasi Input (Code dihapus dari validasi, dan validasi tipe data lainnya)
-        $validator = Validator::make($request->all(), [
-            'tenant_id' => 'required',
-            'name'      => 'required|string|min:3',
-            'phone'     => 'nullable|string',
-            'city'      => 'required|string',
-            'address'   => 'required|min:10',
-            'is_active' => 'boolean',
-            'is_main_branch' => 'boolean',
-        ]);
+public function store(OutletRequest $request)
+{
+    try {
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors(), 'message' => 'Validasi gagal'], 422);
-        }
+       $data = $this->outletService->createOutlet($request->validated());
+        return response()->json([
+            'success' => true,
+            'message' => 'Outlet berhasil dibuat',
+            'data'    => new OutletResource($data)
+        ], 201);
 
-        try {
-
-            DB::beginTransaction();
-
-           $payload = $request->only([
-            'tenant_id', 
-            'name', 
-            'phone', 
-            'city', 
-            'address', 
-            'is_active', 
-            'is_main_branch',
-            'created_by'
-            ]);     
-           
-            $data = $this->outletService->createOutlet($payload);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Outlet berhasil dibuat',
-                'data'    => new OutletResource($data)
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Gagal membuat outlet: ' . $e->getMessage()], 500);
-        }
+    } catch (\Exception $e) {
+       
+        $this->logService->log($e);
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal membuat outlet: ' . $e->getMessage()
+        ], 500);
     }
+}
 
-    public function update(Request $request, $id)
+
+public function update(OutletRequest $request, $id)
+{
+    try {
+       
+        $decryptedId = $request->id;
+        $payload = $request->validated();
+        $updated = $this->outletService->updateOutlet($decryptedId, $payload);
+        return response()->json([
+            'success' => true,
+            'message' => 'Outlet berhasil diperbarui.',
+            'data'    => new OutletResource($updated)
+        ], 200);
+
+    } catch (\Exception $e) {
+       
+       
+        $this->logService->log($e);
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage() ?: 'Terjadi kesalahan sistem saat memperbarui data.'
+        ], 500);
+    }
+}
+  public function destroy($id)
     {
-        $validator = Validator::make($request->all(), [
-            'tenant_id' => 'required',
-            'name'      => 'required|string|min:3',
-            'phone'     => 'nullable|string',
-            'city'      => 'required|string',
-            'address'   => 'required|min:10',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors(), 'message' => 'Validasi gagal'], 422);
-        }
-
         try {
-            
-            DB::beginTransaction();
-            $payload = $request->only([
-                'tenant_id', 
-                'name', 
-                'phone', 
-                'city', 
-                'address', 
-                'is_active', 
-                'is_main_branch',
-                'updated_by'
-            ]);  
-            $updated = $this->outletService->updateOutlet($id, $payload);
+          
+            $user = Auth::user();
+            $tenantId = $user->employee?->tenant_id;
 
-            if (!$updated) {
-                throw new \Exception("Outlet tidak ditemukan.");
+            if (!$tenantId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akses ditolak: Profil Anda tidak terhubung ke bisnis manapun.'
+                ], 403);
             }
 
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Outlet berhasil diupdate',
-                'data'    => new OutletResource($updated)
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function destroy(Request $request, $id)
-    {
-        try {
             $decryptedId = CryptoHelper::decrypt($id);
-            $decryptedTenantId = CryptoHelper::decrypt($request->query('tenant_id')); // Gunakan query
 
-            if (!$decryptedId || !$decryptedTenantId) {
-                throw new \Exception("Parameter tidak valid.");
+            if (!$decryptedId) {
+                return response()->json([
+                    'success' => false, 
+                    'message' => 'Parameter ID tidak valid.'
+                ], 400);
             }
 
-            $deleted = $this->outletService->deleteOutlet($decryptedId, $decryptedTenantId);
+            $deleted = $this->outletService->deleteOutlet($decryptedId, $tenantId);
 
             if (!$deleted) {
-                throw new \Exception("Data tidak ditemukan.");
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data tidak ditemukan atau Anda tidak memiliki otoritas menghapus data ini.'
+                ], 404);
             }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Outlet berhasil dihapus'
-            ]);
+            ], 200);
 
         } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
+
+            $this->logService->log($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus outlet. Terjadi kesalahan pada server.'
+            ], 500);
         }
     }
 }

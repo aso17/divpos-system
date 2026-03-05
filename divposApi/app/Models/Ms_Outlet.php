@@ -6,68 +6,99 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Auth;
 
 class Ms_outlet extends Model
 {
     use HasFactory, SoftDeletes;
 
-    // Karena nama tabel tidak jamak (plural), kita definisikan manual
     protected $table = 'Ms_outlets';
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'tenant_id',
         'name',
         'code',
         'phone',
-        'email',
         'address',
         'city',
+        'description',
         'is_active',
         'is_main_branch',
         'created_by',
         'updated_by',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
-        'is_active' => 'boolean',
+        'tenant_id'      => 'integer', 
+        'is_active'      => 'boolean',
         'is_main_branch' => 'boolean',
-        'subscription_ends_at' => 'datetime',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-        'deleted_at' => 'datetime',
+        'created_at'     => 'datetime',
+        'updated_at'     => 'datetime',
+        'deleted_at'     => 'datetime',
+        'created_by'     => 'integer',
+        'updated_by'     => 'integer',
     ];
 
     /**
-     * Relasi ke Tenant (Owner dari Outlet ini)
+     * Security: Hindari data mentah ini bocor ke response API secara tidak sengaja
      */
+    protected $hidden = [
+        'deleted_at',
+    ];
+
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            if (Auth::check()) { 
+                $model->created_by = Auth::id();
+            }
+        });
+
+        static::updating(function ($model) {
+            if (Auth::check()) {
+                // Performa: Hanya update field updated_by jika ada data yang berubah
+                if ($model->isDirty()) {
+                    $model->updated_by = Auth::id();
+                }
+            }
+        });
+    }
+
+    // --- RELATIONS ---
+
     public function tenant(): BelongsTo
     {
+        // Gunakan FK yang spesifik jika Ms_tenant menggunakan 'id'
         return $this->belongsTo(Ms_tenant::class, 'tenant_id');
     }
 
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(Ms_user::class, 'created_by');
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(Ms_user::class, 'updated_by');
+    }
+
+    // --- SCOPES (Logic & Performance) ---
+
     /**
-     * Scope untuk mempermudah filter per tenant (Multitenancy)
+     * Scope untuk efisiensi query multi-tenant
      */
     public function scopeForTenant($query, $tenantId)
     {
         return $query->where('tenant_id', $tenantId);
     }
 
-    /**
-     * Scope untuk hanya mengambil outlet yang aktif
-     */
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeMain($query)
+    {
+        return $query->where('is_main_branch', true);
     }
 }

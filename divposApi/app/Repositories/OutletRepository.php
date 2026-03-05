@@ -13,21 +13,49 @@ class OutletRepository
         $this->model = $model;
     }
 
-   public function getQueryOutlet($tenantId, $params)
+  public function getQueryOutlet($tenantId, $params)
 {
     $keyword = $params['keyword'] ?? null;
+    $isActive = $params['is_active'] ?? null;
 
-    return $this->model->where('tenant_id', $tenantId)
+    return $this->model
+       
+        ->select([
+            'id', 
+            'tenant_id', 
+            'name', 
+            'code', 
+            'phone', 
+            'address',
+            'description',
+            'city', 
+            'is_active', 
+            'is_main_branch', 
+            'created_at'
+        ])
+        
+       
+        ->where('tenant_id', $tenantId)
+        
+        // Filter status aktif
+        ->when($isActive !== null, function ($query) use ($isActive) {
+            $query->where('is_active', filter_var($isActive, FILTER_VALIDATE_BOOLEAN));
+        })
+
         ->when($keyword, function ($query) use ($keyword) {
             $query->where(function ($q) use ($keyword) {
-                $q->where('name', 'like', "%{$keyword}%")
-                  ->orWhere('code', 'like', "%{$keyword}%")
-                  ->orWhere('city', 'like', "%{$keyword}%");
+                $search = "%{$keyword}%";
+                $q->where('name', 'ILIKE', $search)
+                  ->orWhere('code', 'ILIKE', $search)
+                  ->orWhere('city', 'ILIKE', $search);
             });
         })
-        ->orderBy('is_main_branch', 'desc') 
-        ->orderBy('created_at', 'desc');
+
+        ->orderByDesc('is_main_branch') 
+        ->orderByDesc('created_at');
 }
+
+
 
     public function getLastOutletByTenant($tenantId)
     {

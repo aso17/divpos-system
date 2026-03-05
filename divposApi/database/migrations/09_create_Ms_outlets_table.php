@@ -18,30 +18,41 @@ return new class extends Migration
                   ->onDelete('cascade'); 
 
             // Identity Outlet
-            $table->string('name', 150); // index di sini dihapus, dipindah ke komposit bawah
-            $table->string('code', 50)->unique(); 
+            $table->string('name', 150);
+            $table->string('code', 50); // Unik per Tenant (lihat Unique Constraint di bawah)
             
             // Contact & Location
             $table->string('phone', 20)->nullable();
-            $table->string('email', 100)->nullable();
             $table->text('address')->nullable();
             $table->string('city', 100)->nullable();
+            $table->text('description')->nullable(); 
             
             // Configuration & Status
-            $table->boolean('is_active')->default(true); // index dihapus, dipindah ke komposit bawah
+            $table->boolean('is_active')->default(true);
             $table->boolean('is_main_branch')->default(false);
             
-            // Audit Trail
-            $table->string('created_by', 100)->nullable();
-            $table->string('updated_by', 100)->nullable();
+            // Audit Trail (Enterprise Standard: Menggunakan ID User)
+            $table->unsignedBigInteger('created_by')->nullable()->index();
+            $table->unsignedBigInteger('updated_by')->nullable()->index();
 
+            // Timestamps dengan Timezone (Penting untuk akurasi data antar wilayah)
             $table->timestampsTz();
             $table->softDeletesTz();
 
-            // --- PERBAIKAN: Index Komposit untuk Performa ---
-            // Ini akan mempercepat query saat mencari outlet aktif dalam satu tenant
+            // --- 1. UNIQUE CONSTRAINT PER TENANT ---
+            // Kode outlet boleh sama antar tenant, tapi harus unik di dalam satu tenant.
+            $table->unique(['tenant_id', 'code'], 'uk_outlet_tenant_code');
+
+            // --- 2. INDEX KOMPOSIT UNTUK PERFORMA ---
+            // Mempercepat List Outlet saat difilter Aktif & Nama di React
             $table->index(['tenant_id', 'is_active', 'name'], 'idx_outlet_tenant_active_name');
-            // ------------------------------------------------
+            
+            // Mempercepat pengecekan cabang utama saat transaksi atau login
+            $table->index(['tenant_id', 'is_main_branch'], 'idx_outlet_main_branch');
+
+            // --- 3. FOREIGN KEYS UNTUK AUDIT TRAIL ---
+            $table->foreign('created_by')->references('id')->on('Ms_users')->onDelete('set null');
+            $table->foreign('updated_by')->references('id')->on('Ms_users')->onDelete('set null');
         });
     }
 
