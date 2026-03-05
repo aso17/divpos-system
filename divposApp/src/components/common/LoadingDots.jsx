@@ -25,8 +25,8 @@ export default function LoadingDots({
                         shadow-md shadow-emerald-500/40
                         animate-pulse`}
             style={{
-              animationDelay: `${index * 0.15}s`,
-              animationDuration: "1.2s",
+              animationDelay: `${index * 0.1}s`,
+              animationDuration: "1s",
             }}
           />
         ))}

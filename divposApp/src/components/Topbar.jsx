@@ -18,6 +18,7 @@ export default function Topbar() {
   const dropdownRef = useRef(null);
   const [avatar, setAvatar] = useState(null);
   const [roleName, setRoleName] = useState(null);
+  const [fullName, setFullName] = useState(null);
 
   const handleLogout = async () => {
     await logout();
@@ -26,7 +27,9 @@ export default function Topbar() {
 
   useEffect(() => {
     const storedUser = GetWithExpiry("user");
-    setRoleName(storedUser?.role_name || "Owner");
+    console.log("Loaded user from storage:", storedUser);
+    setRoleName(storedUser?.role?.name || "");
+    setFullName(storedUser?.full_name || "");
     setAvatar(storedUser?.avatar || assetUrl("default-avatar.png"));
   }, [user]);
 
@@ -92,7 +95,7 @@ export default function Topbar() {
 
             <div className="hidden sm:block text-left">
               <p className="text-sm font-semibold text-slate-800 leading-none">
-                {user?.full_name || "Divpos Admin"}
+                {fullName || "Divpos Admin"}
               </p>
               <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-1">
                 {roleName || "Owner"}

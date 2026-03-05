@@ -43,7 +43,7 @@ export default function EmployeesList() {
           per_page: pagination.pageSize,
           keyword: activeSearch,
         });
-
+        // console.log("Fetched employees:", res.data);
         if (isMounted) {
           setData(res.data?.data || []);
           setTotalCount(Number(res.data?.meta?.total || 0));

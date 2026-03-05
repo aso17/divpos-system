@@ -5,7 +5,7 @@ import { encrypt } from "../utils/Encryptions";
 const getAuthInfo = () => {
   const user = GetWithExpiry("user");
   return {
-    tenantId: user?.tenant_id || null,
+    tenantId: user?.tenant.id || null,
     userLogin: user ? user.id : null,
   };
 };

@@ -5,7 +5,7 @@ import { encrypt } from "../utils/Encryptions";
 const getAuthInfo = () => {
   const user = GetWithExpiry("user");
   return {
-    tenantId: user?.tenant_id || null,
+    tenantId: user?.tenant.id || null,
     userLogin: user ? `${user.id}-${user.full_name}` : "system",
   };
 };
@@ -24,7 +24,7 @@ const RoleService = {
     const { tenantId } = getAuthInfo();
     return api.get("/access-control/roles", {
       params: {
-        tenant_id: encrypt(tenantId),
+        tenant_id: tenantId,
         ...params,
       },
     });

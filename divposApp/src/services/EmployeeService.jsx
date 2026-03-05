@@ -1,10 +1,9 @@
 import api from "./api";
 import { GetWithExpiry } from "../utils/Storage";
-import { encrypt } from "../utils/Encryptions";
 const getAuthInfo = () => {
   const user = GetWithExpiry("user");
   return {
-    tenantId: user?.tenant_id || null,
+    tenantId: user?.tenant.id || null,
     userLogin: user ? user.id : null,
   };
 };
@@ -12,6 +11,7 @@ const getAuthInfo = () => {
 const EmployeeService = {
   getEmployees: (params = {}) => {
     const { tenantId } = getAuthInfo();
+
     return api.get("/employees", {
       params: {
         tenant_id: tenantId,

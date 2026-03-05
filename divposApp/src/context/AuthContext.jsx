@@ -73,19 +73,11 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await AuthService.login(credentials, "");
-      console.log("Login successful, response data:", data);
+      console.log("Login successful, response data:", data.user);
       SetWithExpiry("access_token", data.token, 1440);
       SetWithExpiry("refresh_token", data.refresh_token, 1440);
       SetWithExpiry("user", data.user, 1440);
 
-      const tenantInfo = {
-        tenant_id: data.user.tenant.id,
-        name: data.user.tenant.slug,
-        logo: data.user.tenant.logo_path,
-        icon: data.user.tenant.icon_path,
-        code: data.user.tenant.code,
-        type: data.user.tenant.business_type,
-      };
       const configApp = {
         appName: data.app_config.appName,
         logo: data.app_config.logo_path,
@@ -93,8 +85,6 @@ export const AuthProvider = ({ children }) => {
         footer_text: data.app_config.footer_text,
         primary_color: data.app_config.primary_color,
       };
-
-      SetWithExpiry("tenant_info", tenantInfo, 1440);
       SetWithExpiry("app", configApp, 1440);
 
       setUser(data.user);

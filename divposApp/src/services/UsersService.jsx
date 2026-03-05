@@ -4,17 +4,15 @@ import { encrypt } from "../utils/Encryptions";
 
 const getTenantId = () => {
   const user = GetWithExpiry("user");
-  return user?.tenant_id || null;
+  return user?.tenant.id || null;
 };
 
 const UsersService = {
   getUsers: (params = {}) => {
     const tenantId = getTenantId();
-    const encriptedTenantId = encrypt(tenantId);
-
     return api.get("/users", {
       params: {
-        tenant_id: encriptedTenantId,
+        tenant_id: tenantId,
         ...params,
       },
     });
