@@ -6,28 +6,74 @@ export default function RequirePermission({
   route = null,
   children,
 }) {
-  const { permissionMap = {}, loading } = useAuth();
+  // 1. Ambil state user juga untuk deteksi logout
+  const { permissionMap = {}, loading, logout, user } = useAuth();
   const location = useLocation();
-  // 🔥 TUNGGU DATA DIMUAT 🔥
-  if (loading) {
-    return <div></div>;
-  }
-  const currentPath = route || location.pathname;
-  // Debug: Pastikan map terisi saat pengecekan
 
-  // Cari route yang cocok (support dynamic route)
+  // 2. Jika masih loading awal, tampilkan blank/spinner
+  if (loading) {
+    return "";
+  }
+
+  // 3. FIX: Jika user null (sedang/sudah logout), jangan render apapun.
+  // Ini mencegah "kedipan" layar 'Akses Belum Diatur' saat logout.
+  if (!user) {
+    return null;
+  }
+
+  const currentPath = route || location.pathname;
+  const totalPermissions = Object.keys(permissionMap).length;
+
+  // 4. Kasus: User Login Berhasil tapi Role/Permission belum di-setting di DB
+  if (totalPermissions === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-slate-50 p-6 text-center">
+        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+          <span className="text-3xl font-bold">!</span>
+        </div>
+        <h1 className="text-xl font-bold text-slate-800">Akses Belum Diatur</h1>
+        <p className="text-slate-600 mt-2 max-w-xs">
+          Maaf akun Anda belum memiliki akses menu. Silakan hubungi
+          Administrator untuk mapping menu.
+        </p>
+        <button
+          onClick={logout}
+          className="mt-6 px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
+        >
+          exit
+        </button>
+      </div>
+    );
+  }
+
+  // 5. Cari rute yang cocok di dalam permissionMap
   const matchedRoute = Object.keys(permissionMap).find((r) =>
     currentPath.startsWith(r),
   );
 
-  // ⚡️ PERBAIKAN LOGIKA DI SINI ⚡️
-  // Cek apakah rute ada di map, dan apakah izin (view/create/dll) bernilai true
   const routePermissions = permissionMap[matchedRoute];
   const hasPermission =
     routePermissions && routePermissions[permission] === true;
 
+  // 6. Penanganan jika tidak punya izin (Access Denied)
   if (!hasPermission) {
     console.warn(`Akses ditolak ke ${currentPath}. Butuh izin: ${permission}`);
+
+    // Jika di dashboard saja tidak boleh, tampilkan error khusus
+    if (currentPath === "/dashboard") {
+      return (
+        <div className="p-10 text-center">
+          <h2 className="text-lg font-semibold text-red-500">
+            Izin Dashboard Tidak Ditemukan
+          </h2>
+          <button onClick={logout} className="mt-4 text-emerald-600 underline">
+            Logout
+          </button>
+        </div>
+      );
+    }
+
+    // Jika akses halaman lain (laundry/salon/dll) dilarang, lempar balik ke dashboard
     return <Navigate to="/dashboard" replace />;
   }
 

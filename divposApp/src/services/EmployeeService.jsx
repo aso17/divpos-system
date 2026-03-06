@@ -1,20 +1,9 @@
 import api from "./api";
-import { GetWithExpiry } from "../utils/Storage";
-const getAuthInfo = () => {
-  const user = GetWithExpiry("user");
-  return {
-    tenantId: user?.tenant.id || null,
-    userLogin: user ? user.id : null,
-  };
-};
 
 const EmployeeService = {
   getEmployees: (params = {}) => {
-    const { tenantId } = getAuthInfo();
-
     return api.get("/employees", {
       params: {
-        tenant_id: tenantId,
         ...params,
       },
     });
@@ -22,7 +11,6 @@ const EmployeeService = {
 
   createEmployee: (payload) => {
     console.log("Creating employee with payload:", payload);
-    const { tenantId, userLogin } = getAuthInfo();
     const formData = new FormData();
     Object.keys(payload).forEach((key) => {
       if (payload[key] !== null && payload[key] !== undefined) {
@@ -34,9 +22,6 @@ const EmployeeService = {
       }
     });
 
-    if (tenantId) formData.append("tenant_id", tenantId);
-    if (userLogin) formData.append("created_by", userLogin);
-
     return api.post("/employees", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
@@ -45,8 +30,6 @@ const EmployeeService = {
   },
 
   updateEmployee: (id, payload) => {
-    const { tenantId, userLogin } = getAuthInfo();
-
     const formData = new FormData();
     formData.append("_method", "PUT");
 
@@ -62,13 +45,6 @@ const EmployeeService = {
       }
     });
 
-    if (tenantId && !formData.has("tenant_id")) {
-      formData.append("tenant_id", tenantId);
-    }
-    if (userLogin && !formData.has("updated_by")) {
-      formData.append("updated_by", userLogin);
-    }
-
     return api.post(`/employees/${id}`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
@@ -77,19 +53,17 @@ const EmployeeService = {
   },
 
   deleteEmployee: (id) => {
-    const { tenantId } = getAuthInfo();
     return api.delete(`/employees/${id}`, {
       params: {
-        tenant_id: tenantId,
+        ...params,
       },
     });
   },
 
   getEmployeeById: (id) => {
-    const { tenantId } = getAuthInfo();
     return api.get(`/employees/${id}`, {
       params: {
-        tenant_id: tenantId,
+        ...params,
       },
     });
   },

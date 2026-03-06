@@ -400,7 +400,6 @@ export default function EmployeesList() {
             );
           } else {
             setData((prev) => [dataEmployee, ...prev]);
-
             setPagination((prev) => ({ ...prev, pageIndex: 0 }));
             setTotalCount((prev) => prev + 1);
           }

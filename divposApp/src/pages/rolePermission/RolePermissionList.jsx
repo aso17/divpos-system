@@ -17,17 +17,11 @@ import Save from "lucide-react/dist/esm/icons/save";
 import LoadingDots from "../../components/common/LoadingDots";
 import AppHead from "../../components/common/AppHead";
 import RolesService from "../../services/RolespermissionService";
-import { decrypt } from "../../utils/Encryptions";
 import SubmitButton from "../../components/SubmitButton";
 
 export default function RolePermissionList() {
   const { roleId } = useParams();
   const navigate = useNavigate();
-
-  const decryptedId = useMemo(
-    () => (roleId ? decrypt(roleId) : null),
-    [roleId],
-  );
 
   const [data, setData] = useState([]);
   const [roleInfo, setRoleInfo] = useState(null);
@@ -41,30 +35,36 @@ export default function RolePermissionList() {
   };
 
   const fetchPermissions = useCallback(async () => {
-    if (!decryptedId) return;
     setLoading(true);
     try {
-      const res = await RolesService.getRolePermissions(decryptedId);
-      const responseData = res.data?.data || res.data;
-      setData(responseData.permissions || []);
-      if (responseData.role) setRoleInfo(responseData.role);
+      const res = await RolesService.getRolePermissions(roleId);
+      const serverResponse = res.data;
+
+      // 2. Set Permissions (ambil dari serverResponse.data)
+      // Karena Laravel Resource biasanya membungkus array dalam key 'data'
+      setData(serverResponse.data || []);
+
+      // 3. Set Role Info (ambil dari serverResponse.role)
+      if (serverResponse.role) {
+        setRoleInfo(serverResponse.role);
+      }
     } catch (error) {
       console.error("Error fetching permissions:", error);
       triggerToast("Gagal mengambil data hak akses", "error");
     } finally {
       setLoading(false);
     }
-  }, [decryptedId]);
+  }, [roleId]);
 
   useEffect(() => {
     fetchPermissions();
   }, [fetchPermissions]);
 
   const handleSave = async () => {
-    if (!decryptedId) return;
     setIsSubmitting(true);
+    // console.log(roleId);
     try {
-      await RolesService.updatePermissions(decryptedId, { permissions: data });
+      await RolesService.updatePermissions(roleId, { permissions: data });
       triggerToast("Hak akses berhasil diperbarui!", "success");
     } catch (err) {
       triggerToast("Gagal menyimpan perubahan", "error");
@@ -155,7 +155,7 @@ export default function RolePermissionList() {
           can_create: "add",
           can_update: "edit",
           can_delete: "del",
-          can_export: "out",
+          can_export: "exp",
         };
         return {
           accessorKey: field,
@@ -220,7 +220,7 @@ export default function RolePermissionList() {
                 <span className="text-emerald-600">{roleInfo?.role_name}</span>
               </h1>
             </div>
-            <p className="text-[8px] text-slate-400 font-bold tracking-widest uppercase hidden md:block">
+            <p className="text-[7px] text-slate-400 p-2 font-bold tracking-widest uppercase hidden md:block">
               Matrix Kontrol Akses Sistem
             </p>
           </div>

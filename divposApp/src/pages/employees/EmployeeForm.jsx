@@ -33,36 +33,32 @@ export default function EmployeeForm({
       {
         full_name: [
           (v) => rules.required(v, "Nama lengkap wajib diisi"),
-          (v) => rules.noHtml(v), // Cegah XSS di nama
-          (v) => rules.safeString(v), // Cegah karakter SQL berbahaya
+          (v) => rules.noHtml(v),
+          (v) => rules.safeString(v),
         ],
         phone: [
           (v) => rules.required(v, "Nomor telepon wajib diisi"),
           (v) => rules.noLetters(v, "Nomor telepon hanya boleh angka"),
-          (v) => rules.phoneID(v), // Otomatis bersihkan spasi/- dan cek format 08/628
+          (v) => rules.phoneID(v),
         ],
         job_title: [
           (v) => rules.required(v, "Jabatan wajib diisi"),
-          (v) => rules.noHtml(v), // Perbaikan: dibungkus arrow function agar tidak error
+          (v) => rules.noHtml(v),
           (v) => rules.safeString(v),
         ],
         email: [
-          // Rule 1: Wajib jika akses login dicentang
           (v, data) =>
             data.has_login && !v ? "Email wajib diisi untuk akses login" : null,
-          // Rule 2: Cek format (otomatis melakukan .trim() di dalam rules.email)
           (v) => rules.email(v),
         ],
         password: [
           (v, data) => {
-            // Wajib hanya untuk karyawan baru dengan akses login
             if (data.has_login && !initialData && !v)
               return "Password wajib diisi";
-            // Jika diisi (baik edit/baru), minimal 6 karakter
             if (v && v.length < 6) return "Minimal 6 karakter";
             return null;
           },
-          (v) => (v ? rules.safeString(v) : null), // Tambahan keamanan
+          (v) => (v ? rules.safeString(v) : null),
         ],
         role_id: [
           (v, data) =>
@@ -70,14 +66,10 @@ export default function EmployeeForm({
               ? "Role wajib dipilih untuk akses login"
               : null,
         ],
-        outlet_id: [
-          // Opsional, tapi tetap kita amankan dari input aneh
-          (v) => rules.noHtml(v),
-        ],
+        outlet_id: [(v) => rules.noHtml(v)],
       },
     );
 
-  // 1. Fetch data pendukung saat modal buka
   useEffect(() => {
     if (open) {
       RoleService.GetRolesByTenant().then((res) =>
@@ -90,7 +82,7 @@ export default function EmployeeForm({
   }, [open]);
 
   // 2. Sinkronisasi Data Awal (Edit mode)
-  console.log("Initial Data for EmployeeForm:", initialData);
+  // console.log("Initial Data for EmployeeForm:", initialData);
   useEffect(() => {
     if (!open) return;
 
@@ -126,7 +118,6 @@ export default function EmployeeForm({
     e.preventDefault();
     if (isSubmitting) return;
 
-    // validate() akan mengirim seluruh 'values' ke fungsi validator di atas
     if (!validate()) return;
 
     try {
@@ -138,7 +129,7 @@ export default function EmployeeForm({
       } else {
         response = await EmployeeService.createEmployee(values);
       }
-      console.log("API Response:", response);
+      // console.log("API Response:", response);
       triggerToast(response.data?.message, "success");
       onSuccess?.(response.data?.data);
       onClose();

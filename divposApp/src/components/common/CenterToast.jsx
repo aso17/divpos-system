@@ -9,6 +9,7 @@ export default function CenterToast({
 }) {
   useEffect(() => {
     if (!message) return;
+
     const timer = setTimeout(onClose, duration);
     return () => clearTimeout(timer);
   }, [message, duration, onClose]);
@@ -50,13 +51,13 @@ export default function CenterToast({
         onClick={onClose}
       />
 
-      {/* Toast Card */}
-      <div className="relative w-full max-w-[340px] animate-center-toast">
-        <div className="bg-white rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden border border-slate-100">
-          {/* Progress Bar */}
-          <div className={`h-1.5 w-full ${config.bgColor}`}>
+      {/* Toast */}
+      <div className="relative w-full max-w-[340px] animate-toast-in">
+        <div className="bg-white rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden">
+          {/* Progress */}
+          <div className={`h-1.5 w-full ${config.bgColor} overflow-hidden`}>
             <div
-              className={`h-full ${config.accent} animate-progress-bar`}
+              className={`h-full ${config.accent} animate-progress`}
               style={{ animationDuration: `${duration}ms` }}
             />
           </div>
@@ -77,6 +78,7 @@ export default function CenterToast({
               <h3 className="text-base font-bold text-slate-900 mb-1">
                 {config.title}
               </h3>
+
               <p className="text-sm text-slate-500 leading-relaxed">
                 {message}
               </p>
@@ -85,22 +87,23 @@ export default function CenterToast({
         </div>
       </div>
 
-      {/* PERBAIKAN DI SINI: Menghapus atribut 'jsx' dan gunakan dangerouslySetInnerHTML */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
-        .animate-center-toast {
-          animation: toastIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+
+        .animate-toast-in {
+          animation: toastIn 0.35s cubic-bezier(.22,1,.36,1);
         }
 
-        .animate-progress-bar {
-          animation: progress linear forwards;
+        .animate-progress {
+          transform-origin: left;
+          animation: progressShrink linear forwards;
         }
 
         @keyframes toastIn {
           from {
             opacity: 0;
-            transform: translateY(20px) scale(0.9);
+            transform: translateY(25px) scale(.95);
           }
           to {
             opacity: 1;
@@ -108,10 +111,15 @@ export default function CenterToast({
           }
         }
 
-        @keyframes progress {
-          from { width: 100%; }
-          to { width: 0%; }
+        @keyframes progressShrink {
+          from {
+            transform: scaleX(1);
+          }
+          to {
+            transform: scaleX(0);
+          }
         }
+
       `,
         }}
       />

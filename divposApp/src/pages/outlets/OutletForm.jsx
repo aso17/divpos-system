@@ -48,8 +48,6 @@ export default function OutletForm({
       },
     );
 
-  console.log("Current Values:", initialData);
-
   useEffect(() => {
     if (!open) return;
     if (initialData) {

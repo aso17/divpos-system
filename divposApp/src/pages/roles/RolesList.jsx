@@ -17,7 +17,7 @@ import TablePagination from "../../components/TablePagination";
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import AppHead from "../../components/common/AppHead";
 import RolesService from "../../services/RoleService";
-import { encrypt } from "../../utils/Encryptions";
+
 import RoleForm from "./RoleForm";
 
 export default function RolesList() {
@@ -92,10 +92,19 @@ export default function RolesList() {
         res.data?.message || "Data role telah berhasil dihapus.";
       await showConfirm(successMsg, "Hapus Berhasil", "success");
 
-      // Refresh data
-      fetchRoles();
+      if (data.length === 1 && pagination.pageIndex > 0) {
+        setPagination((prev) => ({
+          ...prev,
+          pageIndex: prev.pageIndex - 1,
+        }));
+      } else {
+        fetchRoles();
+      }
+
+      setTotalCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
-      const errorMsg = err.response?.data?.message || "Gagal menghapus role";
+      const errorMsg =
+        err.response?.data?.message || "Terjadi kesalahan server";
       showConfirm(errorMsg, "Gagal Hapus", "error");
     }
   };
@@ -170,7 +179,7 @@ export default function RolesList() {
             <button
               title="Setting Permissions"
               onClick={() => {
-                const hashedId = encrypt(row.original.id);
+                const hashedId = row.original.id;
                 navigate(`/rolespermission/${hashedId}`, {
                   state: {
                     role_name: row.original.role_name,
@@ -316,7 +325,7 @@ export default function RolesList() {
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => {
-                  const hashedId = encrypt(role.id);
+                  const hashedId = role.id;
                   navigate(`/rolespermission/${hashedId}`, {
                     state: {
                       role_name: role.role_name,
@@ -381,7 +390,6 @@ export default function RolesList() {
         />
       </div>
 
-      {/* Floating Action Button Mobile */}
       <button
         onClick={() => {
           setSelectedRole(null);
@@ -403,7 +411,6 @@ export default function RolesList() {
             );
           } else {
             setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-            fetchRoles();
           }
           setOpenModal(false);
         }}

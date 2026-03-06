@@ -1,72 +1,38 @@
 import api from "./api";
-import { GetWithExpiry } from "../utils/Storage";
-import { encrypt } from "../utils/Encryptions";
-
-const getAuthInfo = () => {
-  const user = GetWithExpiry("user");
-  return {
-    tenantId: user?.tenant.id || null,
-    userLogin: user ? `${user.id}-${user.full_name}` : "system",
-  };
-};
 
 const RoleService = {
   GetRolesByTenant: () => {
-    const { tenantId } = getAuthInfo();
     return api.get("/access-control/roles-by-tenant", {
-      params: {
-        tenant_id: tenantId,
-      },
+      params: {},
     });
   },
 
   getRoles: (params = {}) => {
-    const { tenantId } = getAuthInfo();
     return api.get("/access-control/roles", {
       params: {
-        tenant_id: tenantId,
         ...params,
       },
     });
   },
 
   createRole: (payload) => {
-    const { tenantId, userLogin } = getAuthInfo();
     const finalPayload = {
       ...payload,
-      tenant_id: tenantId,
-      created_by: userLogin,
     };
     return api.post("/access-control/roles", finalPayload);
   },
 
   updateRole: (id, payload) => {
-    const { tenantId, userLogin } = getAuthInfo();
     const finalPayload = {
       ...payload,
-      tenant_id: tenantId,
-      updated_by: userLogin,
       _method: "PUT",
     };
-    return api.post(`/roles/${id}`, finalPayload);
+    return api.post(`/access-control/roles/${id}`, finalPayload);
   },
-  // RoleService.js
 
   deleteRole: (id) => {
-    const { tenantId } = getAuthInfo();
-    const roleId = encrypt(id);
-    const tenant_id = encrypt(tenantId);
-    return api.delete(`/access-control/roles/${roleId}`, {
-      params: { tenant_id: tenant_id },
-    });
+    return api.delete(`/access-control/roles/${id}`);
   },
-
-  // deleteRole: (id) => {
-  //   const { tenantId } = getAuthInfo();
-  //   return api.delete(`/role/${encrypt(id)}`, {
-  //     params: { tenant_id: encrypt(tenantId) },
-  //   });
-  // },
 };
 
 export default RoleService;

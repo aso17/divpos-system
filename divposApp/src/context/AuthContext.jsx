@@ -19,11 +19,20 @@ export const AuthProvider = ({ children }) => {
   const isInitialized = useRef(false);
 
   const logout = useCallback(async () => {
+    // 1. SET USER NULL PERTAMA KALI
+    // Ini krusial agar RequirePermission langsung return null (menghilangkan kedipan 'exit')
+    setUser(null);
+    setMenus([]);
+    setPermissionMap({});
+    isInitialized.current = false;
+
     try {
+      // 2. Jalankan API Logout (jika gagal tetap lanjut ke pembersihan storage)
       await AuthService.logout();
     } catch (err) {
       console.error("Logout API failed", err);
     } finally {
+      // 3. Bersihkan semua data di LocalStorage/SessionStorage
       const keysToClear = [
         "access_token",
         "tenant_info",
@@ -35,11 +44,8 @@ export const AuthProvider = ({ children }) => {
 
       keysToClear.forEach((key) => RemoveStorage(key));
 
-      setUser(null);
-      setMenus([]);
-      setPermissionMap({});
-      isInitialized.current = false;
-
+      // 4. Redirect ke login
+      // Menggunakan window.location.href untuk memastikan state benar-benar bersih (hard reload)
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
@@ -73,7 +79,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await AuthService.login(credentials, "");
-      console.log("Login successful, response data:", data.user);
+      // console.log("Login successful, response data:", data.user);
       SetWithExpiry("access_token", data.token, 1440);
       SetWithExpiry("refresh_token", data.refresh_token, 1440);
       SetWithExpiry("user", data.user, 1440);
@@ -90,7 +96,7 @@ export const AuthProvider = ({ children }) => {
       setUser(data.user);
 
       const menuRes = await AuthService.getMenus();
-
+      // console.log(menuRes.data);
       setMenus(menuRes.data.menus || []);
       setPermissionMap(menuRes.data.permissions || {});
 

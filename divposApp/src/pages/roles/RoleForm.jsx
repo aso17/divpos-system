@@ -12,7 +12,6 @@ export default function RoleForm({
   onSuccess,
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const { values, errors, handleChange, validate, setValues, setErrors } =
     useFormValidation(
       {
@@ -34,7 +33,25 @@ export default function RoleForm({
       },
     );
 
-  // Inisialisasi data saat Edit atau Tambah
+  const handleNameChange = (nameValue) => {
+    handleChange("role_name", nameValue);
+
+    if (!initialData) {
+      const words = nameValue.trim().split(/\s+/);
+      let generatedCode = "";
+      if (words.length === 1 && words[0].length > 0) {
+        generatedCode = words[0].substring(0, 3).toUpperCase();
+      } else if (words.length > 1) {
+        generatedCode = words
+          .map((word) => word[0])
+          .join("")
+          .toUpperCase();
+      }
+      generatedCode = generatedCode.replace(/[^A-Z0-9]/g, "").substring(0, 5);
+      handleChange("code", generatedCode);
+    }
+  };
+
   useEffect(() => {
     if (!open) return;
 
@@ -77,14 +94,9 @@ export default function RoleForm({
         response = await RoleService.createRole(payload);
       }
 
-      // Ambil data dari response (biasanya response.data.data)
       const newRoleData = response.data?.data;
-
       triggerToast(response.data?.message || "Success", "success");
-
-      // Kirim data ke parent via onSuccess
       onSuccess?.(newRoleData);
-
       onClose();
     } catch (err) {
       const errorMsg = err.response?.data?.message || "Something went wrong";
@@ -93,6 +105,7 @@ export default function RoleForm({
       setIsSubmitting(false);
     }
   };
+
   const triggerToast = (message, type) => {
     window.dispatchEvent(
       new CustomEvent("global-toast", {
@@ -105,7 +118,6 @@ export default function RoleForm({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-sm">
-      {/* Border Atas menjadi Emerald 500 & Rounded disesuaikan agar konsisten */}
       <div className="bg-white rounded-sm w-full max-w-md shadow-2xl overflow-hidden border-t-4 border-emerald-500 animate-in fade-in zoom-in duration-200">
         <div className="p-6 overflow-y-auto max-h-[95vh]">
           <h2 className="text-xs font-bold mb-4 text-slate-700 uppercase tracking-wider border-b pb-3 flex items-center gap-2">
@@ -126,7 +138,7 @@ export default function RoleForm({
               </label>
               <input
                 value={values.role_name}
-                onChange={(e) => handleChange("role_name", e.target.value)}
+                onChange={(e) => handleNameChange(e.target.value)}
                 className={`${inputClasses({ error: !!errors.role_name })} focus:border-emerald-500 focus:ring-emerald-500/20`}
                 placeholder="e.g. Administrator"
               />
@@ -144,10 +156,20 @@ export default function RoleForm({
               </label>
               <input
                 value={values.code}
-                onChange={(e) => handleChange("code", e.target.value)}
+                onChange={(e) => {
+                  // User bisa input manual, tapi kita paksa Uppercase & No Space
+                  const manualVal = e.target.value
+                    .toUpperCase()
+                    .replace(/\s/g, "");
+                  handleChange("code", manualVal);
+                }}
                 disabled={!!initialData}
-                className={`${inputClasses({ error: !!errors.code })} font-mono ${initialData ? "bg-slate-50 text-slate-400 cursor-not-allowed" : "text-emerald-600 font-bold focus:border-emerald-500 focus:ring-emerald-500/20"}`}
-                placeholder="e.g. ADM / MKT"
+                className={`${inputClasses({ error: !!errors.code })} font-mono ${
+                  initialData
+                    ? "bg-slate-50 text-slate-400 cursor-not-allowed"
+                    : "text-emerald-600 font-bold focus:border-emerald-500 focus:ring-emerald-500/20"
+                }`}
+                placeholder="e.g. ADM"
               />
               {errors.code && (
                 <p className="text-[10px] text-red-500 mt-1">{errors.code}</p>
@@ -167,7 +189,9 @@ export default function RoleForm({
               <textarea
                 value={values.description}
                 onChange={(e) => handleChange("description", e.target.value)}
-                className={`${inputClasses({ error: !!errors.description })} min-h-[80px] py-2 focus:border-emerald-500 focus:ring-emerald-500/20`}
+                className={`${inputClasses({
+                  error: !!errors.description,
+                })} min-h-[80px] py-2 focus:border-emerald-500 focus:ring-emerald-500/20`}
                 placeholder="Brief explanation of this role..."
               />
             </div>

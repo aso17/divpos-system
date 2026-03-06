@@ -4,18 +4,16 @@ import {
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import {
-  Pencil,
-  Trash2,
-  PlusSquare,
-  Store,
-  X,
-  Search,
-  MapPin,
-  Phone,
-  Filter,
-} from "lucide-react";
 
+import Pencil from "lucide-react/dist/esm/icons/pencil";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
+import PlusSquare from "lucide-react/dist/esm/icons/plus-square";
+import Store from "lucide-react/dist/esm/icons/store";
+import X from "lucide-react/dist/esm/icons/x";
+import Search from "lucide-react/dist/esm/icons/search";
+import MapPin from "lucide-react/dist/esm/icons/map-pin";
+import Phone from "lucide-react/dist/esm/icons/phone";
+import Filter from "lucide-react/dist/esm/icons/filter";
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
@@ -43,7 +41,7 @@ export default function OutletList() {
           keyword: activeSearch,
           is_active: filterStatus, // Kirim filter ke backend
         });
-        console.log("Fetched Outlets:", res.data);
+        // console.log("Fetched Outlets:", res.data);
         if (isMounted) {
           setData(res.data?.data || []);
           setTotalCount(Number(res.data?.meta?.total || 0));
