@@ -4,7 +4,6 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use App\Models\Ms_outlet;
 use Illuminate\Support\Facades\Auth;
 use App\Helpers\CryptoHelper;
 use Illuminate\Contracts\Validation\Validator;
@@ -12,32 +11,31 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 
 class OutletRequest extends FormRequest
 {
-    
     protected $tenantId;
 
     public function authorize(): bool
     {
-        // Logic: Pastikan user terautentikasi dan memiliki tenant_id
-        $this->tenantId = Auth::user()?->employee?->tenant_id;
-        return $this->tenantId !== null;
+        // Ambil tenant_id langsung dari session/token login
+        $this->tenantId = Auth::user()?->tenant_id;
+        
+        // Hanya izinkan jika user punya tenant_id
+        return !is_null($this->tenantId);
     }
 
     protected function prepareForValidation()
     {
         $routeId = $this->route('id') ?? $this->route('outlet');
-        
-        // Logic Performa: Hanya proses sanitasi jika field ada di request
         $sanitizedData = [];
         
+        // 1. Dekripsi ID Outlet (untuk update)
         if ($routeId) {
             $sanitizedData['id'] = CryptoHelper::decrypt($routeId);
         }
 
-        if ($this->tenant_id && is_string($this->tenant_id)) {
-            $sanitizedData['tenant_id'] = CryptoHelper::decrypt($this->tenant_id);
-        }
+        // 2. 🛡️ PAKSA tenant_id dari Auth (Abaikan kiriman Frontend)
+        $sanitizedData['tenant_id'] = $this->tenantId;
 
-        // Security: Lapis baja dengan strip_tags + htmlspecialchars (XSS prevention)
+        // 3. Sanitasi Input Text (XSS Prevention)
         $fields = ['name', 'city', 'address', 'description'];
         foreach ($fields as $field) {
             if ($this->has($field)) {
@@ -52,48 +50,29 @@ class OutletRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Security: Anti-IDOR. Jika update, ID harus milik tenant_id user.
+          
             'id' => [
                 'nullable',
                 'integer',
                 $this->id ? Rule::exists('Ms_outlets', 'id')->where('tenant_id', $this->tenantId) : '',
             ],
             
-            'tenant_id' => [
-                'required',
-                'integer',
-                Rule::exists('Ms_tenants', 'id')
-            ],
-            
+         
             'name' => [
-                'required', 
-                'string', 
-                'min:3', 
-                'max:100',
+                'required', 'string', 'min:3', 'max:100',
                 'regex:/^[a-zA-Z0-9\s\.\,\-\'\(\)]+$/', 
             ],
 
             'phone' => 'required|numeric|digits_between:10,15',
-            
-            'city' => [
-                'required', 
-                'string', 
-                'max:50', 
-                'regex:/^[a-zA-Z\s\.\-]+$/'
-            ],
-
+            'city' => ['required', 'string', 'max:50', 'regex:/^[a-zA-Z\s\.\-]+$/'],
             
             'address' => [
-                'required', 
-                'string', 
-                'min:10',
+                'required', 'string', 'min:10',
                 'not_regex:/<script|javascript|http|https|www|<\/|{[ ]*$/i',
             ],
 
             'description' => [
-                'nullable', 
-                'string', 
-                'max:255',
+                'nullable', 'string', 'max:255',
                 'not_regex:/<script|javascript|http|https|www|<\/|{[ ]*$/i',
             ],
 
@@ -105,20 +84,19 @@ class OutletRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'id.exists'             => 'Akses ditolak: Data tidak ditemukan atau milik entitas lain.',
-            'name.regex'            => 'Nama mengandung karakter ilegal.',
-            'address.not_regex'     => 'Alamat tidak diizinkan mengandung link atau script.',
-            'description.not_regex' => 'Deskripsi tidak diizinkan mengandung link atau script.',
-            'phone.numeric'         => 'Nomor telepon wajib angka.',
+            'id.exists' => 'Access denied: Data not found or ownership mismatch.',
+            'name.regex' => 'Name contains illegal characters.',
+            'address.not_regex' => 'Links or scripts are not allowed in the address.',
+            'phone.numeric' => 'Phone number must be numeric.',
         ];
     }
 
     protected function failedValidation(Validator $validator)
     {
-        
         throw new HttpResponseException(response()->json([
             'success' => false,
-            'message' => 'Integrity Check Failed',
+            // 'data'=>$this->tenantId,
+            'message' => 'Integrity Check Failed test',
             'errors'  => $validator->errors()
         ], 422));
     }

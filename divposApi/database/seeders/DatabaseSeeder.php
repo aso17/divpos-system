@@ -20,10 +20,11 @@ class DatabaseSeeder extends Seeder
                 // RoleSeeder::class,
                 ModuleSeeder::class,
                 MenuSeeder::class,
+                BusinessModuleMapSeeder::class,
                 // RoleMenuPermissionSeeder::class,
                 SystemConfigurationSeeder::class,
                 UsersSeederv2::class,
-                // EmployeeSeederv2::class,
+                 EmployeeSeederv2::class,
             ]);
 
         }

@@ -1,94 +1,60 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB; 
 use App\Helpers\CryptoHelper;
+use App\Services\RolePermissionService;
 use App\Http\Resources\RolePermissionResource;
-use App\Services\RolePermissionService; 
-use App\Repositories\RolePermissionRepository; 
+
 class RolePermissionController extends Controller
 {
-   protected $permissionService;
-   protected $permissionRepository;
+    protected $service;
 
-    public function __construct(RolePermissionService $service, RolePermissionRepository $repository)
+    public function __construct(RolePermissionService $service)
     {
-        $this->permissionService = $service;
-        $this->permissionRepository = $repository;
+        $this->service = $service;
     }
-    
-    public function index(Request $request)
+
+   public function index(Request $request)
     {
-        // 1. Decrypt Input
-        $roleId   = CryptoHelper::decrypt($request->query('roleid'));
-        $tenantId = CryptoHelper::decrypt($request->query('tenantid'));
+        $roleId = CryptoHelper::decrypt($request->query('roleid'));
         
-        // 2. Ambil Info Role
-        $role = DB::table('Ms_roles')
-            ->where('id', $roleId)
-            ->where('tenant_id', $tenantId)
-            ->first(['role_name', 'code']);
+        
+        if (!$roleId) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid Role ID'], 400);
+        }
 
-        // 3. Panggil Service
-        $permissions = $this->permissionService->getPermissionsByRole($roleId, $tenantId);
+        $result = $this->service->getRoleWithPermissions($roleId);
 
-        // 4. Return via API Resource
+        if (!$result['role']) {
+            return response()->json(['status' => 'error', 'message' => 'Role tidak ditemukan'], 404);
+        }
+
         return response()->json([
             'status' => 'success',
-            'roleid'=> $roleId,
-            'data' => [
-                'role' => $role,
-                'permissions' => RolePermissionResource::collection($permissions)
-            ]
+            'role'   => $result['role'],
+            'data'   => RolePermissionResource::collection($result['permissions'])
         ]);
     }
-
 
     public function store(Request $request)
     {
         try {
+            
+            $roleId = CryptoHelper::decrypt($request->input('roleid'));
+            $this->service->syncPermissions($roleId, $request->input('permissions'));
 
-            $roleId   = $request->input('role_id'); 
-            $tenantId = $request->input('tenant_id');
-            $userLog  = $request->input('created_by'); 
-            $dataToInsert = $request->input('permissions');
-
-            $dataToInsert = collect($request->input('permissions'))
-                ->map(function ($p) use ($roleId, $tenantId, $userLog) {
-                    $view   = filter_var($p['can_view'], FILTER_VALIDATE_BOOLEAN);
-                    $create = filter_var($p['can_create'], FILTER_VALIDATE_BOOLEAN);
-                    $update = filter_var($p['can_update'], FILTER_VALIDATE_BOOLEAN);
-                    $delete = filter_var($p['can_delete'], FILTER_VALIDATE_BOOLEAN);
-                    $export = filter_var($p['can_export'], FILTER_VALIDATE_BOOLEAN);
-
-                    if (!$view && !$create && !$update && !$delete && !$export) return null;
-
-                    return [
-                        'tenant_id'  => $tenantId,
-                        'role_id'    => $roleId,
-                        'module_id'  => $p['module_id'], 
-                        'menu_id'    => $p['menu_id'],
-                        'can_view'   => $view,
-                        'can_create' => $create,
-                        'can_update' => $update,
-                        'can_delete' => $delete,
-                        'can_export' => $export,
-                        'is_active'  => true,
-                        'created_by' => $userLog,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                })
-                ->filter()
-                ->toArray();
-
-            // Panggil Repository
-            $permissions = $this->permissionRepository->updateRolePermissions($roleId, $tenantId, $dataToInsert);
-
-            return response()->json(['status' => 'success', 'message' => 'Permissions updated']);
-            } catch (\Exception $e) {
-                return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
-            }
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Mapping menu berhasil diperbarui'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                // 'role' =>$roleId,
+                'message' => $e->getMessage()
+            ], 500);
         }
+    }
 }

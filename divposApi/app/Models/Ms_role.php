@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Auth;
 
 class Ms_role extends Model
 {
@@ -13,22 +14,41 @@ class Ms_role extends Model
 
     protected $table = 'Ms_roles';
 
-    
-
     protected $fillable = [
         'tenant_id', 
         'role_name',
         'code',
         'description',
         'is_active',
+        'created_by',
+        'updated_by', 
     ];
 
-public function tenant()
-{
-    return $this->belongsTo(Ms_tenant::class, 'tenant_id');
-}
+    protected static function boot()
+    {
+        parent::boot();
 
-    // Mengatur format data saat dikirim ke Frontend (React)
+        // Saat data sedang dibuat (creating)
+        static::creating(function ($model) {
+            if (Auth::check()) {
+                $model->created_by = Auth::user()->id;
+                $model->updated_by = Auth::user()->id;
+            }
+        });
+
+        // Saat data sedang diupdate (updating)
+        static::updating(function ($model) {
+            if (Auth::check()) {
+                $model->updated_by = Auth::user()->id;
+            }
+        });
+    }
+
+    public function tenant()
+    {
+        return $this->belongsTo(Ms_tenant::class, 'tenant_id');
+    }
+
     protected $casts = [
         'is_active'  => 'boolean',
         'created_at' => 'datetime:Y-m-d H:i:s',
@@ -36,18 +56,11 @@ public function tenant()
         'deleted_at' => 'datetime:Y-m-d H:i:s',
     ];
 
-    /**
-     * Relasi: Satu Role bisa dipakai oleh banyak User.
-     */
     public function users(): HasMany
     {
         return $this->hasMany(Ms_user::class, 'role_id');
     }
 
-    /**
-     * Relasi: Satu Role memiliki banyak Permission (Hak akses menu/modul).
-     * Ini yang akan kita gunakan untuk setting module di React nanti.
-     */
     public function permissions(): HasMany
     {
         return $this->hasMany(Ms_role_menu_permission::class, 'role_id');

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Services\EmployeeService;
-use App\Models\Ms_employee;
 use App\Http\Resources\EmployeeResource;
 use App\Http\Requests\EmployeeRequest;
 use App\Helpers\CryptoHelper;
@@ -21,9 +20,13 @@ class EmployeeController extends Controller
 
     public function index(Request $request)
     {
-        $tenantId = CryptoHelper::decrypt($request->query('tenant_id'));
-        if (!$tenantId) return response()->json(['message' => 'Invalid tenant'], 422);
-
+        $user = Auth::user();
+        $tenantId = $user->tenant_id;
+      if (!$tenantId) {
+        return response()->json([
+            'message' => 'Access denied. You do not have permission to perform this action.'
+        ], 403);
+    }
         $params = [
             'tenant_id' => $tenantId,
             'keyword' => $request->query('keyword'),
@@ -38,10 +41,18 @@ class EmployeeController extends Controller
     public function store(EmployeeRequest $request)
     {
         try {
+
+        $user = Auth::user();
+        $tenantId = $user->tenant_id;
+
+        if (!$tenantId) {
+            return response()->json([
+                'message' => 'Access denied. You do not have permission to perform this action.'
+            ], 403);
+        }
            
-            $payload = $request->validated();
-            $user = Auth::user();
-            $payload['tenant_id'] = $user->employee?->tenant_id;    
+            $payload = $request->validated();         
+            $payload['tenant_id'] = $tenantId;  
             $payload['created_by'] = $user->id;
             $userId = $user->id;
 
@@ -70,9 +81,17 @@ class EmployeeController extends Controller
    public function update(EmployeeRequest $request, $id)
 {
     try {
-       
-        $payload = $request->validated();        
+        
         $user = Auth::user();
+        $tenantId = $user->tenant_id;
+        
+        if (!$tenantId) {
+            return response()->json([
+                'message' => 'Access denied. You do not have permission to perform this action.'
+            ], 403);
+        }
+
+        $payload = $request->validated();           
         $tenantId = $user->employee->tenant_id;
         $userId = $user->id; 
         $updatedEmployee = $this->employeeService->updateEmployee($payload['id'], $tenantId, $userId, $payload);
@@ -96,6 +115,7 @@ class EmployeeController extends Controller
     public function destroy(Request $request, $id)
     {
         try {
+
             $decryptedId = CryptoHelper::decrypt($id);
             $decryptedTenantId = CryptoHelper::decrypt($request->query('tenant_id'));
 

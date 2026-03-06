@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 use App\Services\RoleService;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Resources\RoleResource;
 use Illuminate\Http\Request;
 use App\Helpers\CryptoHelper;
+use App\Http\Requests\RoleRequest;
 class RoleController extends Controller
 {
 
@@ -17,49 +19,49 @@ protected $roleService;
 
     public function GetRolesByTenantId(Request $request)
     {
-        $roles = $this->roleService->getRolesForDropdown($request->tenant_id);
+         $user = Auth::user();
+        $tenantId = $user->tenant_id;
+
+        if (!$tenantId) {
+            return response()->json(['message' => 'Unauthorized: Tenant not found.'], 403);
+        }
+
+        $roles = $this->roleService->getRolesForDropdown($tenantId);
         return RoleResource::collection($roles);
     }
     
     public function index(Request $request)
     {
-        // 1. Validasi Input
-        $request->validate([
-            'tenant_id' => 'required|string',
-            'per_page'  => 'nullable|integer|min:1',
-            'keyword'   => 'nullable|string'
+        $user = Auth::user();
+        $tenantId = $user->tenant_id;
+
+        if (!$tenantId) {
+            return response()->json(['message' => 'Unauthorized: Tenant not found.'], 403);
+        }
+
+        $params = array_merge($request->all(), [
+            'tenant_id' => $tenantId 
         ]);
 
-        // 2. Panggil Service (Logic dekripsi & query ada di sana)
-        $query = $this->roleService->getRoles($request->all());
+        $query = $this->roleService->getRoles($params);
 
         if (!$query) {
             return response()->json(['message' => 'Invalid or Unauthorized Tenant'], 403);
         }
 
-        // 3. Handle Pagination
         $perPage = (int) $request->input('per_page', 10);
         $roles = $query->paginate($perPage);
-
-        // 4. Return Resource (Sesuai gaya Mas)
         return RoleResource::collection($roles)->response()->getData(true);
     }
 
-    public function store(Request $request)
+    public function store(RoleRequest $request)
     {
-        // 1. Validasi Input
-        $validated = $request->validate([
-            'tenant_id'   => 'required|integer',
-            'role_name'   => 'required|string|max:100',
-            'code'        => 'required|string|max:50',
-            'description' => 'nullable|string',
-            'is_active'   => 'boolean',
-            'created_by'  => 'required|string'
-        ]);
-
+        
         try {
-            
-            $role = $this->roleService->createRole($validated);
+
+            $payload = $request->validated();
+            $payload['tenant_id'] = (int) Auth::user()->tenant_id;
+            $role = $this->roleService->createRole($payload);
             
             return response()->json([
                 'status' => 'success',
@@ -71,20 +73,14 @@ protected $roleService;
         }
     }
 
-    public function update(Request $request, $id)
+    public function update(RoleRequest $request)
     {
-        // 2. Validasi Input Update
-        $validated = $request->validate([
-            'role_name'   => 'sometimes|required|string|max:100',
-            'description' => 'nullable|string',
-            'is_active'   => 'boolean',
-            'updated_by'  => 'required|string',
-            // Kita butuh tenant_id di update untuk pengecekan unique code di Service
-            'tenant_id'   => 'required|integer' 
-        ]);
+       $decryptedId = $request->id;
+        $payload = $request->validated();
+            $payload['tenant_id'] = (int) Auth::user()->tenant_id;
 
         try {
-            $role = $this->roleService->updateRole($id, $validated);
+            $role = $this->roleService->updateRole($decryptedId, $payload);
             
             return response()->json([
                 'status' => 'success',

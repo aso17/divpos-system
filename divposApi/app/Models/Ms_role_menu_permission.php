@@ -5,13 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Auth;
 
 class Ms_role_menu_permission extends Model
 {
     use HasFactory;
 
     protected $table = 'Ms_role_menu_permissions';
-
     protected $fillable = [
         'tenant_id',
         'role_id',
@@ -23,7 +23,8 @@ class Ms_role_menu_permission extends Model
         'can_delete',
         'can_export',
         'is_active',
-        'created_by',
+        'created_by', // Pastikan di DB tipe datanya BigInt/Integer
+        
     ];
 
     // Penting agar React JS menerima true/false murni
@@ -59,4 +60,17 @@ class Ms_role_menu_permission extends Model
     {
         return $this->belongsTo(Ms_module::class, 'module_id');
     }
+   
+   protected static function boot()
+{
+    parent::boot();
+
+    static::creating(function ($model) {
+        if (Auth::check()) {            
+            $model->tenant_id = $model->tenant_id ?? Auth::user()->tenant_id;             
+            // Auth::id() jauh lebih aman dari crash "id on null"
+            $model->created_by = (string) Auth::id();
+        }
+    });
+}
 }

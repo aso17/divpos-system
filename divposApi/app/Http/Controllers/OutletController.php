@@ -9,7 +9,7 @@ use App\Services\OutletService;
 use App\Services\LogDbErrorService; 
 use App\Helpers\CryptoHelper; 
 use App\Http\Requests\OutletRequest;
-use Illuminate\Support\Facades\DB; 
+
 
 class OutletController extends Controller
 {
@@ -25,7 +25,7 @@ class OutletController extends Controller
     {
        
         $user = Auth::user();
-        $tenantId = $user->employee?->tenant_id;
+        $tenantId = $user->tenant_id;
 
         if (!$tenantId) {
             return response()->json(['message' => 'Unauthorized: Tenant not found.'], 403);
@@ -48,12 +48,13 @@ class OutletController extends Controller
 public function store(OutletRequest $request)
 {
     try {
-
-       $data = $this->outletService->createOutlet($request->validated());
+        $payload = $request->validated();
+        $payload['tenant_id'] = (int) Auth::user()->tenant_id;
+        $outlet = $this->outletService->createOutlet($payload);
         return response()->json([
             'success' => true,
             'message' => 'Outlet berhasil dibuat',
-            'data'    => new OutletResource($data)
+            'data'    => new OutletResource($outlet)
         ], 201);
 
     } catch (\Exception $e) {
@@ -67,17 +68,18 @@ public function store(OutletRequest $request)
 }
 
 
-public function update(OutletRequest $request, $id)
+public function update(OutletRequest $request)
 {
     try {
        
         $decryptedId = $request->id;
         $payload = $request->validated();
-        $updated = $this->outletService->updateOutlet($decryptedId, $payload);
+        $payload['tenant_id'] = (int) Auth::user()->tenant_id;
+        $outlet = $this->outletService->updateOutlet($decryptedId, $payload);
         return response()->json([
-            'success' => true,
+            'success' => $decryptedId,
             'message' => 'Outlet berhasil diperbarui.',
-            'data'    => new OutletResource($updated)
+            'data'    => new OutletResource($outlet)
         ], 200);
 
     } catch (\Exception $e) {

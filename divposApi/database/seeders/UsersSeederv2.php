@@ -10,12 +10,6 @@ class UsersSeederv2 extends Seeder
 {
     public function run(): void
     {
-       
-        $superAdminRole = DB::table('Ms_roles')
-            ->where('code', 'SUPER_ADMIN')
-            ->whereNull('tenant_id')
-            ->first();
-
         $tenants = DB::table('Ms_tenants')->get();
 
         if ($tenants->isEmpty()) {
@@ -26,45 +20,20 @@ class UsersSeederv2 extends Seeder
         $password = Hash::make('P@ssword1234');
         $now = now();
 
-        // --- MASUKKAN SUPER ADMIN ---
-        $this->command->info("Memasukkan Super Admin...");
-        DB::table('Ms_users')->updateOrInsert(
-            ['email' => 'sa@la.com'],
-            [
-                'username'          => 'superadmin',
-                'password'          => $password,
-                'is_active'         => true,
-                'role_id'           => $superAdminRole->id ?? null,
-                'tenant_id'         => null, // SA tidak terikat tenant
-                'email_verified_at' => $now,
-                'created_at'        => $now,
-                'updated_at'        => $now,
-            ]
-        );
+        $this->command->info("Memasukkan Administrator (Owner) per Tenant...");
 
-        // --- MASUKKAN OWNER PER TENANT ---
-        $this->command->info("Memasukkan Owner per Tenant...");
         foreach ($tenants as $tenant) {
-            // 🎯 LOGIC PENTING: Cari Role OWNER yang khusus milik tenant ini
-            $roleOwner = DB::table('Ms_roles')
-                ->where('tenant_id', $tenant->id)
-                ->where('code', 'OWNER')
-                ->first();
-
-            if (!$roleOwner) {
-                $this->command->warn("Role OWNER untuk tenant {$tenant->name} tidak ditemukan. Dilewati...");
-                continue;
-            }
-
-            $emailOwner = "owner@" . $tenant->slug . ".test";
+            // Kita buat email admin yang unik berdasarkan slug tenant
+            $emailAdmin = "admin@" . $tenant->slug . ".com";
             
+            // 1. Masukkan User Administrator (Tanpa Role ID)
             DB::table('Ms_users')->updateOrInsert(
-                ['email' => $emailOwner],
+                ['email' => $emailAdmin],
                 [
-                    'username'          => "owner_" . str_replace('-', '_', $tenant->slug),
+                    'username'          => "admin_" . str_replace('-', '_', $tenant->slug),
                     'password'          => $password,
                     'is_active'         => true,
-                    'role_id'           => $roleOwner->id, // Role milik tenant ini
+                    'role_id'           => null, // PURE: Administrator/Owner tidak pakai role_id
                     'tenant_id'         => $tenant->id,
                     'email_verified_at' => $now,
                     'created_at'        => $now,
@@ -72,9 +41,17 @@ class UsersSeederv2 extends Seeder
                 ]
             );
 
-            // Update owner_id di table tenants agar sinkron
-            $user = DB::table('Ms_users')->where('email', $emailOwner)->first();
-            DB::table('Ms_tenants')->where('id', $tenant->id)->update(['owner_id' => $user->id]);
+            // 2. Ambil ID user yang baru dibuat/diupdate
+            $user = DB::table('Ms_users')->where('email', $emailAdmin)->first();
+
+            // 3. Update owner_id di table Ms_tenants agar sinkron sebagai administrator
+            DB::table('Ms_tenants')->where('id', $tenant->id)->update([
+                'owner_id' => $user->id
+            ]);
+
+            $this->command->line(" - Tenant: {$tenant->name} | Admin: {$emailAdmin}");
         }
+
+        $this->command->info("Selesai! Semua tenant kini memiliki satu Administrator.");
     }
 }

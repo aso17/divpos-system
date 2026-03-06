@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use Illuminate\Support\Facades\DB;
+use App\Models\Ms_role_menu_permission;
 
 class RolePermissionRepository
 {
@@ -32,21 +33,42 @@ class RolePermissionRepository
             ->get();
     }
 
-    public static function updateRolePermissions($roleId, $tenantId, array $dataToInsert)
+    
+    public function getRoleInfo($roleId, $tenantId)
     {
-        return DB::transaction(function () use ($roleId, $tenantId, $dataToInsert) {
-            
-            DB::table('Ms_role_menu_permissions')
-                ->where('tenant_id', $tenantId)
-                ->where('role_id', $roleId)
-                ->delete();
-
-            // 2. Insert yang baru (jika ada)
-            if (!empty($dataToInsert)) {
-                DB::table('Ms_role_menu_permissions')->insert($dataToInsert);
-            }
-            
-            return true;
-        });
+        return DB::table('Ms_roles')
+            ->where('id', (int) $roleId)
+            ->where('tenant_id', (int) $tenantId)
+            ->first(['role_name', 'code']);
     }
+
+    public function updateRolePermissions($roleId, $tenantId, array $data)
+        {
+            return DB::transaction(function () use ($data) {
+                foreach ($data as $item) {
+                    // Gunakan updateOrInsert untuk efisiensi
+                    DB::table('Ms_role_menu_permissions')->updateOrInsert(
+                        [
+                            // Kondisi Pengecekan (Unique Keys)
+                            'tenant_id' => $item['tenant_id'],
+                            'role_id'   => $item['role_id'],
+                            'menu_id'   => $item['menu_id'],
+                        ],
+                        [
+                            // Data yang akan di-update atau di-insert
+                            'module_id'  => $item['module_id'],
+                            'can_view'   => $item['can_view'],
+                            'can_create' => $item['can_create'],
+                            'can_update' => $item['can_update'],
+                            'can_delete' => $item['can_delete'],
+                            'can_export' => $item['can_export'],
+                            'is_active'  => $item['is_active'],
+                            'created_by' => $item['created_by'],
+                            'updated_at' => now(), // Selalu update waktu perubahan
+                        ]
+                    );
+                }
+                return true;
+            });
+        }
 }

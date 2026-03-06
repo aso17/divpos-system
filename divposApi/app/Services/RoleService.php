@@ -17,15 +17,14 @@ class RoleService
 
     public function getRolesForDropdown($encryptedTenantId)
     {
-        $tenantId = CryptoHelper::decrypt($encryptedTenantId);
-        if (!$tenantId) return collect();
-
-        return $this->roleRepo->getActiveRoles((int)$tenantId);
+        
+        return $this->roleRepo->getActiveRoles((int)$encryptedTenantId);
     }
 
     public function getRoles(array $params)
     {
-        $tenantId = CryptoHelper::decrypt($params['tenant_id'] ?? null);
+        $tenantId = $params['tenant_id'];
+
         if (!$tenantId) return null;
 
         $query = $this->roleRepo->getBaseQuery((int)$tenantId);
