@@ -59,13 +59,8 @@ const EmployeeService = {
       },
     });
   },
-
-  getEmployeeById: (id) => {
-    return api.get(`/employees/${id}`, {
-      params: {
-        ...params,
-      },
-    });
+  getAvailableEmployees: () => {
+    return api.get(`/get-available-employees`); // Panggil route backend
   },
 };
 

@@ -156,7 +156,7 @@ export default function UsersList() {
         header: "ROLE / AKSES",
         cell: ({ row }) => (
           <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wider border border-slate-200">
-            {row.original.role?.role_name || "GUEST"}
+            {row.original.role?.name || "GUEST"}
           </span>
         ),
       },
@@ -408,8 +408,13 @@ export default function UsersList() {
               prevUsers.map((u) => (u.id === datauser.id ? datauser : u)),
             );
           } else {
+            setData((prevUsers) => {
+              const newData = [datauser, ...prevUsers];
+              return newData.slice(0, pagination.pageSize);
+            });
+
+            setTotalCount((prev) => prev + 1);
             setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-            fetchUsers();
           }
           setOpenModal(false);
         }}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Select from "react-select";
 import SubmitButton from "../../components/SubmitButton";
 import { rules } from "../../utils/validators/rules";
 import { inputClasses } from "../../utils/validators/inputClasses";
@@ -6,6 +7,7 @@ import { assetUrl } from "../../utils/Url";
 import { useFormValidation } from "../../hooks/useFormValidation";
 import UsersService from "../../services/UsersService";
 import RoleService from "../../services/RoleService";
+import EmployeeService from "../../services/EmployeeService";
 
 export default function UserForm({
   open,
@@ -15,12 +17,14 @@ export default function UserForm({
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [roles, setRoles] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
 
   const { values, errors, handleChange, validate, setValues, setErrors } =
     useFormValidation(
       {
+        employee_id: "",
         full_name: "",
         email: "",
         username: "",
@@ -31,107 +35,78 @@ export default function UserForm({
         is_active: true,
       },
       {
-        full_name: [
-          (v) => rules.required(v, "Nama wajib diisi"),
-          (v) => rules.noHtml(v, "Nama tidak boleh mengandung tag HTML"),
-          (v) => rules.safeString(v, "Nama mengandung karakter ilegal"),
-        ],
+        full_name: [(v) => rules.required(v, "Nama wajib ada")],
         email: [
-          (v) => rules.required(v, "Email wajib diisi"),
-          (v) => rules.email(v, "Format email tidak valid"),
-          (v) => rules.noHtml(v, "Email tidak boleh mengandung tag HTML"),
+          (v) => rules.required(v, "Email login wajib diisi"),
+          (v) => rules.email(v, "Format email salah"),
         ],
         username: [
           (v) => rules.required(v, "Username wajib diisi"),
-          (v) => rules.minLength(v, 4, "Username minimal 4 karakter"),
-          (v) =>
-            rules.username(
-              v,
-              "Username hanya boleh huruf, angka, titik, dan underscore",
-            ),
-          (v) => rules.noHtml(v, "Username tidak boleh mengandung tag HTML"),
+          (v) => rules.minLength(v, 4, "Min. 4 karakter"),
         ],
-        phone: [
-          (v) => rules.required(v, "No HP wajib diisi"),
-          (v) => rules.phoneID(v, "Format No HP tidak valid (Gunakan 08/628)"),
-        ],
-        avatar: [
-          (file) => {
-            if (!file) return null;
-            return rules.fileType(
-              file,
-              ["image/jpeg", "image/png", "image/webp"],
-              "Avatar harus JPG / PNG / WEBP",
-            );
-          },
-          (file) => {
-            if (!file) return null;
-            return rules.fileSize(
-              file,
-              2 * 1024 * 1024,
-              "Ukuran avatar max 2MB",
-            );
-          },
-        ],
-        role_id: [(v) => rules.required(v, "Role wajib dipilih")],
+        role_id: [(v) => rules.required(v, "Pilih role")],
         password: [
           (v) => {
-            // Wajib jika data baru, opsional jika sedang edit
             if (!initialData && !v) return "Password wajib diisi";
-            // Jika user mengetikkan sesuatu (ingin ganti password), cek kekuatannya
-            if (v) {
-              return rules.strongPassword(
-                v,
-                8,
-                "Password minimal 8 karakter, mengandung Huruf Besar, Kecil, Angka, dan Simbol",
-              );
-            }
+            if (v) return rules.strongPassword(v, 8, "Min 8 Karakter & Simbol");
             return null;
           },
         ],
       },
     );
 
-  // Load roles saat modal dibuka
   useEffect(() => {
     if (open) {
-      RoleService.GetRolesByTenant().then((res) => {
-        setRoles(res.data?.data || []);
-      });
-    }
-  }, [open]);
-
-  useEffect(() => {
-    return () => {
-      if (avatarPreview && avatarPreview.startsWith("blob:")) {
-        URL.revokeObjectURL(avatarPreview);
+      RoleService.GetRolesByTenant().then((res) =>
+        setRoles(res.data?.data || []),
+      );
+      if (!initialData) {
+        EmployeeService.getAvailableEmployees().then((res) => {
+          const options = (res.data?.data || []).map((emp) => ({
+            value: emp.id,
+            label: `${emp.full_name}`,
+            raw: emp,
+          }));
+          setEmployees(options);
+        });
       }
-    };
-  }, [avatarPreview]);
+    }
+  }, [open, initialData]);
 
-  // Inisialisasi data saat Edit atau Tambah
+  const handleEmployeeSelect = (selectedOption) => {
+    if (selectedOption) {
+      const { raw } = selectedOption;
+      setValues((prev) => ({
+        ...prev,
+        employee_id: raw.id,
+        full_name: raw.full_name || "",
+        email: raw.email || "", // Default suggest, tapi bisa diubah
+        phone: raw.phone || "",
+        username: raw.full_name.toLowerCase().replace(/\s+/g, "."),
+      }));
+      setErrors({});
+    }
+  };
+
   useEffect(() => {
     if (!open) return;
-
     if (initialData) {
       setValues({
+        employee_id: initialData.employee?.id || "",
         full_name: initialData.full_name || "",
         email: initialData.email || "",
         username: initialData.username || "",
         phone: initialData.phone || "",
         password: "",
-        role_id: (
-          initialData.role_id ||
-          initialData.role?.role_id ||
-          ""
-        ).toString(),
-        is_active: initialData.is_active == 1 || initialData.is_active === true,
+        role_id: (initialData.role_id || "").toString(),
+        is_active: initialData.is_active == 1,
       });
       setAvatarPreview(
         initialData.avatar ? assetUrl(initialData.avatar) : null,
       );
     } else {
       setValues({
+        employee_id: "",
         full_name: "",
         email: "",
         username: "",
@@ -142,58 +117,37 @@ export default function UserForm({
       });
       setAvatarPreview(null);
     }
-
     setAvatarFile(null);
     setErrors({});
   }, [open, initialData, setValues, setErrors]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isSubmitting) return;
-    if (!validate()) return;
-
+    if (isSubmitting || !validate()) return;
     const formData = new FormData();
-    formData.append("full_name", values.full_name.trim());
-    formData.append("email", values.email.trim());
-    formData.append("username", values.username?.trim() || "");
-    formData.append("phone", values.phone?.trim() || "");
-    formData.append("role_id", values.role_id);
-    formData.append("is_active", values.is_active ? 1 : 0);
-
-    if (avatarFile instanceof File) {
-      formData.append("avatar", avatarFile);
-    }
-
-    if (values.password) {
-      formData.append("password", values.password);
-    }
-
-    if (initialData?.id) {
-      formData.append("_method", "PUT");
-    }
+    Object.keys(values).forEach((key) => {
+      if (values[key] !== null && values[key] !== "") {
+        formData.append(
+          key,
+          key === "is_active" ? (values[key] ? 1 : 0) : values[key],
+        );
+      }
+    });
+    if (avatarFile) formData.append("avatar", avatarFile);
+    if (initialData?.id) formData.append("_method", "PUT");
 
     try {
       setIsSubmitting(true);
-      let response;
-
-      if (initialData?.id) {
-        response = await UsersService.updateUser(initialData.id, formData);
-      } else {
-        response = await UsersService.createUser(formData);
-      }
-      const successMsg = response.data?.message;
-      triggerToast(successMsg, "success");
-      const newUser = response.data?.datauser;
-      if (newUser) {
-        onSuccess?.(newUser);
-      } else {
-        onSuccess?.();
-      }
-
+      const response = initialData?.id
+        ? await UsersService.updateUser(initialData.id, formData)
+        : await UsersService.createUser(formData);
+      const newUserData = response.data?.data;
+      // console.log(newUserData);
+      triggerToast(response.data?.message, "success");
+      onSuccess?.(newUserData);
       onClose();
     } catch (err) {
-      const errorMsg = err.response?.data?.message;
-      triggerToast(errorMsg, "error");
+      triggerToast(err.response?.data?.message || "Error", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -201,178 +155,241 @@ export default function UserForm({
 
   const triggerToast = (message, type) => {
     window.dispatchEvent(
-      new CustomEvent("global-toast", {
-        detail: { message, type },
-      }),
+      new CustomEvent("global-toast", { detail: { message, type } }),
     );
   };
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-lg overflow-y-auto max-h-[95vh]">
-        <h2 className="text-xs font-bold mb-4 text-slate-700 uppercase tracking-wide border-b pb-2">
-          {initialData ? "Edit User" : "Add User"}
-        </h2>
+    <div className="fixed inset-0 z-50 backdrop-blur-sm bg-slate-900/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[95vh]">
+        {/* Header */}
+        <div className="px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b flex justify-between items-center">
+          <h2 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">
+            {initialData ? "Edit User Access" : "New User Account"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-rose-500 transition-colors"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
 
         <form
           onSubmit={handleSubmit}
-          className="grid grid-cols-2 gap-4 text-xxs"
+          className="p-5 overflow-y-auto custom-scrollbar grid grid-cols-2 gap-x-3 gap-y-4"
         >
-          {/* Avatar Upload */}
-          <div className="col-span-2 flex items-center gap-4 bg-slate-50 p-3 rounded-lg border border-dashed">
-            <div className="w-16 h-16 rounded-full bg-white overflow-hidden border-2 border-white shadow-sm shrink-0">
-              {avatarPreview ? (
-                <img
-                  src={avatarPreview}
-                  alt="Preview"
-                  className="w-full h-full object-cover"
+          {/* Baris Foto & Select Karyawan (Hemat Ruang) */}
+          <div className="col-span-2 flex items-center gap-4 bg-slate-50/80 p-3 rounded-xl border border-slate-100 mb-1">
+            <div className="relative">
+              <div className="w-14 h-14 rounded-full bg-white border-2 border-white shadow-sm overflow-hidden ring-1 ring-slate-100">
+                {avatarPreview ? (
+                  <img
+                    src={avatarPreview}
+                    className="w-full h-full object-cover"
+                    alt="Preview"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-300 text-[8px]">
+                    No Photo
+                  </div>
+                )}
+              </div>
+              <label className="absolute -bottom-1 -right-1 bg-blue-600 text-white p-1 rounded-full cursor-pointer shadow-md border border-white">
+                <svg
+                  className="w-2.5 h-2.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="3"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      setAvatarFile(file);
+                      setAvatarPreview(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+              </label>
+            </div>
+
+            <div className="flex-grow">
+              <label className="block mb-1 text-slate-500 font-bold uppercase text-[8px]">
+                Pilih Data karyawan
+              </label>
+              {!initialData ? (
+                <Select
+                  options={employees}
+                  onChange={handleEmployeeSelect}
+                  placeholder="Select Employee..."
+                  className="text-[10px]"
+                  styles={{
+                    control: (b) => ({
+                      ...b,
+                      borderRadius: "8px",
+                      minHeight: "32px",
+                    }),
+                  }}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-300">
-                  No Image
+                <div className="text-[10px] font-bold text-slate-700 bg-white p-2 rounded-lg border border-slate-200">
+                  {values.full_name}
                 </div>
               )}
             </div>
-
-            <div className="flex-1">
-              <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
-                Foto / Avatar
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files[0];
-                  if (!file) return;
-                  setAvatarFile(file);
-                  setAvatarPreview(URL.createObjectURL(file));
-                  setErrors((prev) => ({ ...prev, avatar: null }));
-                }}
-                className="text-[10px] w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xxs file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer"
-              />
-              {errors.avatar && (
-                <p className="text-[10px] text-red-500 mt-1">{errors.avatar}</p>
-              )}
-            </div>
           </div>
 
-          <div className="col-span-1">
+          {/* Full Name - READ ONLY */}
+          <div className="col-span-2 sm:col-span-1">
             <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
-              Nama
+              Full Name
             </label>
             <input
               value={values.full_name}
-              onChange={(e) => handleChange("full_name", e.target.value)}
-              className={inputClasses({ error: !!errors.full_name })}
+              readOnly
+              placeholder="Auto-filled"
+              className="w-full bg-slate-50 border border-slate-200 p-2 rounded-lg text-slate-500 cursor-not-allowed text-[10px] outline-none"
             />
-            {errors.full_name && (
-              <p className="text-[10px] text-red-500 mt-1">
-                {errors.full_name}
-              </p>
-            )}
           </div>
 
-          <div className="col-span-1">
+          {/* Phone - READ ONLY */}
+          <div className="col-span-2 sm:col-span-1">
             <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
-              Email
+              Phone
             </label>
             <input
-              type="email"
-              value={values.email}
-              onChange={(e) => handleChange("email", e.target.value)}
-              className={inputClasses({ error: !!errors.email })}
+              value={values.phone}
+              readOnly
+              placeholder="Auto-filled"
+              className="w-full bg-slate-50 border border-slate-200 p-2 rounded-lg text-slate-500 cursor-not-allowed text-[10px] outline-none"
             />
-            {errors.email && (
-              <p className="text-[10px] text-red-500 mt-1">{errors.email}</p>
-            )}
           </div>
-
-          <div className="col-span-1">
+          {/* Username - EDITABLE */}
+          <div className="col-span-2 sm:col-span-1">
             <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
               Username
             </label>
             <input
               value={values.username}
               onChange={(e) => handleChange("username", e.target.value)}
-              className={inputClasses({ error: !!errors.username })}
+              placeholder="username"
+              className={
+                inputClasses({ error: !!errors.username }) +
+                " rounded-lg p-2 text-[10px]"
+              }
             />
             {errors.username && (
-              <p className="text-[10px] text-red-500 mt-1">{errors.username}</p>
+              <p className="text-[8px] text-rose-500 mt-1">{errors.username}</p>
             )}
           </div>
-
-          <div className="col-span-1">
+          {/* Email - EDITABLE */}
+          <div className="col-span-2 sm:col-span-1">
             <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
-              Phone
+              Email Login
             </label>
             <input
-              value={values.phone}
-              onChange={(e) => handleChange("phone", e.target.value)}
-              className={inputClasses({ error: !!errors.phone })}
-              placeholder="628..."
+              value={values.email}
+              onChange={(e) => handleChange("email", e.target.value)}
+              placeholder="name@mail.com"
+              className={
+                inputClasses({ error: !!errors.email }) +
+                " rounded-lg p-2 text-[10px]"
+              }
             />
-            {errors.phone && (
-              <p className="text-[10px] text-red-500 mt-1">{errors.phone}</p>
+            {errors.email && (
+              <p className="text-[8px] text-rose-500 mt-1">{errors.email}</p>
             )}
           </div>
 
+          {/* Password - EDITABLE */}
           <div className="col-span-2">
             <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
-              Password
+              Password Access
             </label>
             <input
               type="password"
               value={values.password}
               onChange={(e) => handleChange("password", e.target.value)}
-              className={inputClasses({ error: !!errors.password })}
               placeholder={
-                initialData
-                  ? "Kosongkan jika tidak diubah"
-                  : "Minimal 8 karakter"
+                initialData ? "Keep empty to stay same" : "Set password"
+              }
+              className={
+                inputClasses({ error: !!errors.password }) +
+                " rounded-lg p-2 text-[10px]"
               }
             />
             {errors.password && (
-              <p className="text-[10px] text-red-500 mt-1">{errors.password}</p>
+              <p className="text-[8px] text-rose-500 mt-1">{errors.password}</p>
             )}
           </div>
 
+          {/* Role - EDITABLE */}
           <div className="col-span-1">
             <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
-              Role
+              Assign Role
             </label>
             <select
               value={values.role_id}
               onChange={(e) => handleChange("role_id", e.target.value)}
-              className={inputClasses({ error: !!errors.role_id })}
+              className={
+                inputClasses({ error: !!errors.role_id }) +
+                " rounded-lg p-2 text-[10px]"
+              }
             >
-              <option value="">-- Pilih --</option>
+              <option value="">-- Role --</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.role_name}
                 </option>
               ))}
             </select>
+
             {errors.role_id && (
-              <p className="text-[10px] text-red-500 mt-1">{errors.role_id}</p>
+              <p className="text-[8px] text-rose-500 mt-1">{errors.role_id}</p>
             )}
           </div>
 
+          {/* Active Switch */}
           <div className="col-span-1 flex items-end pb-2">
-            <label className="flex items-center gap-2 cursor-pointer group">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={values.is_active}
                 onChange={(e) => handleChange("is_active", e.target.checked)}
-                className="w-3 h-3 rounded text-blue-600 focus:ring-blue-500"
+                className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600"
               />
-              <span className="text-slate-600 font-bold uppercase text-[9px] group-hover:text-blue-600 transition-colors">
+              <span className="text-slate-600 font-bold uppercase text-[9px]">
                 User Active
               </span>
             </label>
           </div>
 
+          {/* Footer Actions */}
           <div className="col-span-2 flex justify-end gap-2 pt-4 border-t mt-2">
             <button
               type="button"

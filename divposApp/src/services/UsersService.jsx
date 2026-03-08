@@ -1,31 +1,17 @@
 import api from "./api";
-import { GetWithExpiry } from "../utils/Storage";
-import { encrypt } from "../utils/Encryptions";
-
-const getTenantId = () => {
-  const user = GetWithExpiry("user");
-  return user?.tenant.id || null;
-};
 
 const UsersService = {
   getUsers: (params = {}) => {
-    const tenantId = getTenantId();
     return api.get("/users", {
       params: {
-        tenant_id: tenantId,
         ...params,
       },
     });
   },
 
   createUser: (payload) => {
-    const tenantId = getTenantId();
-    const encriptedTenantId = encrypt(tenantId);
+    // console.log(payload);
     if (payload instanceof FormData) {
-      if (encriptedTenantId && !payload.has("tenant_id")) {
-        payload.append("tenant_id", encriptedTenantId);
-      }
-
       return api.post("/users", payload, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -41,8 +27,6 @@ const UsersService = {
       }
     });
 
-    if (encriptedTenantId) formData.append("tenant_id", encriptedTenantId);
-
     return api.post("/users", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
@@ -52,19 +36,14 @@ const UsersService = {
 
   updateUser: (id, payload) => {
     let finalData;
-    const tenantId = getTenantId();
-    const encriptedTenantId = encrypt(tenantId);
-    const encryptedUserId = encrypt(id);
+
     if (payload instanceof FormData) {
       finalData = payload;
 
-      // Pastikan _method PUT ada untuk Laravel/Backend spoofing
       if (!finalData.has("_method")) {
         finalData.append("_method", "PUT");
       }
-    }
-    // Jika payload masih berupa Object biasa (fallback)
-    else {
+    } else {
       finalData = new FormData();
       finalData.append("_method", "PUT");
 
@@ -81,12 +60,6 @@ const UsersService = {
       });
     }
 
-    // Tambahkan tenant_id jika belum ada
-    // Pastikan fungsi ini tersedia
-    if (encriptedTenantId && !finalData.has("tenant_id")) {
-      finalData.append("tenant_id", encriptedTenantId);
-    }
-
     return api.post(`/users/${encryptedUserId}`, finalData, {
       headers: {
         "Content-Type": "multipart/form-data",
@@ -95,21 +68,7 @@ const UsersService = {
   },
 
   deleteUser: (id) => {
-    const tenantId = getTenantId();
-    const encryptedUserId = encrypt(id);
-    const encryptedTenantId = encrypt(tenantId);
-
-    return api.delete(`/user/${encryptedUserId}`, {
-      params: {
-        tenant_id: encryptedTenantId,
-      },
-    });
-  },
-  getUserById: (id) => {
-    const tenantId = getTenantId();
-    return api.get(`/users/${id}`, {
-      params: { tenant_id: tenantId },
-    });
+    return api.delete(`/user/${id}`);
   },
 };
 
