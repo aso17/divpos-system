@@ -2,6 +2,9 @@
 
 namespace App\Services;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use App\Models\Ms_employee;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use App\Repositories\UserRepository;
@@ -16,19 +19,21 @@ class UserService
         $this->userRepo = $userRepo;
     }
 
+    public function getEmployeesForDropdown($tenantId)
+    {
+        return $this->userRepo->findAvailableEmployees($tenantId);
+    }
    public function getAllUsers(array $params)
     {
         // 1. Logika Dekripsi Tenant ID
-        $tenantId = CryptoHelper::decrypt($params['tenant_id'] ?? null);
+        $tenantId = $params['tenant_id'];
         
         if (!$tenantId || !is_numeric($tenantId)) {
             return null;
         }
 
-        // 2. Ambil Base Query (Join: Ms_users + Ms_employees + Ms_roles)
         $query = $this->userRepo->getBaseUserQuery((int)$tenantId);
 
-        // 3. Logika Filter Keyword (Gunakan Alias Tabel agar tidak Ambigus)
         if (!empty($params['keyword'])) {
             $q = $params['keyword'];
             $query->where(function ($w) use ($q) {
@@ -53,59 +58,75 @@ class UserService
         return $query->orderByDesc('Ms_users.created_at');
     }
 
-
     public function createUser(array $data, $avatarFile = null)
     {
-        // 1. Hash Password
-        $data['password'] = Hash::make($data['password']);
-
-        // 2. Default Active
-        $data['is_active'] = $data['is_active'] ?? true;
-
-        // 3. Sanitasi Data Dasar
-        $data['full_name'] = strip_tags($data['full_name']);
-        $data['username'] = strip_tags($data['username'] ?? '');
-
-        // 4. Handle Avatar
-        if ($avatarFile) {
-            $filename = 'avatar_' . time() . '_' . Str::uuid() . '.' . $avatarFile->getClientOriginalExtension();
-            $data['avatar'] = $avatarFile->storeAs('avatars', $filename, 'public');
-        }
-
-        return $this->userRepo->create($data);
-    }
-
-    public function updateUserInfo(int $id, int $tenantId, array $data, $avatarFile = null)
-    {
-        $user = $this->userRepo->findByIdAndTenant($id, $tenantId);
-        if (!$user) return null;
-
-        // 1. Handle Password Hash
-        if (!empty($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        } else {
-            unset($data['password']); // Jangan update password kalau kosong
-        }
-
-        // 2. Handle Avatar Upload
-        if ($avatarFile) {
-            // Hapus foto lama jika ada
-            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
-                Storage::disk('public')->delete($user->avatar);
+        return DB::transaction(function () use ($data, $avatarFile) {
+            
+            // 1. Logika Tenant
+            if (!empty($data['employee_id'])) {
+                $data['tenant_id'] = null;
+            } else {
+                $userAuth = Auth::user();
+                $data['tenant_id'] = $userAuth->tenant_id ?? $userAuth->employee?->tenant_id;
             }
 
-            // Simpan foto baru
-            $filename = 'avatar_' . time() . '_' . Str::uuid() . '.' . $avatarFile->getClientOriginalExtension();
-            $data['avatar'] = $avatarFile->storeAs('avatars', $filename, 'public');
-        }
+            // 2. Hash Password & Status
+            $data['password'] = Hash::make($data['password']);
+            $data['is_active'] = $data['is_active'] ?? true;
 
-        return $this->userRepo->update($user, $data);
+            // 3. Handle Avatar
+            if ($avatarFile) {
+                $filename = 'avatar_' . time() . '_' . Str::uuid() . '.' . $avatarFile->getClientOriginalExtension();
+                $data['avatar'] = $avatarFile->storeAs('avatars', $filename, 'public');
+            }
+
+           
+            $user = $this->userRepo->create($data);
+
+            if (!empty($data['employee_id'])) {
+                Ms_employee::where('id', $data['employee_id'])
+                    ->update(['user_id' => $user->id]);
+            }
+
+            return $user;
+        });
     }
+
+public function updateUserInfo(int $id, int $tenantId, array $data, $avatarFile = null)
+{
+    
+    $user = $this->userRepo->findById($id); 
+    
+    if (!$user) return null;
+
+    // 1. Logika Tenant tetap konsisten
+    if (!empty($data['employee_id'])) {
+        $data['tenant_id'] = null;
+    }
+
+    // 2. Handle Password Hash
+    if (!empty($data['password'])) {
+        $data['password'] = Hash::make($data['password']);
+    } else {
+        unset($data['password']);
+    }
+
+    // 3. Handle Avatar Upload & Delete Old
+    if ($avatarFile) {
+        if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+            Storage::disk('public')->delete($user->avatar);
+        }
+        $filename = 'avatar_' . time() . '_' . Str::uuid() . '.' . $avatarFile->getClientOriginalExtension();
+        $data['avatar'] = $avatarFile->storeAs('avatars', $filename, 'public');
+    }
+
+    return $this->userRepo->update($user, $data);
+}
 
     public function deleteUserById(int $id, int $tenantId)
     {
         // 1. Cari data lewat Repo
-        $user = $this->userRepo->findByIdAndTenant($id, $tenantId);
+        $user = $this->userRepo->findById($id);
 
         if (!$user) {
             return null; // Atau throw exception khusus

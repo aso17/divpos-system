@@ -1,11 +1,12 @@
 <?php
 
 namespace App\Http\Controllers;
-
-use App\Models\Ms_user;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
+use App\Http\Resources\EmployeeDropdownResource; 
 use App\Http\Resources\UserResource;
 use App\Services\UserService; 
+use App\Http\Requests\UserRequest; 
 use App\Helpers\CryptoHelper; 
 
 class UserController extends Controller
@@ -19,134 +20,124 @@ class UserController extends Controller
        
     }
     
-  // GET /user
-    public function index(Request $request)
+  public function index(Request $request)
     {
-        // 1. Validasi awal (tenant_id wajib ada)
-        if (!$request->filled('tenant_id')) {
-            return response()->json(['message' => 'tenant_id is required'], 422);
+       
+        $request->validate([
+            'keyword'  => 'nullable|string|max:50',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        $userAuth = Auth::user();
+        $tenantId = $userAuth->tenant_id ?? $userAuth->employee?->tenant_id;
+
+        if (!$tenantId) {
+            return response()->json(['message' => 'Access denied.'], 403);
         }
 
-        // 2. Panggil Service (Dekripsi terjadi di dalam sana)
-        $query = $this->userService->getAllUsers($request->all());
+        // 2. Siapkan Params
+        $params = [
+            'tenant_id' => $tenantId,
+            'keyword'   => $request->query('keyword'),
+        ];
 
-        // 3. Jika dekripsi gagal atau tenant tidak valid
+        // 3. Panggil Service
+        $query = $this->userService->getAllUsers($params);
+
         if (!$query) {
-            return response()->json(['message' => 'Invalid or Unauthorized Tenant'], 403);
+            return response()->json(['message' => 'Unauthorized Tenant'], 403);
         }
 
-        // 4. Handle Pagination secara otomatis
+        // 4. Pagination dengan default yang aman
         $perPage = (int) $request->input('per_page', 10);
-        
-        // Laravel sudah pintar, jika ada ?page= di URL, paginate() otomatis menyesuaikan
         $users = $query->paginate($perPage);
 
-        // 5. Kembalikan Resource (Semua ID akan otomatis ter-enkripsi lagi di sini)
         return UserResource::collection($users);
     }
 
-
-    // GET /user/{id}
-    public function show($id)
+    public function getAvailableEmployees()
     {
-        return Ms_user::with([
-            'role:id,role_name,code',
-            'tenant:id,slug,code'
-        ])->findOrFail($id);
-    }
+       
+       try {
+        $user = Auth::user();      
+        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
+        if (!$tenantId) {
+            return response()->json(['message' => 'Tenant tidak ditemukan'], 403);
+        }
 
-    // POST /user
-    public function store(Request $request)
-    {
-        try {
-            
-            $decryptedTenantId = CryptoHelper::decrypt($request->tenant_id);
+        $employees = $this->userService->getEmployeesForDropdown($tenantId);
 
-            if (!$decryptedTenantId) {
-                throw new \Exception("Tenant ID tidak valid.");
-            }
-            $request->merge([
-                'role_id' => $request->role_id,
-                'tenant_id' => $decryptedTenantId,
-            ]);
-
-            // 2. Validasi
-            $request->validate([
-                'full_name' => 'required|string|max:100',
-                'email'     => 'required|email|unique:Ms_users,email',
-                'username'  => 'nullable|string|max:50|unique:Ms_users,username',
-                'password'  => 'required|min:8',
-                'role_id'   => 'required|exists:Ms_roles,id',
-                'tenant_id' => 'required|exists:Ms_tenants,id',
-                'avatar'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            ]);
-
-            // 3. Panggil Service
-            $user = $this->userService->createUser(
-                $request->all(), 
-                $request->file('avatar')
-            );
-
-            return response()->json([
-                'success' => true,
-                'message' => 'User berhasil dibuat',
-                'datauser' => $user, 
-            ], 201);
+        return response()->json([
+            'status' => 'success',          
+            'data'   => EmployeeDropdownResource::collection($employees)
+        ]);
 
         } catch (\Exception $e) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Gagal membuat user: ' . $e->getMessage()
+                'status'  => 'error',
+                'message' => 'Gagal mengambil data: ' . $e->getMessage()
             ], 500);
         }
     }
 
-    // PUT /user/{id}
+    // POST /user
+public function store(UserRequest $request)
+{
+    try {
+      
+        $user = $this->userService->createUser(
+            $request->validated(), 
+            $request->file('avatar')
+        );
 
-    public function update(Request $r, $id)
-    {
-        try {
-            // 1. Dekripsi ID (untuk keperluan query dan validasi unique)
-            $decryptedId = CryptoHelper::decrypt($id);
-            $decryptedTenantId = CryptoHelper::decrypt($r->header('X-Tenant-Id') ?? $r->tenant_id);
+        $user->load(['role', 'employee']);
 
-            if (!$decryptedId) throw new \Exception("ID tidak valid.");
+        return response()->json([
+            'success' => true,
+            'message' => 'User berhasil dibuat',
+            'data' => new UserResource($user), 
+        ], 201);
 
-            // 2. Validasi (Gunakan ID asli untuk rule unique)
-            $r->validate([
-                'full_name' => 'required|string|max:100',
-                'email'     => "required|email|unique:Ms_users,email,$decryptedId",
-                'username'  => "nullable|unique:Ms_users,username,$decryptedId",
-                'role_id'   => 'nullable|exists:Ms_roles,id',
-                'avatar'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            ]);
-
-            // 3. Siapkan data untuk Service
-            $data = $r->only(['full_name', 'email', 'username', 'phone', 'role_id', 'is_active', 'password']);
-            $avatar = $r->file('avatar');
-
-            // 4. Jalankan Service
-            $user = $this->userService->updateUserInfo(
-                (int)$decryptedId, 
-                (int)$decryptedTenantId, 
-                $data, 
-                $avatar
-            );
-
-            if (!$user) {
-                return response()->json(['status' => 'error', 'message' => 'User tidak ditemukan'], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'User berhasil diupdate',
-                'datauser' => $user, 
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Update gagal: ' . $e->getMessage()], 500);
-        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Gagal membuat user: ' . $e->getMessage()
+        ], 500);
     }
+}
+
+// PUT /user/{id}
+public function update(UserRequest $request, $id)
+{
+    try {
+        // Ambil ID asli yang sudah didekripsi di prepareForValidation
+        $decryptedId = $request->id;
+        
+        // Ambil Tenant ID dari user yang sedang login (sebagai filter akses)
+        $userAuth = Auth::user();
+        $tenantId = $userAuth->tenant_id ?? $userAuth->employee?->tenant_id;
+
+        $user = $this->userService->updateUserInfo(
+            (int)$decryptedId, 
+            (int)$tenantId, 
+            $request->validated(), 
+            $request->file('avatar')
+        );
+
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'User tidak ditemukan atau tidak ada akses'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User berhasil diupdate',
+            'datauser' => $user, 
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json(['message' => 'Update gagal: ' . $e->getMessage()], 500);
+    }
+}
 
     // DELETE /user/{id}
     public function destroy(Request $request, $id)

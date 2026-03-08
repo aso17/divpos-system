@@ -9,7 +9,7 @@ class MenuRepository
     /**
      * Jalur Staff: Berdasarkan Role + Tenant (Isolasi Data)
      */
-    public static function getByRole(int $roleId, int $tenantId)
+ public static function getByRole(int $roleId, int $tenantId)
     {
         return DB::table('Ms_role_menu_permissions as rp')
             ->join('Ms_menus as m', 'm.id', '=', 'rp.menu_id')
@@ -18,7 +18,8 @@ class MenuRepository
                 ['rp.role_id', '=', $roleId],
                 ['rp.tenant_id', '=', $tenantId],
                 ['rp.is_active', '=', true],
-                ['m.is_active', '=', true]
+                ['m.is_active', '=', true],
+                ['rp.can_view', '=', true] // <--- WAJIB DITAMBAHKAN INI
             ])
             ->select([
                 'm.id as menu_id', 

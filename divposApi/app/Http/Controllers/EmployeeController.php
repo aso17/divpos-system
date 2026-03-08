@@ -21,16 +21,18 @@ class EmployeeController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $tenantId = $user->tenant_id;
+        $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
       if (!$tenantId) {
         return response()->json([
             'message' => 'Access denied. You do not have permission to perform this action.'
         ], 403);
-    }
+         }
+
         $params = [
             'tenant_id' => $tenantId,
             'keyword' => $request->query('keyword'),
         ];
+
         $query = $this->employeeService->getAllEmployees($params);
         $perPage = (int) ($request->per_page ?? 10);
         $employees = $query->paginate($perPage);
@@ -79,39 +81,39 @@ class EmployeeController extends Controller
     }
 
    public function update(EmployeeRequest $request, $id)
-{
-    try {
-        
-        $user = Auth::user();
-        $tenantId = $user->tenant_id;
-        
-        if (!$tenantId) {
+    {
+        try {
+            
+            $user = Auth::user();
+            $tenantId = $user->tenant_id;
+            
+            if (!$tenantId) {
+                return response()->json([
+                    'message' => 'Access denied. You do not have permission to perform this action.'
+                ], 403);
+            }
+
+            $payload = $request->validated();           
+            $tenantId = $user->employee->tenant_id;
+            $userId = $user->id; 
+            $updatedEmployee = $this->employeeService->updateEmployee($payload['id'], $tenantId, $userId, $payload);
+            $updatedEmployee->refresh();
+            $updatedEmployee->load(['user.role', 'outlet']);
+
             return response()->json([
-                'message' => 'Access denied. You do not have permission to perform this action.'
-            ], 403);
+                'success' => true,
+                'user_id' => $userId,
+                'message' => 'Data karyawan ' . $updatedEmployee->full_name . ' berhasil diperbarui',
+                'data'    => new EmployeeResource($updatedEmployee),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memperbarui data: ' . $e->getMessage()
+            ], 500);
         }
-
-        $payload = $request->validated();           
-        $tenantId = $user->employee->tenant_id;
-        $userId = $user->id; 
-        $updatedEmployee = $this->employeeService->updateEmployee($payload['id'], $tenantId, $userId, $payload);
-        $updatedEmployee->refresh();
-        $updatedEmployee->load(['user.role', 'outlet']);
-
-        return response()->json([
-            'success' => true,
-            'user_id' => $userId,
-            'message' => 'Data karyawan ' . $updatedEmployee->full_name . ' berhasil diperbarui',
-            'data'    => new EmployeeResource($updatedEmployee),
-        ]);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Gagal memperbarui data: ' . $e->getMessage()
-        ], 500);
     }
-}
     public function destroy(Request $request, $id)
     {
         try {

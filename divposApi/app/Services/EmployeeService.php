@@ -43,7 +43,7 @@ class EmployeeService
 
         $lastSequence = 0;
         if ($lastEmployee && $lastEmployee->employee_code) {
-          
+        
             $lastSequence = (int) substr((string)$lastEmployee->employee_code, -4);
         }
 
@@ -85,86 +85,86 @@ class EmployeeService
  * UPDATE EMPLOYEE
  */
     public function updateEmployee($id, $tenantId, $updatedBy, array $data)
-{
-    return DB::transaction(function () use ($id, $tenantId, $updatedBy, $data) {
-        
-        // 1. Dekripsi ID
-        $realId = is_numeric($id) ? $id : CryptoHelper::decrypt($id);
+    {
+        return DB::transaction(function () use ($id, $tenantId, $updatedBy, $data) {
+            
+            // 1. Dekripsi ID
+            $realId = is_numeric($id) ? $id : CryptoHelper::decrypt($id);
 
-        $employee = Ms_employee::where('id', $realId)
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
+            $employee = Ms_employee::where('id', $realId)
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
 
-        // 🛡️ DETEKSI OWNER (Check menggunakan user_id lama sebelum diupdate)
-        $isOwner = $this->isOwner($employee->user_id, $tenantId);
+            // 🛡️ DETEKSI OWNER (Check menggunakan user_id lama sebelum diupdate)
+            $isOwner = $this->isOwner($employee->user_id, $tenantId);
 
-        // 2. Logic Akun Login (Ms_user)
-        $hasLogin = filter_var($data['has_login'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            // 2. Logic Akun Login (Ms_user)
+            $hasLogin = filter_var($data['has_login'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-        if ($hasLogin) {
-            if ($employee->user_id) {
-                // UPDATE USER LAMA
-                $user = Ms_user::find($employee->user_id);
-                if ($user) {
-                    $userData = [
+            if ($hasLogin) {
+                if ($employee->user_id) {
+                    // UPDATE USER LAMA
+                    $user = Ms_user::find($employee->user_id);
+                    if ($user) {
+                        $userData = [
+                            'email'      => $data['email'],
+                            'updated_by' => $updatedBy,
+                        ];
+                        // 🔒 PROTEKSI ROLE: Jika dia Owner, abaikan role_id dari request
+                        if (!$isOwner) {
+                            $userData['role_id'] = $data['role_id'] ?? null;
+                        }
+
+                        if (!empty($data['password'])) {
+                            $userData['password'] = Hash::make($data['password']);
+                        }
+                        $user->update($userData);
+                    }
+                } else {
+                    // BUAT USER BARU
+                    $newUser = Ms_user::create([
+                        'tenant_id'  => $tenantId,
                         'email'      => $data['email'],
-                        'updated_by' => $updatedBy,
-                    ];
-                    // 🔒 PROTEKSI ROLE: Jika dia Owner, abaikan role_id dari request
-                    if (!$isOwner) {
-                        $userData['role_id'] = $data['role_id'] ?? null;
-                    }
-
-                    if (!empty($data['password'])) {
-                        $userData['password'] = Hash::make($data['password']);
-                    }
-                    $user->update($userData);
+                        'password'   => Hash::make($data['password'] ?? 'password123'),
+                        'role_id'    => $data['role_id'] ?? null,
+                        'created_by' => $updatedBy,
+                    ]);
+                    $employee->user_id = $newUser->id;
                 }
             } else {
-                // BUAT USER BARU
-                $newUser = Ms_user::create([
-                    'tenant_id'  => $tenantId,
-                    'email'      => $data['email'],
-                    'password'   => Hash::make($data['password'] ?? 'password123'),
-                    'role_id'    => $data['role_id'] ?? null,
-                    'created_by' => $updatedBy,
-                ]);
-                $employee->user_id = $newUser->id;
-            }
-        } else {
 
-            // 🔒 PROTEKSI DELETE LOGIN: Owner tidak boleh menghilangkan akses loginnya sendiri
-            if ($employee->user_id) {
-                if ($isOwner) {
-                    throw new \Exception("Akses Ditolak: Akun Pemilik Utama wajib memiliki akses login.");
+                // 🔒 PROTEKSI DELETE LOGIN: Owner tidak boleh menghilangkan akses loginnya sendiri
+                if ($employee->user_id) {
+                    if ($isOwner) {
+                        throw new \Exception("Akses Ditolak: Akun Pemilik Utama wajib memiliki akses login.");
+                    }
+                    Ms_user::where('id', $employee->user_id)->delete();
+                    $employee->user_id = null;
                 }
-                Ms_user::where('id', $employee->user_id)->delete();
-                $employee->user_id = null;
             }
-        }
 
-        // 3. Update Profil Karyawan
-        $updateData = [
-            'full_name'  => $data['full_name'],
-            'phone'      => $data['phone'] ?? null,
-            'job_title'  => $data['job_title'] ?? null,
-            'outlet_id'  => $data['outlet_id'] ?? null, 
-            'updated_by' => $updatedBy,
-            'user_id'    => $employee->user_id,
-        ];
+            // 3. Update Profil Karyawan
+            $updateData = [
+                'full_name'  => $data['full_name'],
+                'phone'      => $data['phone'] ?? null,
+                'job_title'  => $data['job_title'] ?? null,
+                'outlet_id'  => $data['outlet_id'] ?? null, 
+                'updated_by' => $updatedBy,
+                'user_id'    => $employee->user_id,
+            ];
 
-        // 🔒 PROTEKSI IS_ACTIVE: Owner harus selalu AKTIF
-        if ($isOwner) {
-            $updateData['is_active'] = true; 
-        } else {
-            $updateData['is_active'] = $data['is_active'] ?? true;
-        }
+            // 🔒 PROTEKSI IS_ACTIVE: Owner harus selalu AKTIF
+            if ($isOwner) {
+                $updateData['is_active'] = true; 
+            } else {
+                $updateData['is_active'] = $data['is_active'] ?? true;
+            }
 
-        $employee->update($updateData);
+            $employee->update($updateData);
 
-        return $employee->load(['user.role', 'outlet']);
-    });
-}
+            return $employee->load(['user.role', 'outlet']);
+        });
+    }
 
     public function deleteEmployee($id, $tenantId)
     {

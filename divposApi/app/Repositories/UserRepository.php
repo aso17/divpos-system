@@ -3,10 +3,19 @@
 namespace App\Repositories;
 
 use App\Models\Ms_user;
+use App\Models\Ms_employee;
 
 class UserRepository
 {
    
+    public function findAvailableEmployees($tenantId)
+    {
+        return Ms_employee::whereNull('user_id')
+        ->where('tenant_id', $tenantId)
+        ->where('is_active', true)
+        ->select('id', 'full_name','phone','job_title', 'tenant_id')
+        ->get();
+    }
 
     public function getBaseUserQuery(int $tenantId)
     {
@@ -16,24 +25,23 @@ class UserRepository
                 'Ms_users.email',
                 'Ms_users.username',
                 'Ms_users.role_id',
-                'Ms_users.tenant_id as user_tenant_id', // Tanda Owner
+                'Ms_users.tenant_id as user_tenant_id', 
                 'Ms_users.avatar',
                 'Ms_users.is_active as user_active',
                 'Ms_users.created_at',               
                 'Ms_employees.full_name', 
                 'Ms_employees.phone',
                 'Ms_employees.is_active as employee_status',
-                'Ms_employees.tenant_id as employee_tenant_id', // Tanda Staff
+                'Ms_employees.tenant_id as employee_tenant_id', 
                 'Ms_roles.role_name',
                 'Ms_roles.code as role_code'
             ])
-            // 1. Join Employee (Wajib karena Staff ada di sini)
+           
             ->leftJoin('Ms_employees', 'Ms_users.id', '=', 'Ms_employees.user_id')
             
             // 2. Join Role
             ->leftJoin('Ms_roles', 'Ms_users.role_id', '=', 'Ms_roles.id')
             
-            // 3. FILTER SAKTI: Ambil yang tenant_id-nya cocok di Users OR di Employees
             ->where(function($query) use ($tenantId) {
                 $query->where('Ms_users.tenant_id', $tenantId) // Ini ambil si Owner
                     ->orWhere('Ms_employees.tenant_id', $tenantId); // Ini ambil semua Staff-nya
@@ -42,10 +50,11 @@ class UserRepository
             ->whereNull('Ms_users.deleted_at')
             ->orderBy('Ms_users.created_at', 'desc');
     }
-   public function findByIdAndTenant(int $id, int $tenantId)
+
+   public function findById(int $id)
     {
         return Ms_user::where('id', $id)
-            ->where('tenant_id', $tenantId)
+            
             ->first();
     }
 

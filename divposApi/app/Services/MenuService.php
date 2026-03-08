@@ -30,8 +30,8 @@ class MenuService
                     $rows = MenuRepository::getByBusinessType($bizCode);
                 }
             } 
-            elseif (!empty($user->role_id) && !empty($user->tenant_id)) {
-                $rows = MenuRepository::getByRole((int) $user->role_id, (int) $user->tenant_id);
+            elseif (!empty($user->role_id) && !empty($user->employee?->tenant_id)) {
+                $rows = MenuRepository::getByRole((int) $user->role_id, (int) $user->employee?->tenant_id);
             }
 
             if ($rows->isEmpty()) {
