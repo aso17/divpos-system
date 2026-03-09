@@ -60,7 +60,7 @@ const UsersService = {
       });
     }
 
-    return api.post(`/users/${encryptedUserId}`, finalData, {
+    return api.post(`/users/${id}`, finalData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },

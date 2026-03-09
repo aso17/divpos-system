@@ -10,7 +10,7 @@ const RolespermissionService = {
   },
 
   updatePermissions: (roleID, payload) => {
-    console.log(roleID);
+    // console.log(roleID);
     const finalPayload = {
       ...payload,
       roleid: roleID,

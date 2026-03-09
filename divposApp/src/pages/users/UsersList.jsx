@@ -137,7 +137,7 @@ export default function UsersList() {
               {row.original.full_name}
             </span>
             <span className="text-emerald-600 font-mono text-[9px] font-bold">
-              @{row.original.username || "no-username"}
+              username:{row.original.username || "no-username"}
             </span>
           </div>
         ),

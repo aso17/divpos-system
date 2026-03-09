@@ -8,6 +8,7 @@ import { useFormValidation } from "../../hooks/useFormValidation";
 import UsersService from "../../services/UsersService";
 import RoleService from "../../services/RoleService";
 import EmployeeService from "../../services/EmployeeService";
+import { GetWithExpiry } from "../../utils/Storage";
 
 export default function UserForm({
   open,
@@ -20,22 +21,30 @@ export default function UserForm({
   const [employees, setEmployees] = useState([]);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
+  // Ambil data user yang sedang login
+  const authUser = GetWithExpiry("user"); // Sesuaikan key-nya
+  const isOwner = authUser?.is_owner === true;
+  // console.log(isOwner);
+  // console.log(initialData);
+  const isEditingSelf = initialData && authUser?.id === initialData?.id;
+  const isFieldDisabled = !isOwner || isEditingSelf;
 
   const { values, errors, handleChange, validate, setValues, setErrors } =
     useFormValidation(
       {
+        // PARAMETER 1: Initial Values
         employee_id: "",
         full_name: "",
         email: "",
         username: "",
         phone: "",
-        avatar: null,
         password: "",
         role_id: "",
         is_active: true,
       },
       {
-        full_name: [(v) => rules.required(v, "Nama wajib ada")],
+        // PARAMETER 2: Validation Schema (Rules)
+        employee_id: [(v) => rules.required(v, "Pilih karyawan")],
         email: [
           (v) => rules.required(v, "Email login wajib diisi"),
           (v) => rules.email(v, "Format email salah"),
@@ -44,9 +53,15 @@ export default function UserForm({
           (v) => rules.required(v, "Username wajib diisi"),
           (v) => rules.minLength(v, 4, "Min. 4 karakter"),
         ],
-        role_id: [(v) => rules.required(v, "Pilih role")],
+        role_id: [
+          (v) => {
+            if (isFieldDisabled) return null;
+            return rules.required(v, "Pilih role");
+          },
+        ],
         password: [
           (v) => {
+            if (initialData && !v) return null;
             if (!initialData && !v) return "Password wajib diisi";
             if (v) return rules.strongPassword(v, 8, "Min 8 Karakter & Simbol");
             return null;
@@ -80,7 +95,7 @@ export default function UserForm({
         ...prev,
         employee_id: raw.id,
         full_name: raw.full_name || "",
-        email: raw.email || "", // Default suggest, tapi bisa diubah
+        email: raw.email || "",
         phone: raw.phone || "",
         username: raw.full_name.toLowerCase().replace(/\s+/g, "."),
       }));
@@ -98,12 +113,10 @@ export default function UserForm({
         username: initialData.username || "",
         phone: initialData.phone || "",
         password: "",
-        role_id: (initialData.role_id || "").toString(),
+        role_id: (initialData.role.id || "").toString(),
         is_active: initialData.is_active == 1,
       });
-      setAvatarPreview(
-        initialData.avatar ? assetUrl(initialData.avatar) : null,
-      );
+      setAvatarPreview(initialData.avatar);
     } else {
       setValues({
         employee_id: "",
@@ -240,26 +253,42 @@ export default function UserForm({
 
             <div className="flex-grow">
               <label className="block mb-1 text-slate-500 font-bold uppercase text-[8px]">
-                Pilih Data karyawan
+                Data karyawan
               </label>
               {!initialData ? (
                 <Select
                   options={employees}
                   onChange={handleEmployeeSelect}
-                  placeholder="Select Employee..."
+                  placeholder="Select or search Employee..."
                   className="text-[10px]"
                   styles={{
-                    control: (b) => ({
-                      ...b,
+                    control: (base, state) => ({
+                      ...base,
                       borderRadius: "8px",
                       minHeight: "32px",
+                      // Border hijau saat normal dan saat fokus
+                      borderColor: state.isFocused ? "#10b981" : "#10b98180", // 10b98180 itu emerald-500 dengan opacity
+                      boxShadow: state.isFocused ? "0 0 0 1px #10b981" : "none",
+                      "&:hover": {
+                        borderColor: "#10b981",
+                      },
+                    }),
+                    placeholder: (base) => ({
+                      ...base,
+                      color: "#94a3b8", // slate-400
                     }),
                   }}
                 />
               ) : (
-                <div className="text-[10px] font-bold text-slate-700 bg-white p-2 rounded-lg border border-slate-200">
+                /* Tampilan saat Edit User */
+                <div className="text-[10px] font-bold  bg-emerald-50/30 p-2 rounded-lg border border-emerald-500/50">
                   {values.full_name}
                 </div>
+              )}
+              {errors.employee_id && (
+                <p className="text-[8px] text-rose-500 mt-1">
+                  {errors.employee_id}
+                </p>
               )}
             </div>
           </div>
@@ -348,17 +377,22 @@ export default function UserForm({
             )}
           </div>
 
-          {/* Role - EDITABLE */}
           <div className="col-span-1">
             <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
               Assign Role
             </label>
             <select
               value={values.role_id}
+              // --- PASANG DI SINI ---
+              disabled={isFieldDisabled}
               onChange={(e) => handleChange("role_id", e.target.value)}
               className={
                 inputClasses({ error: !!errors.role_id }) +
-                " rounded-lg p-2 text-[10px]"
+                ` rounded-lg p-2 text-[10px] border-emerald-500/50 ${
+                  isFieldDisabled
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : ""
+                }`
               }
             >
               <option value="">-- Role --</option>
@@ -368,20 +402,30 @@ export default function UserForm({
                 </option>
               ))}
             </select>
-
+            {/* Kasih info kecil biar user nggak bingung kenapa mati */}
+            {isFieldDisabled && (
+              <p className="text-[7px] text-slate-400 mt-1 italic tracking-tight">
+                {isEditingSelf
+                  ? "*Hak akses akun sendiri tidak dapat diubah"
+                  : "*Wewenang Owner diperlukan untuk mengubah role"}
+              </p>
+            )}
             {errors.role_id && (
               <p className="text-[8px] text-rose-500 mt-1">{errors.role_id}</p>
             )}
           </div>
 
-          {/* Active Switch */}
           <div className="col-span-1 flex items-end pb-2">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label
+              className={`flex items-center gap-2 ${isFieldDisabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+            >
               <input
                 type="checkbox"
+                // --- PASANG DI SINI ---
+                disabled={isFieldDisabled}
                 checked={values.is_active}
                 onChange={(e) => handleChange("is_active", e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600"
+                className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600"
               />
               <span className="text-slate-600 font-bold uppercase text-[9px]">
                 User Active
@@ -403,7 +447,7 @@ export default function UserForm({
               label={initialData ? "Update User" : "Create User"}
               loadingLabel="Processing..."
               fullWidth={false}
-              className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200"
+              className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-blue-600  shadow-sm shadow-blue-200"
             />
           </div>
         </form>

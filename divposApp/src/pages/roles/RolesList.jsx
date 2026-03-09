@@ -88,20 +88,23 @@ export default function RolesList() {
 
     try {
       const res = await RolesService.deleteRole(role.id);
-      const successMsg =
-        res.data?.message || "Data role telah berhasil dihapus.";
-      await showConfirm(successMsg, "Hapus Berhasil", "success");
+
+      setData((prev) => prev.filter((r) => r.id !== role.id));
 
       if (data.length === 1 && pagination.pageIndex > 0) {
         setPagination((prev) => ({
           ...prev,
           pageIndex: prev.pageIndex - 1,
         }));
-      } else {
-        fetchRoles();
       }
 
       setTotalCount((prev) => Math.max(0, prev - 1));
+
+      await showConfirm(
+        res.data?.message || "Data role telah berhasil dihapus.",
+        "Hapus Berhasil",
+        "success",
+      );
     } catch (err) {
       const errorMsg =
         err.response?.data?.message || "Terjadi kesalahan server";
@@ -410,6 +413,12 @@ export default function RolesList() {
               prev.map((r) => (r.id === newRole.id ? newRole : r)),
             );
           } else {
+            setData((prev) => {
+              const newData = [newRole, ...prev];
+              return newData.slice(0, pagination.pageSize);
+            });
+
+            setTotalCount((prev) => prev + 1);
             setPagination((prev) => ({ ...prev, pageIndex: 0 }));
           }
           setOpenModal(false);
