@@ -23,7 +23,7 @@ class RoleRepository
         ])
         ->where('tenant_id', $tenantId)      
         ->where('is_active', true)      
-        ->orderBy('role_name', 'asc');
+        ->orderBy('role_name', 'desc');
 }
 
     /**

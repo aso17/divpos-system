@@ -10,15 +10,13 @@ class UserResource extends JsonResource
 {
     public function toArray($request)
     {
-        // 1. Logic ID & Tenant (Mencakup alias dari Join)
+        
         $id = $this->id;
         $tenantId = $this->user_tenant_id ?? ($this->employee_tenant_id ?? ($this->tenant_id ?? ($this->employee->tenant_id ?? null)));
 
-        // 2. Logic Profile (Handle Left Join & Eager Load)
         $fullName = $this->full_name ?? ($this->employee->full_name ?? '-');
         $phone    = $this->phone ?? ($this->employee->phone ?? '-');
 
-        // 3. Logic Status (Handle Alias user_active & employee_status)
         $isActive = $this->user_active ?? ($this->is_active ?? ($this->employee_status ?? false));
 
         // 4. Logic Role

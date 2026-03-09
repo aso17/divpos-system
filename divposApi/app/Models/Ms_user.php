@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// Pindahkan urutan use agar Authenticatable paling atas
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,10 +10,11 @@ use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Facades\Auth;
 
 class Ms_user extends Authenticatable
 {
-    // Gunakan Trait yang dibutuhkan
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $table = 'Ms_users';
@@ -34,6 +34,8 @@ class Ms_user extends Authenticatable
         'last_login_ip',
         'locked_until',
         'login_attempts',
+        'created_by', // Tambahkan ini agar bisa di-fill jika perlu
+        'updated_by', // Tambahkan ini agar bisa di-fill jika perlu
     ];
 
     protected $hidden = [
@@ -42,8 +44,10 @@ class Ms_user extends Authenticatable
     ];
 
     /**
-     * Laravel 11 style casting
+     * Agar is_owner otomatis muncul saat model di-convert ke Array/JSON
      */
+    protected $appends = ['is_owner'];
+
     protected function casts(): array
     {
         return [
@@ -55,7 +59,44 @@ class Ms_user extends Authenticatable
         ];
     }
 
+    /**
+     * Accessor is_owner
+     */
+    protected function isOwner(): Attribute
+    {
+        return Attribute::get(fn () => !is_null($this->tenant_id));
+    }
+
+    /**
+     * Automate Audit Logs
+     */
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            if (Auth::check()) {
+                $model->created_by = Auth::id();
+                $model->updated_by = Auth::id();
+            }
+        });
+
+        static::updating(function ($model) {
+            if (Auth::check()) {
+                $model->updated_by = Auth::id();
+            }
+        });
+    }
+
     /* --- RELATIONSHIPS --- */
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(Ms_user::class, 'created_by');
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(Ms_user::class, 'updated_by');
+    }
 
     public function tenant(): BelongsTo
     {

@@ -77,7 +77,7 @@ class UserService
             // 3. Handle Avatar
             if ($avatarFile) {
                 $filename = 'avatar_' . time() . '_' . Str::uuid() . '.' . $avatarFile->getClientOriginalExtension();
-                $data['avatar'] = $avatarFile->storeAs('avatars', $filename, 'public');
+                $data['avatar'] = $avatarFile->storeAs('imgAvatars', $filename, 'public');
             }
 
            
@@ -92,37 +92,49 @@ class UserService
         });
     }
 
-public function updateUserInfo(int $id, int $tenantId, array $data, $avatarFile = null)
-{
-    
-    $user = $this->userRepo->findById($id); 
-    
-    if (!$user) return null;
+    public function updateUserInfo(int $id,  array $data, $avatarFile = null)
+    {
+        // 1. Cari user berdasarkan ID
+        $user = $this->userRepo->findById($id); 
+        if (!$user) return null;
 
-    // 1. Logika Tenant tetap konsisten
-    if (!empty($data['employee_id'])) {
-        $data['tenant_id'] = null;
-    }
+        // --- PROTEKSI WEWENANG ---
+        $authUser = Auth::user();
+        
+        // Menggunakan Accessor is_owner yang sudah kita buat di model Ms_user
+        $isOwner = $authUser->is_owner; 
+        $isEditingSelf = $authUser->id === $user->id;
 
-    // 2. Handle Password Hash
-    if (!empty($data['password'])) {
-        $data['password'] = Hash::make($data['password']);
-    } else {
-        unset($data['password']);
-    }
-
-    // 3. Handle Avatar Upload & Delete Old
-    if ($avatarFile) {
-        if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
-            Storage::disk('public')->delete($user->avatar);
+        // Jika BUKAN Owner ATAU sedang mengedit diri sendiri, 
+        // paksa hapus data role, status aktif, dan tenant agar tidak berubah.
+        if (!$isOwner || $isEditingSelf) {
+            unset($data['role_id'], $data['is_active'], $data['tenant_id']);
         }
-        $filename = 'avatar_' . time() . '_' . Str::uuid() . '.' . $avatarFile->getClientOriginalExtension();
-        $data['avatar'] = $avatarFile->storeAs('avatars', $filename, 'public');
+        // -------------------------
+
+        // 2. Handle Password Hash
+        if (!empty($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        } else {
+           
+            unset($data['password']);
+        }
+
+        // 3. Handle Avatar Upload & Delete Old
+        if ($avatarFile) {
+            // Hapus file lama jika ada
+            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+                Storage::disk('public')->delete($user->avatar);
+            }
+            
+            $filename = 'avatar_' . time() . '_' . \Illuminate\Support\Str::uuid() . '.' . $avatarFile->getClientOriginalExtension();
+            $data['avatar'] = $avatarFile->storeAs('imgAvatars', $filename, 'public');
+        }
+
+        // 4. Eksekusi update melalui Repository
+        // Kolom 'updated_by' akan otomatis terisi berkat fungsi booted() di model
+        return $this->userRepo->update($user, $data);
     }
-
-    return $this->userRepo->update($user, $data);
-}
-
     public function deleteUserById(int $id, int $tenantId)
     {
         // 1. Cari data lewat Repo

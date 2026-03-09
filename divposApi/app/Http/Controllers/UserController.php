@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use App\Http\Resources\EmployeeDropdownResource; 
 use App\Http\Resources\UserResource;
+use App\Services\LogDbErrorService;
 use App\Services\UserService; 
 use App\Http\Requests\UserRequest; 
 use App\Helpers\CryptoHelper; 
@@ -13,10 +14,13 @@ class UserController extends Controller
 {
     protected $userService;
     protected $userRepository;
+    protected $logService;
 
-    public function __construct(UserService $userService)
+
+    public function __construct(UserService $userService,LogDbErrorService $logService)
     {
         $this->userService = $userService;
+        $this->logService = $logService;
        
     }
     
@@ -73,6 +77,7 @@ class UserController extends Controller
         ]);
 
         } catch (\Exception $e) {
+            $this->logService->log($e);
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Gagal mengambil data: ' . $e->getMessage()
@@ -99,6 +104,9 @@ public function store(UserRequest $request)
         ], 201);
 
     } catch (\Exception $e) {
+
+        $this->logService->log($e);
+
         return response()->json([
             'status' => 'error',
             'message' => 'Gagal membuat user: ' . $e->getMessage()
@@ -107,38 +115,44 @@ public function store(UserRequest $request)
 }
 
 // PUT /user/{id}
-public function update(UserRequest $request, $id)
-{
-    try {
-        // Ambil ID asli yang sudah didekripsi di prepareForValidation
-        $decryptedId = $request->id;
-        
-        // Ambil Tenant ID dari user yang sedang login (sebagai filter akses)
-        $userAuth = Auth::user();
-        $tenantId = $userAuth->tenant_id ?? $userAuth->employee?->tenant_id;
+    public function update(UserRequest $request)
+    {
+        try {
+            // ID sudah didekripsi di UserRequest (prepareForValidation)
+            $decryptedId = $request->id;      
+            
+            // Eksekusi Service
+            $user = $this->userService->updateUserInfo(
+                (int)$decryptedId,       
+                $request->validated(), 
+                $request->file('avatar')
+            );
 
-        $user = $this->userService->updateUserInfo(
-            (int)$decryptedId, 
-            (int)$tenantId, 
-            $request->validated(), 
-            $request->file('avatar')
-        );
+            if (!$user) {
+                return response()->json([
+                    'status' => 'error', 
+                    'message' => 'User tidak ditemukan atau Anda tidak memiliki akses'
+                ], 404);
+            }
 
-        if (!$user) {
-            return response()->json(['status' => 'error', 'message' => 'User tidak ditemukan atau tidak ada akses'], 404);
+            // Load relasi untuk response yang lengkap
+            $user->load(['role', 'employee.tenant', 'employee.outlet']);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'User berhasil diperbarui',
+                'data'    => new UserResource($user),
+            ]);
+
+        } catch (\Exception $e) {
+            // Log error jika diperlukan: Log::error($e->getMessage());
+             $this->logService->log($e);
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
+            ], 500);
         }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'User berhasil diupdate',
-            'datauser' => $user, 
-        ]);
-
-    } catch (\Exception $e) {
-        return response()->json(['message' => 'Update gagal: ' . $e->getMessage()], 500);
     }
-}
-
     // DELETE /user/{id}
     public function destroy(Request $request, $id)
     {
@@ -169,6 +183,7 @@ public function update(UserRequest $request, $id)
             ], 200);
 
         } catch (\Exception $e) {
+             $this->logService->log($e);
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage()

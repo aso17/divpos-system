@@ -9,13 +9,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('Ms_users', function (Blueprint $table) {
-            $table->id(); // Shorthand untuk bigIncrements('id')
+            $table->id(); 
 
-            // --- PENTING: Penanda Bisnis ---
-            // Kita buat nullable agar tidak bentrok 'telur vs ayam' saat registrasi owner
             $table->foreignId('tenant_id')
                   ->nullable()
-                  ->index(); // Cukup index saja, constrained opsional jika urutan migrasinya sulit
+                  ->index(); 
 
             // --- DATA AUTENTIKASI ---
             $table->string('email', 150)->unique();
@@ -25,10 +23,12 @@ return new class extends Migration
 
             // Status Login (Tambah index untuk filter cepat)
             $table->boolean('is_active')->default(true)->index();
-            
+            // Audit Trailing
+            $table->unsignedBigInteger('created_by')->nullable()->index();
+            $table->unsignedBigInteger('updated_by')->nullable()->index();
+
             $table->timestampTz('email_verified_at')->nullable();
 
-            // 🔐 Security enhancement (Sudah Bagus)
             $table->unsignedTinyInteger('login_attempts')->default(0);
             $table->timestampTz('locked_until')->nullable();
 
@@ -44,8 +44,10 @@ return new class extends Migration
             $table->timestampsTz();
             $table->softDeletesTz();
             
-            // Note: Tidak perlu $table->index('email') secara manual karena unique() 
-            // di PostgreSQL/MySQL sudah otomatis membuat index B-Tree.
+            // Opsional: Jika ingin pakai foreign key resmi agar data konsisten
+            $table->foreign('created_by')->references('id')->on('Ms_users')->onDelete('set null');
+            $table->foreign('updated_by')->references('id')->on('Ms_users')->onDelete('set null');
+            
         });
 
         // Tabel password_reset_tokens (Sudah Tepat)

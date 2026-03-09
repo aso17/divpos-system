@@ -22,10 +22,10 @@ return new class extends Migration
             // Relasi ke Outlet (Nullable: Untuk posisi manager yang pegang banyak outlet)
             $table->foreignId('outlet_id')->nullable()->constrained('Ms_outlets')->nullOnDelete();
             
-            // 🎯 PENANDA TAHUN: Untuk optimasi generate kode (Point Seek)
+            // 🎯 PENANDA TAHUN: Untuk optimasi generate kode
             $table->unsignedSmallInteger('year');
 
-            // KODE KARYAWAN: Kita hapus ->unique() global, ganti ke Composite Unique di bawah
+            // KODE KARYAWAN
             $table->string('employee_code', 20);
             
             // Profil
@@ -35,25 +35,33 @@ return new class extends Migration
             
             // Status Operasional
             $table->boolean('is_active')->default(true)->index();
+
+            // --- AUDIT TRAILING (Pencatat Aktivitas) ---
+            $table->unsignedBigInteger('created_by')->nullable()->index();
+            $table->unsignedBigInteger('updated_by')->nullable()->index();
             
-            // Audit - Menggunakan Timezone (Tz) sesuai standar pgsql Mas
+            // Audit - Menggunakan Timezone (Tz) sesuai standar pgsql
             $table->timestampsTz();
             $table->softDeletesTz();
 
             /* -------------------------------------------------------------------------- */
-            /* INDEXING & CONSTRAINTS UNTUK SKALA BESAR                                   */
+            /* INDEXING & CONSTRAINTS                                                     */
             /* -------------------------------------------------------------------------- */
             
-            // 🛡️ MULTITENANT UNIQUE: Kode boleh sama antar Tenant, tapi wajib beda di satu Tenant
+            // Foreign Key untuk Audit
+            $table->foreign('created_by')->references('id')->on('Ms_users')->onDelete('set null');
+            $table->foreign('updated_by')->references('id')->on('Ms_users')->onDelete('set null');
+
+            // MULTITENANT UNIQUE: Kode boleh sama antar Tenant, tapi wajib beda di satu Tenant
             $table->unique(['tenant_id', 'employee_code'], 'unique_emp_code_per_tenant');
 
-            // 🚀 GENERATE CODE INDEX: Mencari kode terakhir berdasarkan Tahun & Tenant
+            // GENERATE CODE INDEX: Mencari kode terakhir berdasarkan Tahun & Tenant
             $table->index(['tenant_id', 'year', 'employee_code'], 'idx_emp_year_lookup');
             
-            // 📊 OPERATIONAL INDEX: Untuk list karyawan di dashboard outlet
+            // OPERATIONAL INDEX: Untuk list karyawan di dashboard outlet
             $table->index(['tenant_id', 'outlet_id', 'is_active'], 'idx_emp_operational');
             
-            // 🔍 SEARCH INDEX: Pencarian nama karyawan
+            // SEARCH INDEX: Pencarian nama karyawan
             $table->index('full_name', 'idx_emp_name');
         });
     }

@@ -6,16 +6,19 @@ use Illuminate\Http\Request;
 use App\Services\EmployeeService;
 use App\Http\Resources\EmployeeResource;
 use App\Http\Requests\EmployeeRequest;
+use App\Services\LogDbErrorService;
 use App\Helpers\CryptoHelper;
 use Illuminate\Support\Facades\Auth;
 
 class EmployeeController extends Controller
 {
     protected $employeeService;
+    protected $logService;
 
-    public function __construct(EmployeeService $employeeService)
+    public function __construct(EmployeeService $employeeService,LogDbErrorService $logService)
     {
         $this->employeeService = $employeeService;
+        $this->logService = $logService;
     }
 
     public function index(Request $request)
@@ -73,6 +76,7 @@ class EmployeeController extends Controller
 
         } catch (\Exception $e) {
             // Berikan pesan error yang lebih informatif
+             $this->logService->log($e);
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menambahkan karyawan: ' . $e->getMessage()
@@ -84,9 +88,8 @@ class EmployeeController extends Controller
     {
         try {
             
-            $user = Auth::user();
-            $tenantId = $user->tenant_id;
-            
+            $user = Auth::user();          
+            $tenantId = $user->employee->tenant_id;
             if (!$tenantId) {
                 return response()->json([
                     'message' => 'Access denied. You do not have permission to perform this action.'
@@ -94,7 +97,7 @@ class EmployeeController extends Controller
             }
 
             $payload = $request->validated();           
-            $tenantId = $user->employee->tenant_id;
+           
             $userId = $user->id; 
             $updatedEmployee = $this->employeeService->updateEmployee($payload['id'], $tenantId, $userId, $payload);
             $updatedEmployee->refresh();
@@ -108,6 +111,7 @@ class EmployeeController extends Controller
             ]);
 
         } catch (\Exception $e) {
+             $this->logService->log($e);
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memperbarui data: ' . $e->getMessage()
@@ -119,16 +123,18 @@ class EmployeeController extends Controller
         try {
 
             $decryptedId = CryptoHelper::decrypt($id);
-            $decryptedTenantId = CryptoHelper::decrypt($request->query('tenant_id'));
+            $user = Auth::user();          
+            $tenantId = $user->employee->tenant_id;
 
-            if (!$decryptedId || !$decryptedTenantId) throw new \Exception("Parameter tidak valid.");
+            if (!$decryptedId ) throw new \Exception("Parameter tidak valid.");
 
-            $deleted = $this->employeeService->deleteEmployee($decryptedId, $decryptedTenantId);
+            $deleted = $this->employeeService->deleteEmployee($decryptedId,$tenantId);
 
             if (!$deleted) return response()->json(['message' => 'Karyawan tidak ditemukan'], 404);
 
             return response()->json(['success' => true, 'message' => 'Karyawan berhasil dihapus']);
         } catch (\Exception $e) {
+             $this->logService->log($e);
             return response()->json(['message' => $e->getMessage()], 500);
         }
     }
