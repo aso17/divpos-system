@@ -53,12 +53,9 @@ const EmployeeService = {
   },
 
   deleteEmployee: (id) => {
-    return api.delete(`/employees/${id}`, {
-      params: {
-        ...params,
-      },
-    });
+    return api.delete(`/employees/${id}`);
   },
+
   getAvailableEmployees: () => {
     return api.get(`/get-available-employees`); // Panggil route backend
   },

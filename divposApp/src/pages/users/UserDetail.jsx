@@ -4,6 +4,8 @@ import { X } from "lucide-react";
 export default function UserDetail({ open, user, onClose }) {
   if (!open || !user) return null;
 
+  // console.log(user);
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div
@@ -67,7 +69,7 @@ export default function UserDetail({ open, user, onClose }) {
             <DetailItem label="Username" value={user.username} />
             <DetailItem label="Email" value={user.email} />
             <DetailItem label="Phone" value={user.phone} />
-            <DetailItem label="Tenant" value={user.tenant?.name || "-"} />
+            <DetailItem label="Jabatan" value={user.job_title || "-"} />
 
             <DetailItem
               label="Status"

@@ -96,17 +96,22 @@ export default function UsersList() {
 
     try {
       const res = await UsersService.deleteUser(user.id);
-      const successMsg =
-        res.data?.message || "Data user telah berhasil dihapus.";
-      await showConfirm(successMsg, "Hapus Berhasil", "success");
+
+      setData((prev) => prev.filter((r) => r.id !== user.id));
 
       if (data.length === 1 && pagination.pageIndex > 0) {
-        setPagination((prev) => ({ ...prev, pageIndex: prev.pageIndex - 1 }));
-      } else {
-        fetchUsers();
+        setPagination((prev) => ({
+          ...prev,
+          pageIndex: prev.pageIndex - 1,
+        }));
       }
 
       setTotalCount((prev) => Math.max(0, prev - 1));
+
+      const successMsg =
+        res.data?.message || "Data user telah berhasil dihapus.";
+
+      await showConfirm(successMsg, "Hapus Berhasil", "success");
     } catch (err) {
       const errorMsg =
         err.response?.data?.message || "Terjadi kesalahan server";

@@ -68,7 +68,7 @@ const UsersService = {
   },
 
   deleteUser: (id) => {
-    return api.delete(`/user/${id}`);
+    return api.delete(`/users/${id}`);
   },
 };
 

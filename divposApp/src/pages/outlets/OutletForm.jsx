@@ -125,6 +125,7 @@ export default function OutletForm({
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-white rounded-sm w-full max-w-lg shadow-2xl overflow-hidden border-t-4 border-emerald-500 animate-in fade-in zoom-in duration-200">
         <div className="p-6 overflow-y-auto max-h-[90vh]">
+          {/* TITLE */}
           <h2 className="text-xs font-bold mb-6 text-slate-700 uppercase tracking-wider border-b pb-3 flex items-center gap-2">
             <span className="p-1 bg-emerald-50 text-emerald-600 rounded">
               🏢
@@ -141,29 +142,31 @@ export default function OutletForm({
               <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
                 Nama Outlet <span className="text-red-500">*</span>
               </label>
+
               <input
                 value={values.name}
                 onChange={(e) => handleChange("name", e.target.value)}
                 className={inputClasses({ error: !!errors.name })}
-                placeholder="Contoh: Pusat Jakarta"
               />
+
               {errors.name && (
                 <p className="text-[10px] text-red-500 mt-1">{errors.name}</p>
               )}
             </div>
 
-            {/* Row 2: Telepon & Kota */}
+            {/* Telepon + Kota */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
                   Telepon <span className="text-red-500">*</span>
                 </label>
+
                 <input
                   value={values.phone}
                   onChange={(e) => handleChange("phone", e.target.value)}
                   className={inputClasses({ error: !!errors.phone })}
-                  placeholder="0812..."
                 />
+
                 {errors.phone && (
                   <p className="text-[10px] text-red-500 mt-1">
                     {errors.phone}
@@ -175,42 +178,44 @@ export default function OutletForm({
                 <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
                   Kota <span className="text-red-500">*</span>
                 </label>
+
                 <input
                   value={values.city}
                   onChange={(e) => handleChange("city", e.target.value)}
                   className={inputClasses({ error: !!errors.city })}
-                  placeholder="Jakarta Selatan"
                 />
+
                 {errors.city && (
                   <p className="text-[10px] text-red-500 mt-1">{errors.city}</p>
                 )}
               </div>
             </div>
 
-            {/* Row 3: Description (Penyesuaian Table) */}
+            {/* Description */}
             <div>
               <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
                 Deskripsi / Keterangan
               </label>
+
               <input
                 value={values.description}
                 onChange={(e) => handleChange("description", e.target.value)}
                 className={inputClasses({ error: false })}
-                placeholder="Keterangan outlet..."
               />
             </div>
 
-            {/* Row 4: Alamat */}
+            {/* Address */}
             <div>
               <label className="block mb-1 text-slate-600 font-bold uppercase text-[9px]">
                 Alamat Lengkap <span className="text-red-500">*</span>
               </label>
+
               <textarea
                 value={values.address}
                 onChange={(e) => handleChange("address", e.target.value)}
                 className={`${inputClasses({ error: !!errors.address })} min-h-[60px] py-2`}
-                placeholder="Jl. Merdeka No. 1..."
               />
+
               {errors.address && (
                 <p className="text-[10px] text-red-500 mt-1">
                   {errors.address}
@@ -218,21 +223,22 @@ export default function OutletForm({
               )}
             </div>
 
-            {/* Row 5: Checkboxes */}
+            {/* Checkboxes */}
             <div className="flex gap-6 py-2 border-y border-slate-50">
-              <label className="flex items-center gap-2 cursor-pointer group">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={values.is_active}
                   onChange={(e) => handleChange("is_active", e.target.checked)}
                   className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500"
                 />
+
                 <span className="text-slate-600 font-bold uppercase text-[9px]">
                   Outlet Aktif
                 </span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer group">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={values.is_main_branch}
@@ -241,6 +247,7 @@ export default function OutletForm({
                   }
                   className="w-3.5 h-3.5 rounded text-orange-600 focus:ring-orange-500"
                 />
+
                 <span className="text-slate-600 font-bold uppercase text-[9px]">
                   Cabang Pusat
                 </span>
@@ -256,6 +263,7 @@ export default function OutletForm({
               >
                 Cancel
               </button>
+
               <SubmitButton
                 isSubmitting={isSubmitting}
                 label={initialData ? "Update Cabang" : "Create Cabang"}

@@ -44,7 +44,13 @@ export default function UserForm({
       },
       {
         // PARAMETER 2: Validation Schema (Rules)
-        employee_id: [(v) => rules.required(v, "Pilih karyawan")],
+        employee_id: [
+          (v) => {
+            if (initialData) return null;
+
+            return rules.required(v, "Pilih karyawan");
+          },
+        ],
         email: [
           (v) => rules.required(v, "Email login wajib diisi"),
           (v) => rules.email(v, "Format email salah"),

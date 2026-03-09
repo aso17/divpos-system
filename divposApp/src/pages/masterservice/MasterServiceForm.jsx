@@ -21,7 +21,6 @@ export default function MasterServiceForm({
         is_active: true,
       },
       {
-        // Validasi Nama Layanan: Wajib, Min 3 Karakter, No HTML
         name: [
           (v) => rules.required(v, "Nama layanan wajib diisi"),
           (v) => rules.minLength(v, 3, "Minimal 3 karakter"),
@@ -126,7 +125,7 @@ export default function MasterServiceForm({
                 value={values.name}
                 onChange={(e) => handleChange("name", e.target.value)}
                 className={`${inputClasses({ error: !!errors.name })} focus:border-emerald-500 focus:ring-emerald-500/20`}
-                placeholder="Contoh: Cuci Kering, Setrika Saja"
+                placeholder=""
                 autoFocus
               />
               {errors.name && (

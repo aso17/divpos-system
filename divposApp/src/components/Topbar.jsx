@@ -29,7 +29,7 @@ export default function Topbar() {
     const storedUser = GetWithExpiry("user");
     setRoleName(storedUser?.role?.name || "");
     setFullName(storedUser?.full_name || "");
-    setAvatar(storedUser?.avatar || assetUrl("default-avatar.png"));
+    setAvatar(storedUser?.avatar);
   }, [user]);
 
   useEffect(() => {

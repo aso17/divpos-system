@@ -138,11 +138,6 @@ export default function MasterServiceList() {
         accessorKey: "created_at",
         header: "INFO INPUT",
         cell: ({ getValue, row }) => {
-          const rawCreatedBy = row.original.created_by;
-          const creatorName = rawCreatedBy?.includes("-")
-            ? rawCreatedBy.split("-")[1]
-            : rawCreatedBy || "System";
-
           return (
             <div className="flex flex-col gap-1 py-1">
               <span className="flex items-center gap-1.5 text-slate-500 font-medium text-[10px]">
@@ -151,7 +146,7 @@ export default function MasterServiceList() {
               </span>
               <span className="flex items-center gap-1.5 text-slate-400 font-bold uppercase text-[9px]">
                 <User size={12} className="text-slate-300" />
-                {creatorName}
+                {row.original.created_by}
               </span>
             </div>
           );

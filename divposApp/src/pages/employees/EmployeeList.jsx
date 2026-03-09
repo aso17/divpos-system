@@ -12,6 +12,7 @@ import Search from "lucide-react/dist/esm/icons/search";
 import FileText from "lucide-react/dist/esm/icons/file-text";
 import Building from "lucide-react/dist/esm/icons/building";
 import Phone from "lucide-react/dist/esm/icons/phone";
+import Eye from "lucide-react/dist/esm/icons/eye";
 
 // --- IMPORT COMPONENTS & SERVICES ---
 import TableGeneric from "../../components/TableGeneric";
@@ -20,6 +21,7 @@ import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import AppHead from "../../components/common/AppHead";
 import EmployeeService from "../../services/EmployeeService";
 import EmployeeForm from "./EmployeeForm"; // Modal Form Diimport
+import EmployeeDetail from "./EmployeeDetail"; // Modal Form Diimport
 
 export default function EmployeesList() {
   const [data, setData] = useState([]);
@@ -28,6 +30,7 @@ export default function EmployeesList() {
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
   // --- STATE UNTUK MODAL ---
+  const [detailOpen, setDetailOpen] = useState(false);
   const [openModal, setOpenModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
@@ -65,6 +68,10 @@ export default function EmployeesList() {
     };
   }, [fetchEmployees]);
 
+  const handleOpenDetail = (employee) => {
+    setSelectedEmployee(employee);
+    setDetailOpen(true);
+  };
   // --- HANDLER MODAL ---
   const handleOpenForm = (employee = null) => {
     setSelectedEmployee(employee); // Set data kalau edit, null kalau tambah
@@ -194,6 +201,13 @@ export default function EmployeesList() {
         ),
         cell: ({ row }) => (
           <div className="flex gap-2 justify-center">
+            <button
+              title="Lihat Detail"
+              onClick={() => handleOpenDetail(row.original)} // Kita buat fungsi ini nanti
+              className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+            >
+              <Eye size={14} />
+            </button>
             <button
               title="Edit Karyawan"
               onClick={() => handleOpenForm(row.original)} // Buka modal mode edit
@@ -328,6 +342,12 @@ export default function EmployeesList() {
 
             <div className="flex gap-2 pt-1">
               <button
+                onClick={() => handleOpenDetail(employee)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase border border-blue-100 active:scale-95 transition-all"
+              >
+                <Eye size={12} /> Detail
+              </button>
+              <button
                 onClick={() => handleOpenForm(employee)} // Buka modal edit di mobile
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
               >
@@ -405,6 +425,12 @@ export default function EmployeesList() {
           }
           handleCloseForm();
         }}
+      />
+
+      <EmployeeDetail
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        data={selectedEmployee}
       />
     </div>
   );
