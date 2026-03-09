@@ -1,8 +1,10 @@
 <?php
 
 namespace App\Services;
-
 use App\Repositories\ServiceRepository;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Ms_package;
+use App\Models\Ms_service;
 use App\Helpers\CryptoHelper;
 use Exception;
 
@@ -15,9 +17,6 @@ class MasterService
         $this->serviceRepo = $serviceRepo;
     }
 
-    /**
-     * Mengambil data untuk dropdown (misal untuk form paket)
-     */
     public function getServicesForDropdown($encryptedTenantId)
     {
         $tenantId = CryptoHelper::decrypt($encryptedTenantId);
@@ -26,18 +25,13 @@ class MasterService
         return $this->serviceRepo->getActiveServices((int)$tenantId);
     }
 
-    /**
-     * Mengambil data dengan paginasi dan filter pencarian
-     */
     public function getPaginatedServices(array $params)
     {
-        $tenantId = CryptoHelper::decrypt($params['tenant_id'] ?? null);
+        $tenantId =$params['tenant_id'];
         if (!$tenantId) return null;
 
-        // Menggunakan base query dari repo
         $query = $this->serviceRepo->getBaseQuery((int)$tenantId);
 
-        // Filter Keyword (Nama Layanan)
         if (!empty($params['keyword'])) {
             $keyword = $params['keyword'];
             $query->where('name', 'like', "%{$keyword}%");
@@ -49,54 +43,50 @@ class MasterService
     /**
      * Logika Bisnis Simpan Layanan
      */
-    public function createService(array $data)
+    public function createMasterService(array $data)
     {
-        // 1. Cek duplikasi nama layanan dalam satu tenant
-        $exists = $this->serviceRepo->isNameDuplicate(
-            (int)$data['tenant_id'], 
-            $data['name']
-        );
         
-        if ($exists) {
-            throw new Exception("Layanan dengan nama '{$data['name']}' sudah ada di tenant ini.");
-        }
-
-        // 2. Simpan via Repo
         return $this->serviceRepo->create($data);
     }
 
-    /**
-     * Logika Bisnis Update Layanan
-     */
-    public function updateService($id, array $data)
+/**
+ * Logika Bisnis Update Layanan
+ */
+    public function updateMasterService($id, array $data)
     {
-        // 1. Cek duplikasi jika nama diubah (kecuali untuk ID yang sedang diedit)
-        if (isset($data['name']) && isset($data['tenant_id'])) {
-            $exists = $this->serviceRepo->isNameDuplicate(
-                (int)$data['tenant_id'], 
-                $data['name'], 
-                $id
-            );
-            
-            if ($exists) {
-                throw new Exception("Layanan '{$data['name']}' sudah digunakan.");
-            }
-        }
+        
+        $tenantId = $data['tenant_id'] ?? Auth::user()->employee?->tenant_id;
 
-        return $this->serviceRepo->update($id, (int)$data['tenant_id'], $data);
-    }
+        $service = $this->serviceRepo->update((int)$id, (int)$tenantId, $data);
 
-    /**
-     * Logika Bisnis Hapus Layanan
-     */
-    public function deleteService($id, $tenantId)
-    {
-       
-        $service = $this->serviceRepo->findByIdAndTenant($id, (int)$tenantId);
         if (!$service) {
-            throw new Exception("Layanan tidak ditemukan atau Anda tidak memiliki akses.");
+            throw new \Exception("Gagal memperbarui layanan atau data tidak ditemukan.");
         }
 
-        return $this->serviceRepo->delete($id, (int)$tenantId);
+        return $service;
+    }
+   
+    public function deleteMasterService(int $id, int $tenantId)
+    {
+        // 1. Cek apakah layanan digunakan di Master Paket
+        $hasPackages = Ms_package::where('service_id', $id)
+            ->where('tenant_id', $tenantId)
+            ->exists();
+
+        if ($hasPackages) {
+            
+            throw new \Exception("Layanan tidak bisa dihapus karena masih digunakan dalam Master Paket.");
+        }
+
+        // 2. Cari data dan pastikan milik tenant tersebut
+        $service = Ms_service::where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->first();
+
+        if (!$service) {
+            throw new \Exception("Data tidak ditemukan atau Anda tidak memiliki akses.");
+        }
+
+        return $service->delete();
     }
 }

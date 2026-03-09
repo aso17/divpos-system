@@ -7,7 +7,6 @@ use App\Services\EmployeeService;
 use App\Http\Resources\EmployeeResource;
 use App\Http\Requests\EmployeeRequest;
 use App\Services\LogDbErrorService;
-use App\Helpers\CryptoHelper;
 use Illuminate\Support\Facades\Auth;
 
 class EmployeeController extends Controller
@@ -43,30 +42,23 @@ class EmployeeController extends Controller
         return EmployeeResource::collection($employees);
     }
 
-    public function store(EmployeeRequest $request)
+   public function store(EmployeeRequest $request)
     {
         try {
-
-        $user = Auth::user();
-        $tenantId = $user->tenant_id;
-
-        if (!$tenantId) {
-            return response()->json([
-                'message' => 'Access denied. You do not have permission to perform this action.'
-            ], 403);
-        }
-           
-            $payload = $request->validated();         
-            $payload['tenant_id'] = $tenantId;  
-            $payload['created_by'] = $user->id;
-            $userId = $user->id;
-
-            if (!$payload['tenant_id']) {
-                throw new \Exception("Akses ditolak: Anda tidak terhubung ke Tenant manapun.");
-            }
-            $employee = $this->employeeService->createEmployee($payload, $userId);
             
-            $employee->load(['user.role', 'outlet']);
+            $user = Auth::user();
+            $tenantId = $user->employee->tenant_id; 
+
+            if (!$tenantId) {
+                return response()->json([
+                    'message' => 'Profil Anda tidak terhubung ke Tenant manapun.'
+                ], 403);
+            }
+
+            $payload = $request->validated();
+            $payload['tenant_id'] = $tenantId;
+            $employee = $this->employeeService->createEmployee($payload);
+            $employee->load(['outlet']);
 
             return response()->json([
                 'success' => true,
@@ -75,8 +67,7 @@ class EmployeeController extends Controller
             ], 201);
 
         } catch (\Exception $e) {
-            // Berikan pesan error yang lebih informatif
-             $this->logService->log($e);
+            $this->logService->log($e);
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menambahkan karyawan: ' . $e->getMessage()
@@ -84,58 +75,65 @@ class EmployeeController extends Controller
         }
     }
 
-   public function update(EmployeeRequest $request, $id)
+    public function update(EmployeeRequest $request)
     {
         try {
-            
-            $user = Auth::user();          
+            $user = Auth::user();
             $tenantId = $user->employee->tenant_id;
+
             if (!$tenantId) {
                 return response()->json([
-                    'message' => 'Access denied. You do not have permission to perform this action.'
+                    'message' => 'Akses ditolak. Tenant tidak ditemukan.'
                 ], 403);
             }
 
-            $payload = $request->validated();           
-           
-            $userId = $user->id; 
-            $updatedEmployee = $this->employeeService->updateEmployee($payload['id'], $tenantId, $userId, $payload);
-            $updatedEmployee->refresh();
-            $updatedEmployee->load(['user.role', 'outlet']);
+            $payload = $request->validated();
+            
+            // Memanggil service tanpa mengirim $userId manual
+            $updatedEmployee = $this->employeeService->updateEmployee($payload['id'], $tenantId, $payload);
+            
+            $updatedEmployee->load(['outlet']);
 
             return response()->json([
                 'success' => true,
-                'user_id' => $userId,
                 'message' => 'Data karyawan ' . $updatedEmployee->full_name . ' berhasil diperbarui',
                 'data'    => new EmployeeResource($updatedEmployee),
             ]);
 
         } catch (\Exception $e) {
-             $this->logService->log($e);
+            $this->logService->log($e);
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memperbarui data: ' . $e->getMessage()
             ], 500);
         }
     }
-    public function destroy(Request $request, $id)
-    {
-        try {
 
-            $decryptedId = CryptoHelper::decrypt($id);
-            $user = Auth::user();          
-            $tenantId = $user->employee->tenant_id;
 
-            if (!$decryptedId ) throw new \Exception("Parameter tidak valid.");
+    public function destroy($id)
+{
+    try {
+        $user = Auth::user();
+        $tenantId = $user->employee->tenant_id;
 
-            $deleted = $this->employeeService->deleteEmployee($decryptedId,$tenantId);
-
-            if (!$deleted) return response()->json(['message' => 'Karyawan tidak ditemukan'], 404);
-
-            return response()->json(['success' => true, 'message' => 'Karyawan berhasil dihapus']);
-        } catch (\Exception $e) {
-             $this->logService->log($e);
-            return response()->json(['message' => $e->getMessage()], 500);
+        if (!$tenantId) {
+            return response()->json(['message' => 'Akses ditolak.'], 403);
         }
+
+        // Panggil service untuk menghapus
+        $this->employeeService->deleteEmployee($id, $tenantId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data karyawan dan akses loginnya berhasil dihapus.'
+        ]);
+
+    } catch (\Exception $e) {
+        $this->logService->log($e);
+        return response()->json([
+            'success' => false,
+            'message' => '' . $e->getMessage()
+        ], 500);
     }
+}
 }

@@ -26,7 +26,6 @@ class EmployeeResource extends JsonResource
         'job_title'     => $this->job_title ?? ($roleName),
         'is_active'     => (bool) ($this->employee_active ?? $this->is_active ?? true),
         
-        'has_login'   => $this->user_id ? true : false,
         'user_id'     => CryptoHelper::encrypt($this->user_id),
         'email'       => $email,
         

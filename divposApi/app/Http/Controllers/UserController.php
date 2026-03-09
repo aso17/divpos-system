@@ -119,8 +119,7 @@ public function store(UserRequest $request)
     {
         try {
             // ID sudah didekripsi di UserRequest (prepareForValidation)
-            $decryptedId = $request->id;      
-            
+            $decryptedId = $request->id;                 
             // Eksekusi Service
             $user = $this->userService->updateUserInfo(
                 (int)$decryptedId,       
@@ -153,22 +152,23 @@ public function store(UserRequest $request)
             ], 500);
         }
     }
-    // DELETE /user/{id}
-    public function destroy(Request $request, $id)
+   
+    public function destroy($id)
     {
         try {
-            // 1. Dekripsi (Urusan HTTP/Transport)
-            $decryptedId = CryptoHelper::decrypt($id);
-            $decryptedTenantId = CryptoHelper::decrypt($request->query('tenant_id'));
 
-            if (!$decryptedId || !$decryptedTenantId) {
+          
+            $decryptedId = CryptoHelper::decrypt($id);
+            $user = Auth::user();      
+            $tenantId =$user->employee?->tenant_id;
+
+            if (!$decryptedId ) {
                 return response()->json(['status' => 'error', 'message' => 'Parameter tidak valid'], 400);
             }
 
-            // 2. Panggil Service (Urusan Logika Bisnis)
-            $user = $this->userService->deleteUserById((int)$decryptedId, (int)$decryptedTenantId);
+            $result = $this->userService->revokeUserAccess((int)$decryptedId,$tenantId);
 
-            if (!$user) {
+            if (!$result) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'User tidak ditemukan atau akses ditolak'
@@ -178,8 +178,8 @@ public function store(UserRequest $request)
             // 3. Respon ke Client
             return response()->json([
                 'status' => 'success',
-                'message' => 'User ' . $user->full_name . ' berhasil dihapus',
-                'data' => ['id' => $id]
+                'message' => 'User ' . $result->username . ' berhasil dihapus',
+                
             ], 200);
 
         } catch (\Exception $e) {

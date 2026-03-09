@@ -31,6 +31,7 @@ class UserRepository
                 'Ms_users.created_at',               
                 'Ms_employees.full_name', 
                 'Ms_employees.phone',
+                'Ms_employees.job_title',
                 'Ms_employees.is_active as employee_status',
                 'Ms_employees.tenant_id as employee_tenant_id', 
                 'Ms_roles.role_name',

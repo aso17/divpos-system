@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Models\Ms_employee;
+use App\Models\Ms_user;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use App\Repositories\UserRepository;
@@ -135,24 +136,31 @@ class UserService
         // Kolom 'updated_by' akan otomatis terisi berkat fungsi booted() di model
         return $this->userRepo->update($user, $data);
     }
-    public function deleteUserById(int $id, int $tenantId)
+
+
+    public function revokeUserAccess($userId, $tenantId)
     {
-        // 1. Cari data lewat Repo
-        $user = $this->userRepo->findById($id);
+        return DB::transaction(function () use ($userId, $tenantId) {
+            // 1. Cari user yang sah di tenant tersebut
+            $user = Ms_user::where('id', $userId)
+                ->whereHas('employee', function($q) use ($tenantId) {
+                    $q->where('tenant_id', $tenantId);
+                })->firstOrFail();
 
-        if (!$user) {
-            return null; // Atau throw exception khusus
-        }
+           
+            if ($user->is_owner) {
+                throw new \Exception("Akun Owner tidak dapat dihapus melalui jalur ini.");
+            }
+            if (Auth::user()->id == $user->id) {
+                throw new \Exception("Anda tidak bisa menghapus akun Anda sendiri.");
+            }
 
-        // 2. Logika Bisnis Tambahan (Contoh: Jangan hapus diri sendiri)
+            Ms_employee::where('user_id', $user->id)->update(['user_id' => null]);
+            $user->delete();
 
-        // if (auth()->id() === $user->id) {
-        //     throw new \Exception("Anda tidak diperbolehkan menghapus akun sendiri.");
-        // }
-
-        // 3. Eksekusi hapus lewat Repo
-        $this->userRepo->delete($user);
-
-        return $user;
+            return $user;
+        });
     }
+   
+   
 }

@@ -4,25 +4,39 @@ namespace App\Helpers;
 
 class CryptoHelper
 {
+    // Gunakan static property untuk caching key & iv agar tidak dihitung ulang
+    private static $key = null;
+    private static $iv = null;
+
+    private static function init()
+    {
+        if (self::$key === null) {
+            // JANGAN pakai env() langsung, pakai config() yang sudah di-cache Laravel
+            // Pastikan Mas sudah tambah 'app_secret_key' di config/app.php 
+            // atau pakai config('app.key') bawaan Laravel.
+            $secretKey = config('app.secret_key', 'default_secret_key_yang_panjang');
+            
+            // Hitung hash sekali saja selama satu request berjalan
+            $fullHash = hash('sha256', $secretKey);
+            self::$key = hash('sha256', $secretKey, true);
+            self::$iv = substr($fullHash, 0, 16); 
+        }
+    }
+
     public static function encrypt($value)
     {
         if (is_null($value) || $value === '') return null;
 
-        $secretKey = env('APP_SECRET_KEY');
-        $key = hash('sha256', $secretKey, true);
-
-        // UBAH: Gunakan IV Statis (16 byte) dari hash key
-        $iv = substr(hash('sha256', $secretKey), 0, 16); 
+        self::init();
 
         $ciphertextRaw = openssl_encrypt(
             (string)$value,
             'AES-256-CBC',
-            $key,
+            self::$key,
             OPENSSL_RAW_DATA,
-            $iv
+            self::$iv
         );
 
-        // Jangan gabungkan IV lagi karena sudah statis
         return str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($ciphertextRaw));
     }
 
@@ -30,9 +44,7 @@ class CryptoHelper
     {
         if (!$cipherText || !is_string($cipherText)) return null;
 
-        $secretKey = env('APP_SECRET_KEY');
-        $key = hash('sha256', $secretKey, true);
-        $iv = substr(hash('sha256', $secretKey), 0, 16); 
+        self::init();
 
         $base64 = str_replace(['-', '_'], ['+', '/'], $cipherText);
         $remainder = strlen($base64) % 4;
@@ -43,9 +55,9 @@ class CryptoHelper
         $decrypted = openssl_decrypt(
             $ciphertextRaw,
             'AES-256-CBC',
-            $key,
+            self::$key,
             OPENSSL_RAW_DATA,
-            $iv
+            self::$iv
         );
 
         return $decrypted ?: null;

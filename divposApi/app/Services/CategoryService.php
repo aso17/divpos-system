@@ -16,7 +16,7 @@ class CategoryService
 
     public function getPaginatedCategories(array $params)
     {
-        $tenantId = CryptoHelper::decrypt($params['tenant_id']);
+        $tenantId =$params['tenant_id'];
         $query = $this->repository->getBaseQuery($tenantId);
 
         if (!empty($params['keyword'])) {
@@ -29,32 +29,38 @@ class CategoryService
 
     public function storeCategory(array $data)
     {
-        $data['tenant_id'] = CryptoHelper::decrypt($data['tenant_id']);
-        $data['created_by'] = CryptoHelper::decrypt($data['created_by']);
-        
+               
         return $this->repository->create($data);
     }
 
-    public function updateCategory(string $encryptedId, array $data)
+    public function updateCategory($id,$tenantId, array $data)
     {
-        $id = CryptoHelper::decrypt($encryptedId);
-        $tenantId = CryptoHelper::decrypt($data['tenant_id']);
         
-        $category = $this->repository->findByIdAndTenant($id, $tenantId);
+        
+        $category = $this->repository->findByIdAndTenant((int)$id, $tenantId);
         if (!$category) throw new \Exception("Kategori tidak ditemukan");
         $data['tenant_id'] = $tenantId;
-        $data['updated_by'] = CryptoHelper::decrypt($data['updated_by']);
-        
+       
         return $this->repository->update($category, $data);
     }
-
-    public function deleteCategory(string $encryptedId, string $encryptedTenantId)
+    
+    public function deleteCategory(string $id, int $tenantId)
     {
-        $id = CryptoHelper::decrypt($encryptedId);
-        $tenantId = CryptoHelper::decrypt($encryptedTenantId);
+        $realId = CryptoHelper::decrypt($id);
+        $category = $this->repository->findByIdAndTenant($realId, $tenantId);
+        
+        if (!$category) {
+            throw new \Exception("Kategori tidak ditemukan.");
+        }
 
-        $category = $this->repository->findByIdAndTenant($id, $tenantId);
-        if (!$category) throw new \Exception("Kategori tidak ditemukan");
+        // 🛡️ SECURITY & INTEGRITY CHECK
+        // Cek apakah ada package yang masih bergantung pada kategori ini
+        if ($category->packages()->exists()) {
+            throw new \Exception(
+                "Gagal menghapus! Kategori ini masih memiliki paket layanan aktif. " . 
+                "Silakan hapus atau pindahkan paket tersebut terlebih dahulu."
+            );
+        }
 
         return $this->repository->delete($category);
     }

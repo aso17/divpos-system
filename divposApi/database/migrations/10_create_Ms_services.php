@@ -11,25 +11,25 @@ return new class extends Migration
      */
     public function up(): void
     {
-       Schema::create('Ms_services', function (Blueprint $table) {
+      Schema::create('Ms_services', function (Blueprint $table) {
         $table->id();
         $table->foreignId('tenant_id')->constrained('Ms_tenants')->onDelete('cascade');
         
         $table->string('name', 100);
         $table->string('description', 200)->nullable(); 
+        $table->boolean('is_active')->default(true);
         
-        $table->boolean('is_active')->default(true);                
-        $table->string('created_by', 50)->nullable();
-        $table->string('updated_by', 50)->nullable();
+        // Audit SIAPA (ID User)
+        $table->unsignedBigInteger('created_by')->nullable();
+        $table->unsignedBigInteger('updated_by')->nullable();
         
-        $table->timestamps(); 
-        $table->softDeletes(); 
+        $table->timestampsTz(); 
+        $table->softDeletesTz(); 
         
         $table->unique(['tenant_id', 'name'], 'idx_service_tenant_name');
-        
-        $table->index(['tenant_id', 'is_active'], 'idx_service_tenant_active');
-        // ------------------------------------
     });
+        // ------------------------------------
+   
     }
 
     /**

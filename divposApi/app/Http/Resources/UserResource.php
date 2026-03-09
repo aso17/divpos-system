@@ -16,6 +16,7 @@ class UserResource extends JsonResource
 
         $fullName = $this->full_name ?? ($this->employee->full_name ?? '-');
         $phone    = $this->phone ?? ($this->employee->phone ?? '-');
+        $job_title    = $this->job_title ?? ($this->employee->job_title ?? '-');
 
         $isActive = $this->user_active ?? ($this->is_active ?? ($this->employee_status ?? false));
 
@@ -30,6 +31,7 @@ class UserResource extends JsonResource
             'email'      => $this->email,
             'username'   => $this->username,
             'phone'      => $phone,
+            'job_title'=>$job_title,
             'avatar'     => $this->avatar ? asset('storage/' . $this->avatar) : null,
             'is_active'  => (bool) $isActive,
             

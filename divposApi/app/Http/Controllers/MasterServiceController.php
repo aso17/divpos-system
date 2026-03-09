@@ -3,23 +3,41 @@
 namespace App\Http\Controllers;
 
 use App\Services\MasterService;
-use App\Models\Ms_package;
-use App\Http\Resources\ServiceResource;
+use App\Http\Resources\MasterServiceResource;
 use Illuminate\Http\Request;
+use App\Http\Requests\MasterServiceRequest;
+use App\Services\LogDbErrorService;
+use Illuminate\Support\Facades\Auth;
 use App\Helpers\CryptoHelper;
 
 class MasterServiceController extends Controller
 {
     protected $masterService;
+    protected $logService;
 
-    public function __construct(MasterService $masterService)
+    public function __construct(MasterService $masterService,LogDbErrorService $logService)
     {
         $this->masterService = $masterService;
+         $this->logService = $logService;
     }
 
     public function index(Request $request)
     {
-        $query = $this->masterService->getPaginatedServices($request->all());
+         $user = Auth::user();
+         $tenantId = $user->employee->tenant_id;
+
+      if (!$tenantId) {
+            return response()->json([
+                'message' => 'Access denied. You do not have permission to perform this action.'
+            ], 403);
+        }
+
+        $params = [
+            'tenant_id' => $tenantId,
+            'keyword' => $request->query('keyword'),
+        ];
+
+        $query = $this->masterService->getPaginatedServices($params);
 
         if (!$query) {
             return response()->json(['message' => 'Tenant tidak valid'], 403);
@@ -27,43 +45,23 @@ class MasterServiceController extends Controller
 
         $perPage = $request->per_page ?? 10;
         $services = $query->paginate($perPage);
-        return ServiceResource ::collection($services)->response()->getData(true);
+        return MasterServiceResource ::collection($services)->response()->getData(true);
     }
 
-   public function store(Request $request)
+    public function store(MasterServiceRequest $request)
     {
-       
-        if ($request->has('tenant_id')) {
-            try {
-                $request->merge([
-                    'tenant_id'  => (int) CryptoHelper::decrypt($request->tenant_id),
-                    'created_by' => CryptoHelper::decrypt($request->created_by),
-                ]);
-            } catch (\Exception $e) {
-                return response()->json(['message' => 'Data identitas tidak valid'], 400);
-            }
-        }
-        // 2. Validasi Input
-        $validated = $request->validate([
-            'tenant_id'   => 'required|integer|exists:Ms_tenants,id', 
-            'name'        => 'required|string|max:100', 
-            'description' => 'nullable|string|max:200', 
-            'is_active'   => 'boolean',
-            'created_by'  => 'required|string|max:50',  
-        ]);
-
         try {
-            // 3. Eksekusi melalui Business Logic Layer
-            $service = $this->masterService->createService($validated);
-
+          
+            $validated = $request->validated();
+            $service = $this->masterService->createMasterService($validated);
             return response()->json([
                 'status'  => 'success',
-                'message' => 'Layanan berhasil dibuat',
-                'data'    => new ServiceResource($service)
+                'message' => 'Layanan ' . $service->name . ' berhasil dibuat',
+                'data'    => new MasterServiceResource($service)
             ], 201);
 
         } catch (\Exception $e) {
-           
+            $this->logService->log($e);
             return response()->json([
                 'status'  => 'error',
                 'message' => $e->getMessage()
@@ -71,87 +69,51 @@ class MasterServiceController extends Controller
         }
     }
 
-    public function update(Request $request, $id)
+    public function update(MasterServiceRequest $request)
     {
-        // 1. Pre-Processing: Dekripsi & Normalisasi
-        if ($request->has('tenant_id')) {
-            try {
-                $request->merge([
-                    // Decode ID dari URL jika terenkripsi, atau biarkan jika integer
-                    'tenant_id'  => (int) CryptoHelper::decrypt($request->tenant_id),
-                    'updated_by' => CryptoHelper::decrypt($request->updated_by), // Ambil dari info login React
-                ]);
-            } catch (\Exception $e) {
-                return response()->json(['message' => 'Identitas tenant tidak valid'], 400);
-            }
-        }
-
-        // 2. Validasi Ketat (Sesuaikan dengan skema tabel Ms_services)
-        
-        $validated = $request->validate([
-            'tenant_id'   => 'required|integer|exists:Ms_tenants,id',
-            'name'        => 'sometimes|required|string|max:100',
-            'description' => 'nullable|string|max:200',
-            'is_active'   => 'boolean',
-            'updated_by'  => 'required|string|max:50',
-        ]);
-
         try {
-           
-            $service = $this->masterService->updateService($id, $validated);
+            
+            $payload = $request->validated();                  
+            $service = $this->masterService->updateMasterService((int)$payload['id'], $payload);
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Layanan berhasil diperbarui',
-                'data' => new ServiceResource($service)
+                'data'    => new MasterServiceResource($service)
             ]);
+
         } catch (\Exception $e) {
-            // 422 untuk kegagalan bisnis logic (misal: nama duplikat setelah rename)
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
-    }
-
-    /**
-     * Remove the specified service from storage
-     */
-  public function destroy(Request $request, $id)
-{
-    try {
-        // 1. Dekripsi ID Layanan dan Tenant ID
-        $decryptedId = CryptoHelper::decrypt($id);
-        $decryptedTenantId = CryptoHelper::decrypt($request->query('tenant_id'));
-
-        if (!$decryptedId || !$decryptedTenantId) {
+            $this->logService->log($e);
             return response()->json([
-                'status' => 'error',
-                'message' => 'Parameter keamanan tidak valid.'
-            ], 400);
-        }
-
-      
-        $hasPackages = Ms_package::where('service_id', $decryptedId)
-            ->where('tenant_id', $decryptedTenantId)
-            ->exists();
-
-        if ($hasPackages) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Layanan tidak bisa dihapus karena masih digunakan dalam Master Paket.'
+                'status'  => 'error', 
+                'message' => $e->getMessage()
             ], 422);
         }
-
-        $this->masterService->deleteService((int)$decryptedId, (int)$decryptedTenantId);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Layanan berhasil dihapus'
-        ]);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
-        ], 500);
     }
-}
+   
+    public function destroy($id)
+    {
+        try {
+            $decryptedId = CryptoHelper::decrypt($id);
+            $tenantId = Auth::user()->employee?->tenant_id;
+
+            if (!$decryptedId || !$tenantId) {
+                return response()->json(['status' => 'error', 'message' => 'Parameter tidak valid.'], 400);
+            }
+
+            $this->masterService->deleteMasterService((int)$decryptedId, (int)$tenantId);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Layanan berhasil dihapus'
+            ]);
+
+        } catch (\Exception $e) {
+             $this->logService->log($e);
+            return response()->json([
+                'status'  => 'error',
+                'message' => $e->getMessage() 
+            ], 422);
+        }
+    }
 }

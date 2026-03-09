@@ -6,91 +6,114 @@ use App\Http\Resources\CategoryResource;
 use App\Services\CategoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use App\Http\Requests\CategoryRequest;
+use App\Services\LogDbErrorService;
+use Illuminate\Support\Facades\Auth;
 
 class CategoryController extends Controller
 {
     protected $service;
+    protected $logService;
 
-    public function __construct(CategoryService $service)
+    public function __construct(CategoryService $service,LogDbErrorService $logService)
     {
         $this->service = $service;
+         $this->logService = $logService;
     }
 
     public function index(Request $request)
     {
-        $categories = $this->service->getPaginatedCategories($request->all());
+        $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
+      if (!$tenantId) {
+        return response()->json([
+            'message' => 'Access denied. You do not have permission to perform this action.'
+        ], 403);
+         }
+
+        $params = [
+            'tenant_id' => $tenantId,
+            'keyword' => $request->query('keyword'),
+        ];
+          
+        $categories = $this->service->getPaginatedCategories($params);
         return CategoryResource::collection($categories);
     }
 
-   public function store(Request $request)
+  /**
+ * STORE
+ */
+    public function store(CategoryRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:50',
-            'duration_hours' => 'required|integer|min:0',
-            'tenant_id' => 'required',
-            'created_by' => 'required'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $validator->errors()->first()
-            ], 422);
-        }
-
         try {
-            $category = $this->service->storeCategory($request->all());
+            
+            $tenantId = $request->tenantId; 
+            $payload = $request->validated();
+            $payload['tenant_id'] = $tenantId;
+
+            $category = $this->service->storeCategory($payload);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Kategori baru berhasil ditambahkan',
                 'data' => new CategoryResource($category)
-            ], 201); // 201 Created
+            ], 201); 
+
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            $this->logService->log($e);
+            return response()->json([
+                'status' => 'error', 
+                'message' => 'Gagal menyimpan data kategori'.$e->getMessage()
+            ], 500);
         }
     }
 
-    // UPDATE
-    public function update(Request $request, $id)
+/**
+ * UPDATE
+ */
+        public function update(CategoryRequest $request, $id)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:50',
-            'duration_hours' => 'required|integer|min:0',
-            'tenant_id' => 'required',
-            'updated_by' => 'required'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validasi gagal',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
         try {
-            $category = $this->service->updateCategory($id, $request->all());
+           
+            $tenantId = (int) $request->tenantId;        
+            $realId = $request->id;
+            $payload = $request->validated();
+            $category = $this->service->updateCategory($realId, $tenantId,$payload);
+
             return response()->json([
                 'status' => 'success',
+                'pa'=>$tenantId,
                 'message' => 'Kategori berhasil diperbarui',
                 'data' => new CategoryResource($category)
             ], 200);
+
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 404);
+            $this->logService->log($e);
+            return response()->json([
+                'status' => 'error',   
+                'message' => $e->getMessage()
+            ], 400);
         }
     }
 
-    // DELETE
-    public function destroy(Request $request, $id)
+   public function destroy($id)
     {
         try {
-            $this->service->deleteCategory($id, $request->tenant_id);
+           
+            $tenantId = Auth::user()->employee->tenant_id;
+            $this->service->deleteCategory($id, $tenantId);
+
             return response()->json([
                 'status' => 'success',
-                'message' => 'Kategori berhasil dihapus selamanya'
+                'message' => 'Kategori berhasil dihapus'
             ], 200);
+
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 404);
+            $this->logService->log($e);
+            return response()->json([
+                'status' => 'error', 
+                'message' => $e->getMessage() 
+            ], 400);
         }
     }
 }

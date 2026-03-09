@@ -4,14 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 class Ms_category extends Model
 {
-    use HasFactory, SoftDeletes;
+    use SoftDeletes;
 
     protected $table = 'Ms_categories';
 
@@ -19,54 +17,72 @@ class Ms_category extends Model
         'tenant_id',
         'name',
         'slug',
-        'duration_hours',
         'priority',
         'is_active',
         'created_by',
-        'updated_by',
-    ];
-
-    protected $casts = [
-        'tenant_id' => 'integer',
-        'duration_hours' => 'integer',
-        'priority' => 'integer',
-        'is_active' => 'boolean',
+        'updated_by'
     ];
 
     /**
-     * Boot function untuk logic otomatis
+     * Otomatisasi data saat event model berjalan
      */
-    protected static function boot()
+    protected static function booted()
     {
-        parent::boot();
+        // Sebelum data dibuat (Create)
+        static::creating(function ($model) {
+            // 1. Paksa tenant_id sesuai user yang login
+            if (Auth::check()) {
+                $model->tenant_id = Auth::user()->tenant_id;
+                $model->created_by = Auth::id();
+            }
 
-        // Otomatis membuat slug saat creating/updating jika nama berubah
-        static::creating(function ($category) {
-            if (empty($category->slug)) {
-                $category->slug = Str::slug($category->name);
+            // 2. Generate slug otomatis jika kosong
+            if (empty($model->slug)) {
+                $model->slug = Str::slug($model->name);
+            }
+        });
+
+        // Sebelum data diupdate (Update)
+        static::updating(function ($model) {
+            if (Auth::check()) {
+                $model->updated_by = Auth::id();
+            }
+
+            // Update slug jika nama berubah
+            if ($model->isDirty('name')) {
+                $model->slug = Str::slug($model->name);
             }
         });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | RELATIONS
-    |--------------------------------------------------------------------------
-    */
+    // app/Models/Ms_category.php
 
-    /**
-     * Relasi ke Tenant (Owner data)
-     */
-    public function tenant(): BelongsTo
+    public function packages()
     {
-        return $this->belongsTo(Ms_tenant::class, 'tenant_id');
+        
+        return $this->hasMany(Ms_package::class, 'category_id');
+    }
+    /**
+     * Scope untuk mempermudah filter data milik tenant sendiri
+     */
+    public function scopeMyTenant($query)
+    {
+        return $query->where('tenant_id', Auth::user()->tenant_id);
     }
 
     /**
-     * Relasi ke Packages (Mencegah Orphan Data saat Delete)
+     * Relasi ke Creator (User)
      */
-    public function packages(): HasMany
+    public function creator()
     {
-        return $this->hasMany(Ms_package::class, 'category_id');
+        return $this->belongsTo(Ms_User::class, 'created_by');
+    }
+
+    /**
+     * Relasi ke Updater (User)
+     */
+    public function updater()
+    {
+        return $this->belongsTo(Ms_User::class, 'updated_by');
     }
 }

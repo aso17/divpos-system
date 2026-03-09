@@ -14,16 +14,17 @@ class AuthRepository
                 'Ms_users.id', 
                 'Ms_users.email', 
                 'Ms_users.username',
+                'Ms_users.avatar',
                 'Ms_users.password', 
                 'Ms_users.role_id', 
                 'Ms_users.is_active as user_active',
-                'Ms_users.tenant_id as user_tenant_id', // Alias biar jelas ini punya User (Owner)
+                'Ms_users.tenant_id as user_tenant_id', 
                 
                 'Ms_employees.full_name',
                 'Ms_employees.is_active as employee_active',
-                'Ms_employees.tenant_id as employee_tenant_id', // Ini pegangan buat Staff
+                'Ms_employees.tenant_id as employee_tenant_id',
                 
-                'Ms_tenants.id as tenant_id', // ID Tenant yang "ketemu" (baik via Owner/Staff)
+                'Ms_tenants.id as tenant_id', 
                 'Ms_tenants.name as tenant_name',
                 'Ms_tenants.slug as tenant_slug',
                 'Ms_tenants.code as tenant_code',

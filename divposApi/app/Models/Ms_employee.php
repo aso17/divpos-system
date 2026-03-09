@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class Ms_employee extends Model
 {
@@ -57,5 +58,25 @@ class Ms_employee extends Model
     public function outlet()
     {
         return $this->belongsTo(Ms_outlet::class, 'outlet_id');
+    }
+
+
+      protected static function booted()
+    {
+        static::creating(function ($model) {
+            if (Auth::check()) {
+                // Isi dengan ID User (Integer)
+                $model->created_by = Auth::id(); 
+                // Ambil tenant_id dari relasi employee
+                $model->tenant_id = Auth::user()->employee?->tenant_id;
+            }
+        });
+
+        static::updating(function ($model) {
+            if (Auth::check()) {
+                // Isi dengan ID User (Integer)
+                $model->updated_by = Auth::id();
+            }
+        });
     }
 }
