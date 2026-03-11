@@ -64,9 +64,18 @@ class PackageRequest extends FormRequest
                 })
             ],
             
-            'name'          => [
-                'required', 'string', 'max:100', 
-                'not_regex:/[<>"{}]/' // Proteksi XSS sederhana
+           'name' => [
+            'required', 
+            'string', 
+            'max:100',
+                // 1. Hanya izinkan Huruf, Angka, Spasi, dan simbol standar ( - & ( ) . )
+                'regex:/^[a-zA-Z0-9\s\-&().]+$/',
+                // 2. Proteksi tambahan agar tidak mengandung "http", "www", atau ".com" dsb.
+                function ($attribute, $value, $fail) {
+                    if (preg_match('/(http|https|www|\.com|\.net|\.id|\.io)/i', $value)) {
+                        $fail('Nama paket tidak diperbolehkan mengandung link atau URL.');
+                    }
+                },
             ],
             'description'   => 'nullable|string|max:200',
             'price'         => 'required|numeric|min:0',

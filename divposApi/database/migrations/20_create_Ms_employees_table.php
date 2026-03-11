@@ -16,13 +16,10 @@ return new class extends Migration
                   ->constrained('Ms_users')
                   ->nullOnDelete(); 
       
-            // Relasi ke Tenant (Wajib: Pemisah data antar bisnis LAUNDRY, SALON, dll)
             $table->foreignId('tenant_id')->constrained('Ms_tenants')->cascadeOnDelete();
             
-            // Relasi ke Outlet (Nullable: Untuk posisi manager yang pegang banyak outlet)
             $table->foreignId('outlet_id')->nullable()->constrained('Ms_outlets')->nullOnDelete();
-            
-            // 🎯 PENANDA TAHUN: Untuk optimasi generate kode
+
             $table->unsignedSmallInteger('year');
 
             // KODE KARYAWAN

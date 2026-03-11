@@ -13,6 +13,23 @@ class OutletRepository
         $this->model = $model;
     }
 
+
+  public function getForTransaction(int $tenantId)
+    {
+        return Ms_outlet::select([
+                'id', 
+                'name', 
+                'code', 
+                'address', 
+                'is_main_branch'
+            ])
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->orderBy('is_main_branch', 'desc') 
+            ->orderBy('name', 'asc')
+            ->get();
+    }
+
   public function getQueryOutlet($tenantId, $params)
 {
     $keyword = $params['keyword'] ?? null;

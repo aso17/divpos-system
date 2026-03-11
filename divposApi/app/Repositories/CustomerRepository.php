@@ -23,6 +23,16 @@ class CustomerRepository
         ->where('tenant_id', $tenantId);
     }
 
+
+   public function getCustomerByPhone(int $tenantId, string $phone)
+    {
+        // Membersihkan karakter non-angka agar pencarian akurat
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+
+        return Ms_customer::where('tenant_id', $tenantId)
+            ->where('phone', $cleanPhone)
+            ->first(); 
+    }
     /**
      * Mencari customer berdasarkan ID (umum)
      */

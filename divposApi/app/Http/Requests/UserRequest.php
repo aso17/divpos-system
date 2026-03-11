@@ -67,7 +67,9 @@ class UserRequest extends FormRequest
                 'required',
                 'email:rfc',
                 'max:150',
-                Rule::unique('Ms_users', 'email')->ignore($userId),
+                Rule::unique('Ms_users', 'email')
+                    ->ignore($userId)
+                    ->whereNull('deleted_at'),
             ],
 
             'username' => [
@@ -76,7 +78,9 @@ class UserRequest extends FormRequest
                 'min:4',
                 'max:50',
                 'regex:/^[a-zA-Z0-9._]+$/',
-                Rule::unique('Ms_users', 'username')->ignore($userId),
+                Rule::unique('Ms_users', 'username')
+                    ->ignore($userId) 
+                    ->whereNull('deleted_at'),
             ],
 
             'password' => [

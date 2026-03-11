@@ -24,11 +24,15 @@ return new class extends Migration
             $table->decimal('point', 15, 2)->default(0); // Untuk sistem reward/loyalty
             $table->boolean('is_active')->default(true);
             
-            $table->string('created_by')->nullable();
-            $table->string('updated_by')->nullable();
-            $table->timestamps();
-            $table->softDeletes();
+           $table->unsignedBigInteger('created_by')->index(); // Wajib ada ID pembuat
+           $table->unsignedBigInteger('updated_by')->nullable()->index();
 
+            $table->timestampsTz();
+            $table->softDeletesTz();
+
+            $table->foreign('created_by')->references('id')->on('Ms_users')->onDelete('restrict');
+            
+            $table->foreign('updated_by')->references('id')->on('Ms_users')->onDelete('restrict');
             // Indexing agar pencarian nama/HP cepat saat kasir mengetik di POS
             $table->index(['tenant_id', 'phone']);
             $table->index(['tenant_id', 'name']);

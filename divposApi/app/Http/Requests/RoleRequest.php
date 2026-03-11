@@ -11,87 +11,95 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 
 class RoleRequest extends FormRequest
 {
-    protected $tenantId;
-
     public function authorize(): bool
     {
-        $this->tenantId = Auth::user()?->tenant_id;
-        return !is_null($this->tenantId);
+        // Gunakan employee tenant_id agar konsisten dengan Master lainnya
+        return Auth::check() && !is_null(Auth::user()->employee?->tenant_id);
     }
 
     protected function prepareForValidation()
     {
-       
-        $routeId = collect($this->route()->parameters())->first();
+        $tenantId = Auth::user()->employee->tenant_id;
+        $routeId = $this->route('id') ?? $this->route('role');
         
-        $sanitizedData = [];
+        $mergeData = [
+            'tenant_id' => $tenantId,
+        ];
 
+        // 1. Dekripsi ID
         if ($routeId) {
-            $sanitizedData['id'] = CryptoHelper::decrypt($routeId);
+            $mergeData['id'] = CryptoHelper::decrypt($routeId);
         }
 
+        // 2. Sanitasi Role Name (Huruf depan Kapital per kata)
         if ($this->has('role_name')) {
-            $sanitizedData['role_name'] = strip_tags($this->role_name);
+            $mergeData['role_name'] = ucwords(preg_replace('/\s+/', ' ', strip_tags(trim($this->role_name))));
         }
         
+        // 3. Sanitasi Code (Hapus spasi, Paksa Uppercase, hanya Alfanumerik & Underscore)
         if ($this->has('code')) {
-            
-            $sanitizedData['code'] = strtoupper(str_replace(' ', '', $this->code));
+            $mergeData['code'] = strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '', $this->code));
         }
 
-        $this->merge($sanitizedData);
-  }
+        // 4. Sanitasi Description
+        if ($this->has('description')) {
+            $mergeData['description'] = strip_tags(trim($this->description));
+        }
 
-    /**
-     * Aturan validasi yang ketat
-     */
+        // 5. Konversi Boolean
+        if ($this->has('is_active')) {
+            $mergeData['is_active'] = filter_var($this->is_active, FILTER_VALIDATE_BOOLEAN);
+        }
+
+        $this->merge($mergeData);
+    }
+
     public function rules(): array
     {
+        $tenantId = Auth::user()->employee->tenant_id;
+        $id = $this->id;
+
         return [
-            // Cek apakah Role ID yang diedit memang milik Tenant ini
             'id' => [
-                'nullable',
-                'integer',
-                $this->id ? Rule::exists('Ms_roles', 'id')->where('tenant_id', $this->tenantId) : '',
+                'sometimes', 'nullable', 'integer',
+                Rule::exists('Ms_roles', 'id')->where('tenant_id', $tenantId)
             ],
 
             'role_name' => [
-                'required',
-                'string',
-                'min:3',
-                'max:100',
+                'required', 'string', 'min:3', 'max:100',
                 'regex:/^[a-zA-Z0-9\s\.\,\-\'\(\)]+$/', 
+                'not_regex:/(http|https|www|\.com|\.net|\.id)/i'
             ],
 
             'code' => [
-                'required',
-                'string',
-                'max:50',
-                // Unik per tenant: Boleh ada 'ADM' di tenant lain, tapi tidak boleh double di tenant yang sama
+                'required', 'string', 'max:50',
+                // Pastikan format code hanya alfanumerik dan underscore (Contoh: ADMIN_OUTLET)
+                'regex:/^[A-Z0-9_]+$/',
                 Rule::unique('Ms_roles', 'code')
-                    ->where('tenant_id', $this->tenantId)
-                    ->ignore($this->id),
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->ignore($id),
             ],
 
-            'description' => 'nullable|string|max:255',
-            'is_active'   => 'boolean',
+            'description' => [
+                'nullable', 'string', 'max:255',
+                'not_regex:/[<>"{}]/i', 
+                'not_regex:/(http|https|www|\.com|\.net|\.id)/i'
+            ],
+            
+            'is_active' => 'boolean',
         ];
     }
 
-    /**
-     * Custom error message agar lebih user-friendly
-     */
     public function messages(): array
     {
         return [
             'code.unique' => 'Kode Role ini sudah digunakan di bisnis Anda.',
-            'id.exists'   => 'Akses ditolak: Data Role tidak ditemukan atau bukan milik Anda.',
+            'code.regex'  => 'Format kode harus huruf besar dan hanya boleh mengandung underscore (_).',
+            'id.exists'   => 'Akses ditolak: Data Role tidak ditemukan.',
         ];
     }
 
-    /**
-     * Response JSON jika validasi gagal (Integrity Check)
-     */
     protected function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(response()->json([

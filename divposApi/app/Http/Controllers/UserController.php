@@ -155,9 +155,7 @@ public function store(UserRequest $request)
    
     public function destroy($id)
     {
-        try {
-
-          
+        try {         
             $decryptedId = CryptoHelper::decrypt($id);
             $user = Auth::user();      
             $tenantId =$user->employee?->tenant_id;
@@ -175,7 +173,6 @@ public function store(UserRequest $request)
                 ], 404);
             }
 
-            // 3. Respon ke Client
             return response()->json([
                 'status' => 'success',
                 'message' => 'User ' . $result->username . ' berhasil dihapus',

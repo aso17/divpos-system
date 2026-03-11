@@ -28,10 +28,8 @@ return new class extends Migration
             // PERBAIKAN: Beri batas panjang agar efisien
             $table->string('description', 255)->nullable(); 
 
-            // created_at adalah penanda waktu kejadian
-            $table->timestamp('created_at')->useCurrent();
-            // updated_at tidak terlalu krusial untuk log, tapi baik ada
-            $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
+             $table->timestampsTz();
+            $table->softDeletesTz();
 
             // --- Indexing ---
             // Optimasi komposit untuk laporan status per transaksi

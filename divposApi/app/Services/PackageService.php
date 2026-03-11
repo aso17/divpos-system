@@ -19,7 +19,12 @@ class PackageService
         $this->logRepo = $logRepo;
     }
 
-   
+   public function getAllPackagesTransaction(int $tenantId)
+    {
+        // Jika kedepannya Mas mau tambah Cache (misal: Redis), 
+        // logic-nya ditaruh di sini agar Repository tetap murni query.
+        return $this->packageRepo->getForTransaction($tenantId);
+    }
 
    
    public function getAllPackages(array $params)
@@ -144,8 +149,6 @@ class PackageService
                     $data['is_weight_based'] = (bool) $unit->is_decimal;
                 }
 
-                // 3. Mapping Payload (Data Integrity)
-                // Kita gunakan data dari Request yang sudah bersih
                 $payload = [
                     'service_id'     => isset($data['service_id']) ? (int) $data['service_id'] : $package->service_id,
                     'category_id'    => isset($data['category_id']) ? (int) $data['category_id'] : $package->category_id,
@@ -186,25 +189,43 @@ class PackageService
         });
     }
    
-
-    /**
-     * Hapus Paket
-     */
     public function deletePackage($id, $tenantId)
     {
-        
-        $package = $this->packageRepo->findByIdAndTenant((int)$id, (int)$tenantId);
+        return DB::transaction(function () use ($id, $tenantId) {
+            try {
+                $package = $this->packageRepo->findByIdAndTenant((int)$id, (int)$tenantId);
 
-        if (!$package) return null;
+                if (!$package) return null;
 
-        // Logika Bisnis: Contoh jangan hapus jika ada transaksi aktif (opsional)
-        // if ($package->orders()->exists()) { throw new \Exception("Paket sudah pernah digunakan dalam transaksi."); }
+                $isUsedInTransaction = DB::table('Tr_transaction_details')
+                    ->where('package_id', $id)
+                    ->whereNull('deleted_at')
+                    ->exists();
 
-        $this->packageRepo->delete($package);
+                if ($isUsedInTransaction) {
+                   
+                    throw new \Exception("Paket '{$package->name}' tidak bisa dihapus karena sudah digunakan dalam transaksi. Silakan nonaktifkan saja (is_active = false).");
+                    
+                }
 
-        return $package;
+                // 2. PROSES HAPUS (Soft Delete)
+                $this->packageRepo->delete($package);
+
+                return $package;
+
+            } catch (\Exception $e) {
+                $this->logRepo->store([
+                    'user_id'    => Auth::id(),
+                    'tenant_id'  => $tenantId,
+                    'error_code' => $e->getCode() ?: 500,
+                    'message'    => "PackageService@deletePackage: " . $e->getMessage(),
+                    'bindings'   => json_encode(['id' => $id]), 
+                ]);
+
+                throw $e; 
+            }
+        });
     }
-
 
       /**
      * Generate Kode Paket Unik per Tenant

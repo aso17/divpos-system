@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\PaymentMethodService;
 use App\Http\Resources\PaymentMethodResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class PaymentMethodController extends Controller
@@ -18,8 +19,14 @@ class PaymentMethodController extends Controller
 
     public function index(Request $request)
     {
-       
-        $tenantId = $request->query('tenant_id'); 
+       $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
+
+        if (!$tenantId) {
+            return response()->json([
+                'message' => 'Access denied. Profil bisnis tidak ditemukan.'
+            ], 403);
+        }
 
         $data = $this->service->getAllPaymentMethods(
             $tenantId,

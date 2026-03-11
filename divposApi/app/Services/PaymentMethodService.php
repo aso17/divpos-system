@@ -14,6 +14,16 @@ class PaymentMethodService
         $this->repository = $repository;
     }
 
+   public function getAllPaymentMethodsTransaction($tenantId)
+    {
+        // Panggil repository untuk ambil data dari DB
+        $data = $this->repository->getForTransaction($tenantId);
+        return $data;
+    }
+
+
+
+
    public function getAllPaymentMethods($tenantId, $keyword, $perPage)
     {
         

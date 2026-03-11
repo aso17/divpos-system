@@ -7,7 +7,6 @@ use App\Http\Resources\PackageResource;
 use App\Http\Requests\PackageRequest;
 use App\Services\PackageService; 
 use App\Helpers\CryptoHelper; 
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 
 class PackageController extends Controller
@@ -81,22 +80,25 @@ class PackageController extends Controller
             ], 400);
         }
 
-        // 3. Kembalikan response dengan Resource
         return response()->json([
             'message' => 'Paket berhasil diupdate',
             'data'    => new PackageResource($updated)
         ]);
     }
-    public function destroy(Request $request, $id)
+    public function destroy($id)
     {
+         $user = Auth::user();
+         $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
+
+        if (!$tenantId) {
+            return response()->json([
+                'message' => 'Access denied. You do not have permission to perform this action.'
+            ], 403);
+            }
+
         $decryptedId = CryptoHelper::decrypt($id) ?? $id;
-        $decryptedTenantId = CryptoHelper::decrypt($request->tenant_id);
-
-        if (!$decryptedTenantId) {
-            return response()->json(['message' => 'Akses ditolak'], 403);
-        }
-
-        $deleted = $this->packageService->deletePackage($decryptedId, $decryptedTenantId);
+      
+        $deleted = $this->packageService->deletePackage($decryptedId, $tenantId);
 
         if (!$deleted) {
             return response()->json(['message' => 'Data tidak ditemukan atau sudah dihapus'], 404);

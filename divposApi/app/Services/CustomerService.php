@@ -17,30 +17,16 @@ class CustomerService
     }
 
 
-
-    /**
-     * Ambil daftar customer dengan filter keyword (Nama/HP)
-     */
-    public function getDataList($encryptedTenantId, $keyword = null, $perPage = 10)
+   public function getCustomerTransaction($tenantId, $phone)
     {
-        // 1. Dekripsi Tenant ID
-        $tenantId = CryptoHelper::decrypt($encryptedTenantId);
-        if (!$tenantId || !is_numeric($tenantId)) {
-            return collect(); // Return empty collection jika tenant tidak valid
+        // 1. Validasi awal: Tenant harus ada dan Phone tidak boleh kosong
+        if (!$tenantId || !is_numeric($tenantId) || empty($phone)) {
+            return null; // Balikkan null, bukan collect() agar konsisten dengan objek tunggal
         }
 
-        // 2. Ambil base query dari Repository
-        $query = $this->customerRepo->getBaseQuery((int)$tenantId);
-
-        // 3. Filter berdasarkan keyword (Nama atau Nomor HP)
-        if (!empty($keyword)) {
-            $query->where(function ($q) use ($keyword) {
-                $q->where('name', 'like', "%{$keyword}%")
-                  ->orWhere('phone', 'like', "%{$keyword}%");
-            });
-        }
-
-        return $query->orderByDesc('id')->paginate($perPage);
+        // 2. Langsung panggil repo untuk ambil satu data (Exact Match)
+        // Asumsi: di Repo fungsi getCustomerByPhone sudah menggunakan ->first()
+        return $this->customerRepo->getCustomerByPhone((int)$tenantId, $phone);
     }
 
     /**

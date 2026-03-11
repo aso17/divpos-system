@@ -12,90 +12,89 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 
 class CategoryRequest extends FormRequest
 {
-    // Public agar bisa diakses langsung oleh Controller tanpa re-query
-    public $tenantId;
-
     public function authorize(): bool
     {
-        // Pastikan tenant_id tersedia
-        return !is_null($this->tenantId);
+        // Pastikan user punya tenant_id
+        return Auth::check() && !is_null(Auth::user()->employee?->tenant_id);
     }
 
     protected function prepareForValidation()
     {
-        // 1. KRUSIAL: Ambil tenant_id di awal lifecycle agar tersedia untuk sanitize & rules
-        $this->tenantId = Auth::user()?->employee?->tenant_id;
-
+        $tenantId = Auth::user()->employee->tenant_id;
         $routeId = $this->route('id') ?? $this->route('category');
-        $sanitizedData = [];
         
-        // 2. Dekripsi ID Kategori
-        if ($routeId && !is_numeric($routeId)) {
-            $sanitizedData['id'] = CryptoHelper::decrypt($routeId);
+        $mergeData = [
+            'tenant_id' => $tenantId,
+        ];
+
+        // 1. Dekripsi ID
+        if ($routeId) {
+            $mergeData['id'] = CryptoHelper::decrypt($routeId);
         }
 
-        // 3. Pasang tenant_id ke dalam data request
-        $sanitizedData['tenant_id'] = $this->tenantId;
-
-        // 4. Sanitasi Input (XSS Prevention)
+        // 2. Sanitasi Nama & Generate Slug
         if ($this->has('name')) {
-            $cleanName = trim(strip_tags($this->name));
-            $sanitizedData['name'] = htmlspecialchars($cleanName, ENT_QUOTES, 'UTF-8');
+            $cleanName = preg_replace('/\s+/', ' ', strip_tags(trim($this->name)));
+            $mergeData['name'] = $cleanName;
             
-            // Auto-generate slug jika kosong
-            if (!$this->has('slug') || empty($this->slug)) {
-                $sanitizedData['slug'] = Str::slug($cleanName);
+            // Generate slug otomatis hanya jika slug kosong
+            if (empty($this->slug)) {
+                $mergeData['slug'] = Str::slug($cleanName);
             }
         }
 
-        if ($this->has('slug')) {
-            $sanitizedData['slug'] = Str::slug($this->slug);
+        // 3. Sanitasi Slug (jika diinput manual)
+        if ($this->has('slug') && !empty($this->slug)) {
+            $mergeData['slug'] = Str::slug($this->slug);
         }
 
-        // Merge ke request agar divalidasi oleh rules()
-        $this->merge($sanitizedData);
+        // 4. Konversi Boolean
+        if ($this->has('is_active')) {
+            $mergeData['is_active'] = filter_var($this->is_active, FILTER_VALIDATE_BOOLEAN);
+        }
+
+        $this->merge($mergeData);
     }
 
-   public function rules(): array
-{
-    $id = $this->id; 
+    public function rules(): array
+    {
+        $tenantId = Auth::user()->employee->tenant_id;
+        $id = $this->id; 
 
-    return [
-        'tenant_id' => 'required|integer',
-        
-        'id' => [
-            'nullable',
-            'integer',
-            $id ? Rule::exists('Ms_categories', 'id')->where('tenant_id', $this->tenantId) : '',
-        ],
-        'name' => [
-            'required', 'string', 'min:2', 'max:100',
-            'regex:/^[a-zA-Z0-9\s\.\,\-\'\(\)]+$/',
-            Rule::unique('Ms_categories', 'name')
-                ->where('tenant_id', $this->tenantId)
-                ->whereNull('deleted_at') // <--- TAMBAHKAN INI
-                ->ignore($id)
-        ],
-        'slug' => [
-            'nullable', 'string', 'max:150',
-            Rule::unique('Ms_categories', 'slug')
-                ->where('tenant_id', $this->tenantId)
-                ->whereNull('deleted_at') // <--- TAMBAHKAN INI JUGA
-                ->ignore($id)
-        ],
-        'priority'  => 'integer|min:0|max:255',
-        'is_active' => 'boolean',
-    ];
-}
+        return [
+            'tenant_id' => 'required|integer',
+            'id' => [
+                'sometimes', 'nullable', 'integer',
+                Rule::exists('Ms_categories', 'id')->where('tenant_id', $tenantId)
+            ],
+            'name' => [
+                'required', 'string', 'min:2', 'max:100',
+                'regex:/^[a-zA-Z0-9\s\.\,\-\'\(\)]+$/',
+                Rule::unique('Ms_categories', 'name')
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->ignore($id)
+            ],
+            'slug' => [
+                'required', 'string', 'max:150',
+                Rule::unique('Ms_categories', 'slug')
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->ignore($id)
+            ],
+            'priority'  => 'nullable|integer|min:0|max:255',
+            'is_active' => 'boolean',
+        ];
+    }
 
     public function messages(): array
     {
         return [
-            'id.exists'     => 'Akses ditolak: Data tidak ditemukan atau milik tenant lain.',
+            'id.exists'     => 'Akses ditolak: Data tidak ditemukan.',
             'name.required' => 'Nama kategori wajib diisi.',
-            'name.unique'   => 'Kategori ini sudah ada di daftar Anda.',
-            'name.regex'    => 'Nama mengandung karakter yang tidak diizinkan.',
-            'slug.unique'   => 'Slug sudah digunakan.',
+            'name.unique'   => 'Nama kategori ini sudah terdaftar.',
+            'name.regex'    => 'Nama kategori mengandung simbol yang dilarang.',
+            'slug.unique'   => 'Slug kategori sudah digunakan, silakan buat nama yang sedikit berbeda.',
         ];
     }
 
@@ -103,7 +102,7 @@ class CategoryRequest extends FormRequest
     {
         throw new HttpResponseException(response()->json([
             'success' => false,
-            'message' => 'Integrity Check Failed',
+            'message' => 'Integrity Check Failed (Category)',
             'errors'  => $validator->errors()
         ], 422));
     }

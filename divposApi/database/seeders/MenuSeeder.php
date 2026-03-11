@@ -32,13 +32,24 @@ class MenuSeeder extends Seeder
             ['module'=>'MASTER','menu_name'=>'Kategori Jasa','code'=>'MST_KATEGORI','route_name'=>'/categories','icon'=>'clock','order_no'=>5,'parent'=>'MST_PARENT'],
             ['module'=>'MASTER','menu_name'=>'Paket Layanan','code'=>'MST_PAKET','route_name'=>'/packages','icon'=>'tag','order_no'=>6,'parent'=>'MST_PARENT'],
 
-            // Kelompok Keuangan
-            ['module'=>'MASTER','menu_name'=>'Metode Pembayaran','code'=>'MST_PAYMENT','route_name'=>'/payment-methods','icon'=>'credit-card','order_no'=>7,'parent'=>'MST_PARENT'],
-          
             // LAPORAN
+           
             ['module'=>'REPORT','menu_name'=>'Laporan','code'=>'RPT_PARENT','route_name'=>null,'icon'=>'bar-chart-2','order_no'=>5,'parent'=>null],
-            ['module'=>'REPORT','menu_name'=>'Harian','code'=>'RPT_DAILY','route_name'=>'/reports/daily','icon'=>'calendar','order_no'=>1,'parent'=>'RPT_PARENT'],
-            ['module'=>'REPORT','menu_name'=>'Bulanan','code'=>'RPT_MONTHLY','route_name'=>'/reports/monthly','icon'=>'calendar','order_no'=>2,'parent'=>'RPT_PARENT'],
+
+            // 1. PENDAPATAN (Berapa uang yang masuk?)
+            ['module'=>'REPORT','menu_name'=>'Analisa Pendapatan','code'=>'RPT_REVENUE','route_name'=>'/reports/revenue','icon'=>'dollar-sign','order_no'=>1,'parent'=>'RPT_PARENT'],
+
+            // 2. STATUS LAYANAN (Penting untuk Laundry & Carwash: Menghitung berapa yang masih "Proses", "Selesai", atau "Diambil")
+            ['module'=>'REPORT','menu_name'=>'Status Layanan','code'=>'RPT_SERVICE_STATUS','route_name'=>'/reports/service-status','icon'=>'refresh-cw','order_no'=>2,'parent'=>'RPT_PARENT'],
+
+            // 3. PERFORMANCE PAKET (Cek paket mana yang paling laku di Laundry vs Salon)
+            ['module'=>'REPORT','menu_name'=>'Produk & Paket Terlaris','code'=>'RPT_BEST_SELLER','route_name'=>'/reports/best-seller','icon'=>'package','order_no'=>3,'parent'=>'RPT_PARENT'],
+
+            // 4. METODE PEMBAYARAN (Memisahkan setoran Tunai vs Otomatis/Midtrans)
+            ['module'=>'REPORT','menu_name'=>'Rekap Pembayaran','code'=>'RPT_PAYMENT_RECAP','route_name'=>'/reports/payments','icon'=>'credit-card','order_no'=>4,'parent'=>'RPT_PARENT'],
+
+            // 5. PRODUKTIVITAS KARYAWAN (Siapa yang paling rajin nyuci atau potong rambut?)
+            ['module'=>'REPORT','menu_name'=>'Performa Karyawan','code'=>'RPT_STAFF_PERF','route_name'=>'/reports/staff-performance','icon'=>'users','order_no'=>5,'parent'=>'RPT_PARENT'],
 
            // SETTING
             ['module'=>'SETTING','menu_name'=>'Pengaturan','code'=>'SET_PARENT','route_name'=>null,'icon'=>'settings','order_no'=>6,'parent'=>null],

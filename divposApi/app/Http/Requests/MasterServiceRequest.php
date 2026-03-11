@@ -11,63 +11,72 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 
 class MasterServiceRequest extends FormRequest
 {
-    protected $tenantId;
-
     public function authorize(): bool
     {
-        $this->tenantId = Auth::user()->employee?->tenant_id;
-        return !is_null($this->tenantId);
+        // Pastikan tenant_id aman
+        return Auth::check() && !is_null(Auth::user()->employee?->tenant_id);
     }
 
     protected function prepareForValidation()
     {
-        // Ambil ID dari route parameter (services/{id})
         $routeId = $this->route('id') ?? $this->route('master_service');
-        $sanitizedData = [];
-        
-        // 1. Dekripsi ID Service & Masukkan ke Request agar bisa diakses $this->id
+        $tenantId = Auth::user()->employee->tenant_id;
+
+        $mergeData = [
+            'tenant_id' => $tenantId,
+        ];
+
+        // 1. Dekripsi ID
         if ($routeId) {
-            $decryptedId = CryptoHelper::decrypt($routeId);
-            // MERGE adalah kunci agar $this->id di rules() tidak null
-            $this->merge(['id' => $decryptedId]); 
+            $mergeData['id'] = CryptoHelper::decrypt($routeId);
         }
 
-        // 2. 🛡️ PAKSA tenant_id dari Auth
-        $sanitizedData['tenant_id'] = $this->tenantId;
-
-        // 3. Sanitasi Input Text
-        $fields = ['name', 'description'];
-        foreach ($fields as $field) {
-            if ($this->has($field)) {
-                $value = trim($this->$field);
-                $sanitizedData[$field] = htmlspecialchars(strip_tags($value), ENT_QUOTES, 'UTF-8');
-            }
+        // 2. Sanitasi Nama & Deskripsi
+        // Kita gunakan strip_tags & trim saja agar karakter asli di DB tetap bersih (bukan hasil htmlspecialchars)
+        if ($this->has('name')) {
+            $mergeData['name'] = preg_replace('/\s+/', ' ', strip_tags(trim($this->name)));
         }
 
-        $this->merge($sanitizedData);
+        if ($this->has('description')) {
+            $mergeData['description'] = strip_tags(trim($this->description));
+        }
+
+        // 3. Pastikan is_active jadi boolean murni
+        if ($this->has('is_active')) {
+            $mergeData['is_active'] = filter_var($this->is_active, FILTER_VALIDATE_BOOLEAN);
+        }
+
+        $this->merge($mergeData);
     }
 
     public function rules(): array
     {
+        $tenantId = Auth::user()->employee->tenant_id;
+
         return [
             'id' => [
-                'nullable',
-                'integer',
-                // Cek apakah ID benar milik tenant ini
-                $this->id ? Rule::exists('Ms_services', 'id')->where('tenant_id', $this->tenantId) : '',
+                'sometimes', 'nullable', 'integer',
+                Rule::exists('Ms_services', 'id')->where('tenant_id', $tenantId)
             ],
             
-           'name' => [
+            'name' => [
                 'required', 'string', 'min:3', 'max:100',
+                // Whitelist: Huruf, angka, spasi, titik, koma, strip, apostrof, kurung
                 'regex:/^[a-zA-Z0-9\s\.\,\-\'\(\)]+$/',
+                // Pastikan tidak ada link
+                'not_regex:/(http|https|www|\.com|\.net|\.id)/i',
+                // Unique per Tenant
                 Rule::unique('Ms_services', 'name')
-                    ->where('tenant_id', $this->tenantId)
-                    ->ignore($this->id), // Mengabaikan diri sendiri saat update
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->ignore($this->id),
             ],
 
             'description' => [
                 'nullable', 'string', 'max:200',
-                'not_regex:/<script|javascript|http|https|www|<\/|{[ ]*$/i',
+                // Proteksi URL & Script untuk deskripsi
+                'not_regex:/(http|https|www|\.com|\.net|\.id)/i',
+                'not_regex:/[<>"{}]/i',
             ],
 
             'is_active' => 'boolean',
@@ -77,11 +86,11 @@ class MasterServiceRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'id.exists' => 'Akses ditolak: Data tidak ditemukan atau bukan milik Anda.',
-            'name.required' => 'Nama layanan wajib diisi.',
-            'name.unique' => 'Nama layanan ini sudah ada di daftar outlet Anda.',
-            'name.regex' => 'Nama layanan mengandung karakter yang dilarang.',
-            'description.not_regex' => 'Deskripsi tidak boleh mengandung link atau script.',
+            'id.exists'             => 'Data layanan tidak ditemukan atau akses ditolak.',
+            'name.required'         => 'Nama layanan wajib diisi.',
+            'name.unique'           => 'Nama layanan ini sudah terdaftar di bisnis Anda.',
+            'name.regex'            => 'Nama layanan mengandung simbol yang tidak diizinkan.',
+            'description.not_regex' => 'Deskripsi dilarang mengandung link (URL) atau simbol kode (XSS).',
         ];
     }
 

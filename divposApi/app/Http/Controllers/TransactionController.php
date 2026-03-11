@@ -8,12 +8,13 @@ use App\Services\CustomerService;
 use App\Services\OutletService;
 use App\Services\TransactionService;
 use App\Services\PaymentMethodService;
-use App\Http\Resources\PackageResource;
 use App\Http\Resources\TransactionResource;
-use App\Http\Resources\PaymentMethodResource;
+use App\Http\Resources\TransactionPaymentMethodResource;
 use App\Http\Resources\CustomerResource;
-use App\Http\Resources\OutletResource;
+use App\Http\Resources\TransactionPackageResource;
+use App\Http\Resources\TransactionOutletResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use App\Helpers\CryptoHelper; 
 
 
@@ -37,96 +38,40 @@ class TransactionController extends Controller
 
     
 
-   public function getInitData(Request $request)
-{
-    $tenantId = $request->query('tenant_id');
-    
-    if (!$tenantId) {
-        return response()->json(['message' => 'Invalid Tenant'], 400);
-    }
-
-    // 1. Ambil data Paket (Gunakan optional atau check null)
-    $packageQuery = $this->packageService->getAllPackages([
-        'tenant_id' => $tenantId,
-        'is_active' => true
-    ]);
-    
-    $packages = $packageQuery ? $packageQuery->get() : collect([]);
-
-    // 2. Ambil data Outlet
-    $outletQuery = $this->outletService->getAllOutlets([
-        'tenant_id' => $tenantId,
-        'is_active' => true
-    ]);
-    $outlets = $outletQuery ? $outletQuery->get() : collect([]);
-
-    $paymentMethods = $this->paymentMethodService->getAllPaymentMethods(
-        $tenantId, 
-        null, 
-        100
-    );
-
-    // 4. Ambil data Customers
-    $customers = $this->customerService->getDataList(
-        $tenantId,
-        null,
-        50 
-    );
-
-    return response()->json([
-        'status' => 'success',
-        'data' => [
-            'packages' => PackageResource::collection($packages),
-            'outlets' => OutletResource::collection($outlets),
-            'payment_methods' => PaymentMethodResource::collection($paymentMethods),
-            'customers' => CustomerResource::collection($customers),
-        ]
-    ]);
-}
-    public function getPackages(Request $request)
+  public function getInitData()
     {
-        $data = $this->packageService->getAllPackages([
-            'tenant_id' => $request->query('tenant_id'),
-            'is_active' => true
-        ]);
+        $user = Auth::user();
         
-        return PackageResource::collection($data->get());
-    }
+        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
 
-    public function getOutlets(Request $request)
-    {
-        $data = $this->outletService->getAllOutlets([
-            'tenant_id' => $request->query('tenant_id'),
-            'is_active' => true
+        if (!$tenantId) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Access denied. Profil bisnis tidak ditemukan.'
+            ], 403);
+        }
+
+    
+        $packages = $this->packageService->getAllPackagesTransaction($tenantId); 
+        $outlets = $this->outletService->getAllOutletsTransaction($tenantId);
+        $paymentMethods = $this->paymentMethodService->getAllPaymentMethodsTransaction($tenantId);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'packages'        => TransactionPackageResource::collection($packages ?? collect([])),
+                'outlets'         => TransactionOutletResource::collection($outlets ?? collect([])),
+                'payment_methods' => TransactionPaymentMethodResource::collection($paymentMethods ?? collect([])),
+            ]
         ]);
-        
-        return PackageResource::collection($data->get());
     }
    
-    public function getPaymentMethods(Request $request)
-    {
-        // Ambil parameter dari request
-        $tenantId = $request->query('tenant_id');
-        $keyword = $request->query('keyword'); 
-        $perPage = $request->query('per_page', 100);
-
-        // Panggil service dengan parameter individu
-        $data = $this->paymentMethodService->getAllPaymentMethods(
-            $tenantId, 
-            $keyword, 
-            $perPage
-        );
-        
-        // Resource::collection otomatis menangani data hasil paginate()
-        return PaymentMethodResource::collection($data);
-    }
 
     public function getTransactionHistory(Request $request)
     {
         $data = $this->transactionService->getTransactionHistory($request->all());
         $formattedData = TransactionResource::collection($data)->response()->getData(true);
 
-        // Ini isi manual dari apa yang biasanya dilakukan sendResponse
         return response()->json([
             'success' => true,
             'data'    => $formattedData,
@@ -134,18 +79,34 @@ class TransactionController extends Controller
         ], 200);
     }
 
-    // Dipanggil oleh TransactionService.getCustomers() di React
     public function getCustomers(Request $request)
     {
-        $data = $this->customerService->getDataList(
-            $request->query('tenant_id'),
-            $request->query('keyword'),
-            1000 // Limit besar agar pencarian di frontend (customers.find) akurat
+        $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
+
+        if (!$tenantId) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Access denied. Profil bisnis tidak ditemukan.'
+            ], 403);
+        }
+
+        $customer = $this->customerService->getCustomerTransaction(
+            $tenantId,
+            $request->query('phone')
         );
 
-        return CustomerResource::collection($data);
-    }
+        
+        if (!$customer) {
+            return response()->json([
+                'status' => 'success',
+                'data'   => null
+            ]);
+        }
 
+        
+        return new CustomerResource($customer);
+    }
 
     public function store(Request $request)
     {

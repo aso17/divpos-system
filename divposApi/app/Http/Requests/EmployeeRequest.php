@@ -55,17 +55,23 @@ class EmployeeRequest extends FormRequest
             'id'        => 'nullable|integer',
             'full_name' => [
                 'required', 'string', 'max:100',
-                'regex:/^[a-zA-Z\s\'.]+$/' // Hanya huruf, spasi, petik, dan titik
+                'regex:/^[a-zA-Z\s\'.\-]+$/',
+                'not_regex:/(http|https|www|\.com|\.net|\.id|\.io|\.gov)/i',
+                function ($attribute, $value, $fail) {
+                    if (preg_match('/(.)\1{4,}/', $value)) {
+                        $fail('Nama tidak valid (terdeteksi pengulangan karakter berlebih).');
+                    }
+                },
             ],
             'phone'     => 'required|numeric|digits_between:10,15',
             'job_title' => [
                 'required', 'string', 'max:50', 
-                'not_regex:/^(http|https|www)/i' 
+               'regex:/^[a-zA-Z\s\-]+$/',
+                'not_regex:/(http|https|www|\.com|\.net|\.id)/i'
             ],
             'outlet_id' => [
                 'nullable',
                 'integer',
-                // Pastikan outlet yang dipilih memang milik tenant ini
                 Rule::exists('Ms_outlets', 'id')->where('tenant_id', $tenantId)
             ],
             'is_active' => [

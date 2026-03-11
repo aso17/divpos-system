@@ -15,6 +15,11 @@ class OutletService
         $this->outletRepo = $outletRepo;
     }
 
+
+    public function getAllOutletsTransaction(int $tenantId)
+    {
+        return $this->outletRepo->getForTransaction($tenantId);
+    }
     public function getAllOutlets(array $params)
     {
         $tenantId = $params['tenant_id'] ?? null;

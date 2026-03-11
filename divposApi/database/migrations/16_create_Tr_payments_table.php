@@ -35,8 +35,8 @@ return new class extends Migration
             // PERBAIKAN: Gunakan string(255) untuk konsistensi performa
             $table->string('notes', 255)->nullable(); 
             
-            $table->timestamps();
-            $table->softDeletes();
+            $table->timestampsTz();
+            $table->softDeletesTz();
 
             // --- Indexing ---
             $table->index(['tenant_id', 'transaction_id'], 'idx_pay_tenant_trans');

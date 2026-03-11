@@ -38,8 +38,8 @@ return new class extends Migration
             // --- Informasi Tambahan ---
             $table->string('notes', 255)->nullable(); 
             
-            $table->timestamps();
-            $table->softDeletes();
+            $table->timestampsTz();
+            $table->softDeletesTz();
 
             // --- Indexing (Optimasi Laporan Detail) ---
             // Komposit index untuk pencarian detail transaksi per tenant

@@ -47,16 +47,18 @@ return new class extends Migration
             $table->enum('payment_status', ['UNPAID', 'PARTIAL', 'PAID'])->default('UNPAID');
             
             $table->text('notes')->nullable(); // Catatan khusus
-            $table->string('created_by');
-            $table->string('updated_by')->nullable();
+           $table->unsignedBigInteger('created_by')->index(); // Wajib ada ID pembuat
+           $table->unsignedBigInteger('updated_by')->nullable()->index();
             
-            $table->timestamps();
-            $table->softDeletes();
+            $table->timestampsTz();
+            $table->softDeletesTz();
+
+
+            $table->foreign('created_by')->references('id')->on('Ms_users')->onDelete('restrict');
+            $table->foreign('updated_by')->references('id')->on('Ms_users')->onDelete('restrict');
 
            // --- Indexing (Kecepatan Query) ---
-            $table->unique(['tenant_id', 'invoice_no']); // Invoice tidak boleh kembar dalam 1 tenant
-
-            // PERBAIKAN: Masukkan outlet_id ke dalam index komposit utama
+            $table->unique(['tenant_id', 'invoice_no']); 
             $table->index(['tenant_id', 'outlet_id', 'status'], 'idx_trans_tenant_outlet_status');                
             $table->index(['tenant_id', 'order_date'], 'idx_trans_tenant_date');                
             $table->index(['customer_phone'], 'idx_trans_cust_phone');

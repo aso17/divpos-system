@@ -11,69 +11,81 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 
 class OutletRequest extends FormRequest
 {
-    protected $tenantId;
-
     public function authorize(): bool
     {
-        // Ambil tenant_id langsung dari session/token login
-        $this->tenantId = Auth::user()?->tenant_id;
-        
-        // Hanya izinkan jika user punya tenant_id
-        return !is_null($this->tenantId);
+        // Langsung return boolean, lebih clean
+        return Auth::check() && !is_null(Auth::user()->tenant_id);
     }
 
     protected function prepareForValidation()
     {
         $routeId = $this->route('id') ?? $this->route('outlet');
-        $sanitizedData = [];
-        
-        // 1. Dekripsi ID Outlet (untuk update)
+        $tenantId = Auth::user()->tenant_id;
+
+        $mergeData = [
+            'tenant_id' => $tenantId,
+        ];
+
+        // 1. Dekripsi ID jika ada (Edit Mode)
         if ($routeId) {
-            $sanitizedData['id'] = CryptoHelper::decrypt($routeId);
+            $mergeData['id'] = CryptoHelper::decrypt($routeId);
         }
 
-        // 2. 🛡️ PAKSA tenant_id dari Auth (Abaikan kiriman Frontend)
-        $sanitizedData['tenant_id'] = $this->tenantId;
-
-        // 3. Sanitasi Input Text (XSS Prevention)
-        $fields = ['name', 'city', 'address', 'description'];
-        foreach ($fields as $field) {
+        // 2. Sanitasi Text Otomatis
+        $textFields = ['name', 'city', 'address', 'description'];
+        foreach ($textFields as $field) {
             if ($this->has($field)) {
-                $value = trim($this->$field);
-                $sanitizedData[$field] = htmlspecialchars(strip_tags($value), ENT_QUOTES, 'UTF-8');
+                // Hapus tag HTML & Spasi berlebih (Double space jadi single)
+                $cleanValue = preg_replace('/\s+/', ' ', strip_tags(trim($this->$field)));
+                $mergeData[$field] = $cleanValue;
             }
         }
 
-        $this->merge($sanitizedData);
+        // 3. Konversi Boolean (Jika kiriman dari FE berupa string "true"/"1")
+        $boolFields = ['is_active', 'is_main_branch'];
+        foreach ($boolFields as $field) {
+            if ($this->has($field)) {
+                $mergeData[$field] = filter_var($this->$field, FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        $this->merge($mergeData);
     }
 
     public function rules(): array
     {
+        $tenantId = Auth::user()->tenant_id;
+
         return [
-          
             'id' => [
-                'nullable',
-                'integer',
-                $this->id ? Rule::exists('Ms_outlets', 'id')->where('tenant_id', $this->tenantId) : '',
+                'sometimes', 'nullable', 'integer',
+                Rule::exists('Ms_outlets', 'id')->where('tenant_id', $tenantId)
             ],
             
-         
             'name' => [
                 'required', 'string', 'min:3', 'max:100',
-                'regex:/^[a-zA-Z0-9\s\.\,\-\'\(\)]+$/', 
+                'regex:/^[a-zA-Z0-9\s\.\,\-\'\(\)]+$/',
+                'not_regex:/(http|https|www|\.com|\.net|\.id)/i'
             ],
 
             'phone' => 'required|numeric|digits_between:10,15',
-            'city' => ['required', 'string', 'max:50', 'regex:/^[a-zA-Z\s\.\-]+$/'],
+
+            'city' => [
+                'required', 'string', 'max:50', 
+                'regex:/^[a-zA-Z\s\.\-]+$/', 
+            ],
             
             'address' => [
                 'required', 'string', 'min:10',
-                'not_regex:/<script|javascript|http|https|www|<\/|{[ ]*$/i',
+                'regex:/^[a-zA-Z0-9\s.,\/()\-]+$/',
+                'not_regex:/[<>"{}]/i',
             ],
 
             'description' => [
                 'nullable', 'string', 'max:255',
-                'not_regex:/<script|javascript|http|https|www|<\/|{[ ]*$/i',
+                'not_regex:/[<>"{}]/i', 
+                'not_regex:/(http|https|www|\.com|\.net|\.id|\.io|\.gov|\.org)/i',
+    
             ],
 
             'is_active'      => 'boolean',
@@ -84,10 +96,12 @@ class OutletRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'id.exists' => 'Access denied: Data not found or ownership mismatch.',
-            'name.regex' => 'Name contains illegal characters.',
-            'address.not_regex' => 'Links or scripts are not allowed in the address.',
-            'phone.numeric' => 'Phone number must be numeric.',
+            'id.exists'         => 'Akses ditolak: Data tidak ditemukan.',
+            'name.regex'        => 'Nama mengandung karakter simbol yang dilarang.',
+            'city.regex'        => 'Format nama kota tidak valid.',
+            'address.regex'     => 'Format alamat tidak valid.',
+            'address.not_regex' => 'Alamat tidak boleh mengandung link atau script.',
+            'phone.numeric'     => 'Nomor telepon harus berupa angka.',
         ];
     }
 
@@ -95,8 +109,7 @@ class OutletRequest extends FormRequest
     {
         throw new HttpResponseException(response()->json([
             'success' => false,
-            // 'data'=>$this->tenantId,
-            'message' => 'Integrity Check Failed test',
+            'message' => 'Integrity Check Failed',
             'errors'  => $validator->errors()
         ], 422));
     }

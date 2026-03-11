@@ -6,7 +6,27 @@ use App\Models\Ms_package;
 use Illuminate\Support\Facades\DB;
 class PackageRepository
 {
-
+    public function getForTransaction(int $tenantId)
+    {
+        return Ms_package::select([
+                'id',
+                'tenant_id',
+                'unit_id',
+                'name',
+                'price',          // WAJIB: Untuk original_price
+                'final_price',    // WAJIB: Untuk harga setelah diskon
+                'discount_value', // WAJIB: Untuk nominal diskon
+                'discount_type',  // WAJIB: Untuk label (fixed/percentage)
+                'description',
+                'is_weight_based'
+            ])
+            ->with(['unit:id,short_name']) 
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->orderBy('name', 'asc')
+            ->get();
+    }
    public function getLastCodeByPrefix(int $tenantId, string $prefix)
     {
         return Ms_package::select('code')

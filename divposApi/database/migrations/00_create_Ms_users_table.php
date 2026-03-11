@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -16,12 +17,11 @@ return new class extends Migration
                   ->index(); 
 
             // --- DATA AUTENTIKASI ---
-            $table->string('email', 150)->unique();
-            $table->string('username', 50)->unique()->nullable();
+            $table->string('email', 150); 
+            $table->string('username', 50)->nullable(); 
             $table->string('password', 255); 
             $table->string('avatar', 255)->nullable();    
 
-            // Status Login (Tambah index untuk filter cepat)
             $table->boolean('is_active')->default(true)->index();
             // Audit Trailing
             $table->unsignedBigInteger('created_by')->nullable()->index();
@@ -47,8 +47,12 @@ return new class extends Migration
             // Opsional: Jika ingin pakai foreign key resmi agar data konsisten
             $table->foreign('created_by')->references('id')->on('Ms_users')->onDelete('set null');
             $table->foreign('updated_by')->references('id')->on('Ms_users')->onDelete('set null');
+
             
-        });
+            });
+
+            DB::statement('CREATE UNIQUE INDEX users_email_active_unique ON "Ms_users" (email) WHERE deleted_at IS NULL');
+            DB::statement('CREATE UNIQUE INDEX users_username_active_unique ON "Ms_users" (username) WHERE deleted_at IS NULL');
 
         // Tabel password_reset_tokens (Sudah Tepat)
         Schema::create('password_reset_tokens', function (Blueprint $table) {
