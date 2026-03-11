@@ -4,14 +4,22 @@ import {
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import { Pencil, Trash2, PlusSquare, Plus, Search, X, Box } from "lucide-react";
+import { Plus, Box } from "lucide-react";
+import Search from "lucide-react/dist/esm/icons/search";
+import Eye from "lucide-react/dist/esm/icons/eye";
+import Pencil from "lucide-react/dist/esm/icons/pencil";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
+import X from "lucide-react/dist/esm/icons/x";
+import PlusSquare from "lucide-react/dist/esm/icons/plus-square";
 
 // Import Components & Services
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import PackageService from "../../services/PackageService";
+import { formatRupiah } from "../../utils/formatter";
 import PackageForm from "./PackageForm";
+import PackageDetail from "./PackageDetail";
 
 export default function PackageList() {
   const [data, setData] = useState([]);
@@ -21,7 +29,8 @@ export default function PackageList() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-
+  const [detailPackage, setDetailPackage] = useState(null);
+  const [openDetail, setOpenDetail] = useState(false);
   const [openModal, setOpenModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState(null);
 
@@ -152,7 +161,8 @@ export default function PackageList() {
               Rp {Number(row.original.price).toLocaleString("id-ID")}
             </span>
             <span className="text-[9px] text-slate-400 font-medium italic">
-              Per {row.original.unit}
+              {/* UBAH DI SINI: tambahkan .name */}
+              Per {row.original.unit?.name || "Unit"}
             </span>
           </div>
         ),
@@ -186,6 +196,15 @@ export default function PackageList() {
           <div className="flex gap-2 justify-center">
             <button
               onClick={() => {
+                setDetailPackage(row.original);
+                setOpenDetail(true);
+              }}
+              className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm"
+            >
+              <Eye size={14} />
+            </button>
+            <button
+              onClick={() => {
                 setSelectedPackage(row.original);
                 setOpenModal(true);
               }}
@@ -193,6 +212,7 @@ export default function PackageList() {
             >
               <Pencil size={14} />
             </button>
+
             <button
               onClick={() => handleDelete(row.original)}
               className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all"
@@ -333,10 +353,10 @@ export default function PackageList() {
 
                 <p className="text-[10px] font-black text-slate-700 whitespace-nowrap">
                   <span className="text-[8px]">Rp</span>{" "}
-                  {Number(pkg.price).toLocaleString("id-ID")}
+                  {formatRupiah(pkg.price)}
                   <span className="text-[8px] font-normal text-slate-400">
                     {" "}
-                    /{pkg.unit}
+                    /{pkg.unit.name}
                   </span>
                 </p>
               </div>
@@ -349,7 +369,7 @@ export default function PackageList() {
                 <p className="text-[10px] font-black text-slate-700 uppercase">
                   {pkg.min_order}{" "}
                   <span className="text-[8px] font-normal text-slate-400">
-                    {pkg.unit}
+                    {pkg.unit.name}
                   </span>
                 </p>
               </div>
@@ -358,8 +378,17 @@ export default function PackageList() {
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => {
-                  setSelectedPackage(pkg);
+                  setDetailPackage(pkg);
+                  setOpenDetail(true);
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
+              >
+                <Pencil size={10} /> Detail
+              </button>
 
+              <button
+                onClick={() => {
+                  setSelectedPackage(pkg);
                   setOpenModal(true);
                 }}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
@@ -466,6 +495,12 @@ export default function PackageList() {
 
           setSelectedPackage(null);
         }}
+      />
+
+      <PackageDetail
+        open={openDetail}
+        pkg={detailPackage}
+        onClose={() => setOpenDetail(false)}
       />
     </div>
   );

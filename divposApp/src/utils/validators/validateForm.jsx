@@ -6,12 +6,14 @@ export const validateForm = (values, schema) => {
     const rules = schema[field];
 
     for (const rule of rules) {
-      // PERBAIKAN: Tambahkan 'values' sebagai argumen kedua
-      const error = rule(value, values);
+      // Panggil rule dengan mengirimkan value saat ini dan seluruh object values
+      const result = rule(value, values);
 
-      if (error) {
-        errors[field] = error;
-        break;
+      // PERBAIKAN: Jika result bernilai true (boolean), berarti VALID.
+      // Kita hanya ambil jika result adalah STRING (pesan error).
+      if (result !== true && typeof result === "string") {
+        errors[field] = result;
+        break; // Stop di error pertama untuk field ini
       }
     }
   }
