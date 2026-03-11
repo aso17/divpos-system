@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
                 MenuSeeder::class,
                 BusinessModuleMapSeeder::class,
                 // RoleMenuPermissionSeeder::class,
+                UnitSeeder::class,
                 SystemConfigurationSeeder::class,
                 UsersSeederv2::class,
                  EmployeeSeederv2::class,

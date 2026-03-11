@@ -13,6 +13,7 @@ use App\Http\Controllers\{
     MasterServiceController,
     PackageController,
     CategoryController,
+    UnitController,
     EmployeeController,
     CustomerController,
     TransactionController,
@@ -92,6 +93,8 @@ Route::middleware(['api', 'auth:sanctum'])->group(function () {
     Route::apiResource('packages', PackageController::class);
 
     Route::apiResource('categories', CategoryController::class);
+    Route::apiResource('categories', CategoryController::class);
+    Route::apiResource('units', UnitController::class);
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('payment-methods', PaymentMethodController::class);
 

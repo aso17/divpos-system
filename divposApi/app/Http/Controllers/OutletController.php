@@ -25,7 +25,7 @@ class OutletController extends Controller
     {
        
         $user = Auth::user();
-        $tenantId = $user->tenant_id;
+        $tenantId = $user->employee->tenant_id;
 
         if (!$tenantId) {
             return response()->json(['message' => 'Unauthorized: Tenant not found.'], 403);

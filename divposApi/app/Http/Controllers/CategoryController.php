@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Resources\CategoryResource;
 use App\Services\CategoryService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use App\Http\Requests\CategoryRequest;
 use App\Services\LogDbErrorService;
 use Illuminate\Support\Facades\Auth;

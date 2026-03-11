@@ -38,21 +38,36 @@ class PackageRepository
     public function getBasePackageQuery(int $tenantId)
     {
         return Ms_package::select(
-            'id', 'service_id', 'category_id', 'code', 'name', 
-            'description', 'price', 'unit', 'min_order', 
-            'is_active', 'tenant_id', 'created_at'
-        )
-        ->with([
-            'service:id,name', 
-            'category:id,name,slug',
-            'tenant:id,slug,code'
-        ])
-        ->where('tenant_id', $tenantId);
+                'id', 
+                'tenant_id', 
+                'service_id', 
+                'category_id', 
+                'unit_id', // Ganti unit (string) jadi unit_id
+                'code', 
+                'name', 
+                'description', 
+                'price', 
+                'discount_type', 
+                'discount_value', 
+                'final_price',
+                'duration_menit',
+                'is_weight_based',
+                'min_order', 
+                'is_active', 
+                'created_at'
+            )
+            ->with([
+                'service:id,name', 
+                'category:id,name,slug',
+                'unit:id,name,short_name,is_decimal', // Tambahkan relasi unit
+                'tenant:id,code'
+            ])
+            ->where('tenant_id', $tenantId);
     }
 
     /**
      * Mencari satu paket berdasarkan ID dan Tenant (Security Check)
-     */
+     */ 
     public function findByIdAndTenant(int $id, int $tenantId)
     {
         return Ms_package::where('id', $id)
@@ -60,14 +75,26 @@ class PackageRepository
             ->first();
     }
 
+    public function getLastPackageByTenant(int $tenantId)
+    {
+        return Ms_package::withTrashed() 
+            ->where('tenant_id', $tenantId)
+            ->select('code') 
+            ->where('code', 'LIKE', 'PCK-' . date('ym') . '-%') 
+            ->orderBy('id', 'desc')
+            ->first();
+    }
     /**
      * Membuat data paket baru
      */
     public function create(array $data)
     {
         $package = Ms_package::create($data);
-        // Load relasi agar response di frontend lengkap
-        return $package->load(['service', 'category']);
+        return $package->load([
+            'service:id,name', 
+            'category:id,name', 
+            'unit:id,name'
+        ]);
     }
 
     /**
@@ -77,7 +104,11 @@ class PackageRepository
     {
         $package->update($data);
         // Ambil data terbaru beserta relasinya
-        return $package->fresh(['service', 'category']);
+        return $package->fresh([
+            'service:id,name', 
+            'category:id,name', 
+            'unit:id,name'
+            ]);
     }
 
     /**

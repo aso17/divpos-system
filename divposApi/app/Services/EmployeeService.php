@@ -7,7 +7,6 @@ use App\Models\Ms_employee;
 
 use App\Repositories\EmployeeRepository;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use App\Helpers\CryptoHelper;
 
 class EmployeeService

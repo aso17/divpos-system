@@ -4,184 +4,186 @@ namespace App\Services;
 
 use App\Repositories\PackageRepository;
 use App\Helpers\CryptoHelper;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use App\Models\Ms_Package;
-use Illuminate\Support\Str;
+use App\Repositories\LogDbErrorRepository;
+
 
 class PackageService
 {
-    protected $packageRepo;
+    protected $packageRepo, $logRepo;
 
-    public function __construct(PackageRepository $packageRepo)
-    {
+    public function __construct( PackageRepository $packageRepo,  LogDbErrorRepository $logRepo) {
         $this->packageRepo = $packageRepo;
+        $this->logRepo = $logRepo;
     }
 
+   
 
-    public function getPackageById($id)
+   
+   public function getAllPackages(array $params)
     {
-        
-        return Ms_Package::find($id);
-    }
+        $tenantId = $params['tenant_id'] ?? null;
 
-   public function generatePackageCode($encryptedTenantId, $serviceId, $categoryId)
-    {
-        // 1. Dekripsi data
-        $tenantId = (int) CryptoHelper::decrypt($encryptedTenantId);
-        $sId = (int) (CryptoHelper::decrypt($serviceId) ?? $serviceId);
-        $cId = (int) (CryptoHelper::decrypt($categoryId) ?? $categoryId);
-
-        // 2. Ambil inisial nama dari Repo
-        $serviceName = $this->packageRepo->getServiceName($sId);
-        $categoryName = $this->packageRepo->getCategoryName($cId);
-
-        if (!$serviceName || !$categoryName) {
-            return 'PKG-' . strtoupper(Str::random(5));
-        }
-
-        // Format Prefix (Misal: LAU-KIL)
-        $prefix = strtoupper(substr($serviceName, 0, 3)) . '-' . strtoupper(substr($categoryName, 0, 3));
-
-        // 3. Ambil kode terakhir
-        $lastCode = $this->packageRepo->getLastCodeByPrefix($tenantId, $prefix);
-
-        if (!$lastCode) {
-            return $prefix . "-001";
-        }
-
-        
-        $lastNumber = (int) substr($lastCode, -3);
-        $nextNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT);
-
-        return $prefix . '-' . $nextNumber;
-    }
-
-    /**
-     * Ambil daftar paket dengan logika dekripsi dan filter
-     */
-    public function getAllPackages(array $params)
-    {
-        // 1. Logika Dekripsi Tenant ID
-        $tenantId = CryptoHelper::decrypt($params['tenant_id'] ?? null);
+        // Early return jika tenant_id tidak valid
         if (!$tenantId || !is_numeric($tenantId)) {
-            return null;
+            return collect([]); 
         }
 
-        // 2. Panggil Base Query dari Repo (e.g., Package::where('tenant_id', $tenantId))
-        $query = $this->packageRepo->getBasePackageQuery((int)$tenantId);
+        // 1. Ambil Base Query (Pastikan Repo sudah pakai select & with yang kita bahas tadi)
+        $query = $this->packageRepo->getBasePackageQuery((int) $tenantId);
 
-        // 3. Logika Filter Keyword (Nama atau Kode)
-        if (!empty($params['keyword'])) {
-            $q = $params['keyword'];
-            $query->where(function ($w) use ($q) {
-                $w->where('name', 'like', "%{$q}%")
-                  ->orWhere('code', 'like', "%{$q}%");
-            });
-        }
+        // 2. Gunakan Chain of Responsibility (Clean Code)
+        return $query
+            // Filter Keyword (Nama atau Kode)
+            ->when(!empty($params['keyword']), function ($q) use ($params) {
+                $keyword = $params['keyword'];
+                $q->where(function ($w) use ($keyword) {
+                    $w->where('name', 'ilike', "%{$keyword}%")
+                    ->orWhere('code', 'ilike', "%{$keyword}%");
+                });
+            })
 
-        // 4. Logika Filter Kategori (Dekripsi jika ID di-encrypt)
-        if (!empty($params['category_id'])) {
-            $catId = CryptoHelper::decrypt($params['category_id']) ?? $params['category_id'];
-            if (is_numeric($catId)) {
-                $query->where('category_id', $catId);
-            }
-        }
+            // Filter Kategori (Dekripsi & Cek Validitas)
+            ->when(!empty($params['category_id']), function ($q) use ($params) {
+                $catId = CryptoHelper::decrypt($params['category_id']);
+                if ($catId) $q->where('category_id', $catId);
+            })
 
-        // 5. Logika Filter Layanan
-        if (!empty($params['service_id'])) {
-            $svcId = CryptoHelper::decrypt($params['service_id']) ?? $params['service_id'];
-            if (is_numeric($svcId)) {
-                $query->where('service_id', $svcId);
-            }
-        }
+            // Filter Layanan (Dekripsi & Cek Validitas)
+            ->when(!empty($params['service_id']), function ($q) use ($params) {
+                $svcId = CryptoHelper::decrypt($params['service_id']);
+                if ($svcId) $q->where('service_id', $svcId);
+            })
 
-        return $query->orderByDesc('id');
+            // Filter Status Aktif
+            ->when(isset($params['is_active']) && $params['is_active'] !== '', function ($q) use ($params) {
+                $q->where('is_active', filter_var($params['is_active'], FILTER_VALIDATE_BOOLEAN));
+            })
+
+            // 3. Sorting Utama
+            ->orderByDesc('id');
     }
 
-    /**
-     * Simpan Paket Baru
-     */
    public function createPackage(array $data)
     {
-        try {
-            // 1. Dekripsi & Casting Identity
-            $tenantId = CryptoHelper::decrypt($data['tenant_id']);
-            if (!$tenantId) throw new \Exception("Identity Tenant tidak valid.");
+        // Menggunakan Transaction agar data Ms_packages dan Logging tetap sinkron
+        return DB::transaction(function () use ($data) {
+            try {
+                $user = Auth::user();
+                $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
 
-            $data['tenant_id'] = (int) $tenantId;
-            
-            $decryptedUser = CryptoHelper::decrypt($data['created_by']) ?? $data['created_by'];
-            $data['created_by'] = substr(strip_tags($decryptedUser), 0, 50);
+                if (!$tenantId) throw new \Exception("Identity Tenant tidak ditemukan.");
 
-            $data['service_id'] = (int) ($data['service_id'] ?? 0);
-            $data['category_id'] = (int) ($data['category_id'] ?? 0);
-            
-            $data['code'] = strtoupper(preg_replace('/[^a-zA-Z0-9\-]/', '', substr($data['code'], 0, 20)));
-            
-            // Name: Maksimal 100 karakter
-            $data['name'] = htmlspecialchars(strip_tags(trim(substr($data['name'], 0, 100))), ENT_QUOTES, 'UTF-8');
-            
-            // Description: Maksimal 200 karakter (nullable)
-            if (!empty($data['description'])) {
-                $data['description'] = htmlspecialchars(strip_tags(trim(substr($data['description'], 0, 200))), ENT_QUOTES, 'UTF-8');
+                $unit = \App\Models\Ms_unit::findOrFail($data['unit_id']);
+
+                // 2. Generate Kode Otomatis
+                $data['code'] = $this->generateUniqueCode($tenantId);
+
+                // 3. Sanitasi & Mapping Data Final
+                $payload = [
+                    'tenant_id'       => (int) $tenantId,
+                    'service_id'      => (int) $data['service_id'],
+                    'category_id'     => (int) $data['category_id'],
+                    'unit_id'         => (int) $data['unit_id'],
+                    'code'            => $data['code'],
+                    // Cukup strip_tags & trim agar karakter khusus seperti '&' tidak berubah jadi '&amp;' di DB
+                    'name'            => strip_tags(trim($data['name'])), 
+                    'description'     => isset($data['description']) ? strip_tags($data['description']) : null,
+                    'price'           => abs((float) $data['price']),
+                    'discount_type'   => $data['discount_type'] ?? 'none',
+                    'discount_value'  => (float) ($data['discount_value'] ?? 0),
+                    // Kalkulasi ulang di BE untuk keamanan
+                    'final_price'     => $this->calculateFinalPrice($data['price'], $data['discount_type'], $data['discount_value']),
+                    'duration_menit'  => (int) ($data['duration_menit'] ?? 0),
+                    
+                    // AMBIL DARI MASTER UNIT (Sesuai catatan denormalisasi di migrasi Mas)
+                    'is_weight_based' => (bool) $unit->is_decimal, 
+                    
+                    'min_order'       => (float) ($data['min_order'] ?? 1),
+                    'is_active'       => filter_var($data['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                    // created_by & updated_by otomatis diisi oleh Model Booting
+                ];
+
+                return $this->packageRepo->create($payload);
+
+            } catch (\Exception $e) {
+                // Log error ke Repo khusus Log
+                $this->logRepo->store([
+                    'user_id'    => Auth::id(),
+                    'tenant_id'  => $tenantId ?? null,
+                    'error_code' => $e->getCode() ?: 500,
+                    'message'    => "PackageService@createPackage: " . $e->getMessage(),
+                    'url'        => request()->fullUrl(),
+                    'ip_address' => request()->ip(),
+                    'bindings'   => json_encode($data), 
+                ]);
+
+                return null; // Controller akan menangani response error 400
             }
-
-            // 4. Normalisasi Angka (Decimal 12,2 dan 5,2)
-            $data['price'] = abs((float) ($data['price'] ?? 0));
-            $data['min_order'] = abs((float) ($data['min_order'] ?? 1.00));
-            
-            // Unit: Maksimal 10 karakter
-            $data['unit'] = substr(strip_tags(trim($data['unit'] ?? 'Kg')), 0, 10);
-            
-            $data['is_active'] = filter_var($data['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
-
-            // 5. Kirim ke Repository
-            return $this->packageRepo->create($data);
-
-        } catch (\Exception $e) {
-            // \Log::error("Gagal membuat paket: " . $e->getMessage());
-            return null;
-        }
+        });
     }
 
-    /**
-     * Update Data Paket
-     */
-   public function updatePackage($id, array $data)
+    public function updatePackage($id, array $data)
     {
-        try {
-            // 1. Cari dulu Model-nya berdasarkan ID (Integer)
-            // Kita butuh objek Ms_package untuk dikirim ke Repository
-            $packageModel = \App\Models\Ms_package::find($id);
+        return DB::transaction(function () use ($id, $data) {
+            try {
+                $user = Auth::user();
+                $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
 
-            if (!$packageModel) {
-                // \Log::error("Update Gagal: Paket dengan ID {$id} tidak ditemukan.");
+                // 1. Cari Paket & Pastikan Milik Tenant (Security Double Check)
+                $package = $this->packageRepo->findByIdAndTenant((int)$id, (int)$tenantId);
+                if (!$package) {
+                    throw new \Exception("Paket tidak ditemukan atau Anda tidak memiliki akses.");
+                }
+
+                // 2. Jika Unit berubah, update flag is_weight_based
+                if (isset($data['unit_id']) && $data['unit_id'] != $package->unit_id) {
+                    $unit = \App\Models\Ms_unit::findOrFail($data['unit_id']);
+                    $data['is_weight_based'] = (bool) $unit->is_decimal;
+                }
+
+                // 3. Mapping Payload (Data Integrity)
+                // Kita gunakan data dari Request yang sudah bersih
+                $payload = [
+                    'service_id'     => isset($data['service_id']) ? (int) $data['service_id'] : $package->service_id,
+                    'category_id'    => isset($data['category_id']) ? (int) $data['category_id'] : $package->category_id,
+                    'unit_id'        => isset($data['unit_id']) ? (int) $data['unit_id'] : $package->unit_id,
+                    'name'           => isset($data['name']) ? strip_tags(trim($data['name'])) : $package->name,
+                    'description'    => isset($data['description']) ? strip_tags($data['description']) : $package->description,
+                    'price'          => isset($data['price']) ? abs((float) $data['price']) : $package->price,
+                    'discount_type'  => $data['discount_type'] ?? $package->discount_type,
+                    'discount_value' => isset($data['discount_value']) ? (float) $data['discount_value'] : $package->discount_value,
+                    'final_price'    => $this->calculateFinalPrice(
+                                            $data['price'] ?? $package->price, 
+                                            $data['discount_type'] ?? $package->discount_type, 
+                                            $data['discount_value'] ?? $package->discount_value
+                                        ),
+                    'duration_menit' => isset($data['duration_menit']) ? (int) $data['duration_menit'] : $package->duration_menit,
+                    'is_weight_based'=> $data['is_weight_based'] ?? $package->is_weight_based,
+                    'min_order'      => isset($data['min_order']) ? (float) $data['min_order'] : $package->min_order,
+                    'is_active'      => isset($data['is_active']) ? filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN) : $package->is_active,
+                ];
+
+               
+                return $this->packageRepo->update($package, $payload);
+
+            } catch (\Exception $e) {
+                
+                $this->logRepo->store([
+                    'user_id'    => Auth::id(),
+                    'tenant_id'  => $tenantId ?? null,
+                    'error_code' => $e->getCode() ?: 500,
+                    'message'    => "PackageService@updatePackage: " . $e->getMessage(),
+                    'url'        => request()->fullUrl(),
+                    'ip_address' => request()->ip(),
+                    'bindings'   => json_encode(['id' => $id, 'data' => $data]), 
+                ]);
+
                 return null;
             }
-
-            // 2. Dekripsi & Sanitasi (Sama seperti store)
-            $tenantId = CryptoHelper::decrypt($data['tenant_id']);
-            if (!$tenantId) throw new \Exception("Tenant ID tidak valid.");
-            
-            $data['tenant_id'] = (int) $tenantId;
-
-            // Dekripsi updated_by (Audit Trail)
-            $decryptedUser = CryptoHelper::decrypt($data['updated_by'] ?? '') ?? $data['updated_by'];
-            $data['updated_by'] = substr(strip_tags($decryptedUser), 0, 50);
-
-            // 3. Mapping data lainnya
-            $data['service_id'] = (int) $data['service_id'];
-            $data['category_id'] = (int) $data['category_id'];
-            $data['price'] = abs((float) $data['price']);
-            $data['min_order'] = abs((float) $data['min_order']);
-            $data['is_active'] = filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
-
-          
-            return $this->packageRepo->update($packageModel, $data);
-
-        } catch (\Exception $e) {
-            // \Log::error("Update Error ID {$id}: " . $e->getMessage());
-            return null;
-        }
+        });
     }
    
 
@@ -202,4 +204,33 @@ class PackageService
 
         return $package;
     }
+
+
+      /**
+     * Generate Kode Paket Unik per Tenant
+     */
+    private function generateUniqueCode($tenantId)
+    {
+        $prefix = "PCK-" . date('ym') . "-";
+       
+        $lastPackage = $this->packageRepo->getLastPackageByTenant($tenantId);
+        
+        $number = 1;
+        if ($lastPackage) {
+            $lastCode = $lastPackage->code;
+            $lastNumber = (int) substr($lastCode, -4);
+            $number = $lastNumber + 1;
+        }
+
+        return $prefix . str_pad($number, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function calculateFinalPrice($price, $type, $value)
+    {
+        if ($type === 'percentage') return $price - ($price * ($value / 100));
+        if ($type === 'fixed') return max(0, $price - $value);
+        return $price;
+    }
+
+
 }
