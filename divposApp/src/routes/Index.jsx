@@ -8,7 +8,6 @@ import OutletPage from "../pages/outlets/OutletList";
 import EmployeePage from "../pages/employees/EmployeeList";
 import CategoryPage from "../pages/category/CategoryList";
 import LayananPage from "../pages/masterservice/MasterServiceList";
-import PaymentMethodPage from "../pages/paymentMethod/PaymentMethodList";
 import TransactionPage from "../pages/transactions/Transactions";
 import TrxHistoryPage from "../pages/transactions/TransactionHistory";
 import RolePermissionsPage from "../pages/RolePermission/RolePermissionList";
@@ -82,16 +81,6 @@ export default function AppRoutes() {
               element={
                 <RequirePermission permission="view">
                   <LayananPage />
-                </RequirePermission>
-              }
-            />
-
-            {/* Master Data */}
-            <Route
-              path="/payment-method"
-              element={
-                <RequirePermission permission="view">
-                  <PaymentMethodPage />
                 </RequirePermission>
               }
             />

@@ -1,7 +1,6 @@
 import axios from "axios";
 import { apiUrl } from "../utils/Url";
 import { showToast } from "../utils/Toast";
-// 🛡️ Impor fungsi storage yang sudah terenkripsi sesuai diskusi sebelumnya
 import { GetWithExpiry, SetWithExpiry, RemoveStorage } from "../utils/Storage";
 
 /**
@@ -12,7 +11,6 @@ import { GetWithExpiry, SetWithExpiry, RemoveStorage } from "../utils/Storage";
 const api = axios.create({
   baseURL: apiUrl(),
   timeout: 10000,
-  withCredentials: false,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -21,18 +19,15 @@ const api = axios.create({
 
 /**
  * ===============================
- * TOKEN SERVICE (Revisi Keamanan)
+ * TOKEN SERVICE (Encrypted)
  * ===============================
  */
 const tokenService = {
-  // 🔐 Pakai Fungsi Terenkripsi
   getAccessToken: () => GetWithExpiry("access_token"),
-  setAccessToken: (token) => SetWithExpiry("access_token", token, 60), // expiry 1 jam
+  setAccessToken: (token) => SetWithExpiry("access_token", token, 60),
   removeAccessToken: () => RemoveStorage("access_token"),
-
-  // 🔐 Pakai Fungsi Terenkripsi juga untuk Refresh Token
   getRefreshToken: () => GetWithExpiry("refresh_token"),
-  setRefreshToken: (token) => SetWithExpiry("refresh_token", token, 1440), // expiry 24 jam
+  setRefreshToken: (token) => SetWithExpiry("refresh_token", token, 1440),
   removeRefreshToken: () => RemoveStorage("refresh_token"),
 };
 
@@ -59,8 +54,6 @@ const processQueue = (error, token = null) => {
 api.interceptors.request.use(
   (config) => {
     const token = tokenService.getAccessToken();
-    // const tenant = tokenService.getTenant(); // Tidak dipakai di header auth
-
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -78,13 +71,16 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    const response = error.response;
 
-    // ===============================
-    // HANDLE 401 (TOKEN EXPIRED)
-    // ===============================
+    // 🛡️ 1. STANDAR DUNIA: Cek jika request dibatalkan (AbortController)
+    if (axios.isCancel(error)) {
+      // Return promise pending agar tidak masuk ke logic error UI
+      return new Promise(() => {});
+    }
+
+    // 2. HANDLE 401 (TOKEN EXPIRED)
     if (
-      response?.status === 401 &&
+      error.response?.status === 401 &&
       !originalRequest._retry &&
       !originalRequest.url.includes("/logout") &&
       !originalRequest.url.includes("/auth/refresh")
@@ -103,52 +99,34 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = tokenService.getRefreshToken();
+        if (!refreshToken) throw new Error("No refresh token");
 
-        if (!refreshToken) {
-          throw new Error("No refresh token found");
-        }
-
-        // Hit ke backend untuk refresh token
         const { data } = await axios.post(`${apiUrl()}/auth/refresh`, {
           refresh_token: refreshToken,
         });
 
-        const newAccessToken = data.token;
-        const newRefreshToken = data.refresh_token;
+        tokenService.setAccessToken(data.token);
+        tokenService.setRefreshToken(data.refresh_token);
 
-        // 🔐 Simpan Token Baru dengan Enkripsi
-        tokenService.setAccessToken(newAccessToken);
-        tokenService.setRefreshToken(newRefreshToken);
-
-        processQueue(null, newAccessToken);
-
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        processQueue(null, data.token);
+        originalRequest.headers.Authorization = `Bearer ${data.token}`;
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-
-        // 🛡️ Hapus semua data sesi jika refresh token gagal
         tokenService.removeAccessToken();
         tokenService.removeRefreshToken();
-        localStorage.removeItem("tenant_name");
-        RemoveStorage("user");
-        RemoveStorage("app");
-
         if (window.location.pathname !== "/login") {
-          showToast("Session expired. Please login again.", "error");
+          showToast("Sesi habis, silakan login kembali.", "error");
           window.location.replace("/login");
         }
-
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }
     }
 
-    // ===============================
-    // OTHER ERRORS
-    // ===============================
-    handleApiError(response);
+    // 3. CENTRALIZED ERROR HANDLING
+    handleApiError(error);
 
     return Promise.reject(error);
   },
@@ -159,34 +137,37 @@ api.interceptors.response.use(
  * CENTRALIZED ERROR HANDLER
  * ===============================
  */
-function handleApiError(response) {
+function handleApiError(error) {
+  const response = error.response;
+
+  // Jika tidak ada response, berarti masalah koneksi atau timeout
   if (!response) {
-    showToast("Network error. Please check your connection.", "error");
+    if (error.code === "ECONNABORTED") {
+      showToast("Koneksi lambat (Timeout). Coba lagi.", "error");
+    } else {
+      showToast("Koneksi terputus. Cek internet Mas A_so.", "error");
+    }
     return;
   }
 
-  const message = response.data?.message || "Unexpected system error occurred.";
+  const message = response.data?.message || "Terjadi kesalahan sistem.";
 
   switch (response.status) {
     case 403:
-      showToast("Access denied.", "error");
+      showToast("Akses ditolak!", "error");
       break;
-
     case 422:
       const validationErrors = response.data?.errors;
-      if (validationErrors) {
-        const firstError = Object.values(validationErrors)[0][0];
-        showToast(firstError, "error");
-      } else {
-        showToast(message, "error");
-      }
+      const firstError = validationErrors
+        ? Object.values(validationErrors)[0][0]
+        : message;
+      showToast(firstError, "error");
       break;
-
     case 500:
-      showToast("Server error. Please try again later.", "error");
+      showToast("Server sedang bermasalah (500).", "error");
       break;
-
     default:
+      // Abaikan 401 karena sudah ditangani di interceptor
       if (response.status !== 401) {
         showToast(message, "error");
       }

@@ -374,19 +374,17 @@ export default function PackageForm({
               </div>
 
               {/* Row 4: Diskon */}
+              <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">
+                Setting discount
+              </label>
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 items-start">
                 <div className="flex flex-col">
                   <select
                     value={values.discount_type}
                     onChange={(e) => {
                       const newType = e.target.value;
-                      // 1. Update tipe diskonnya
                       handleChange("discount_type", newType);
-
-                      // 2. Reset nilai diskon ke 0 setiap kali tipe berubah
                       handleChange("discount_value", 0);
-
-                      // 3. (Opsional) Hapus error validasi jika ada
                       setErrors((prev) => {
                         const newErr = { ...prev };
                         delete newErr.discount_value;
@@ -523,8 +521,8 @@ export default function PackageForm({
                 </button>
                 <SubmitButton
                   isSubmitting={isSubmitting}
-                  label={initialData ? "Update" : "Save"}
-                  loadingLabel="..."
+                  label={initialData ? "Update Package" : "Create Package"}
+                  loadingLabel="Processing"
                   fullWidth={false}
                   className="text-[10px] font-bold uppercase py-1.5 px-6 rounded bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-sm hover:shadow-md transition"
                 />

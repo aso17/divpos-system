@@ -6,14 +6,13 @@ import { rules } from "../../utils/validators/rules";
 import { inputClasses } from "../../utils/validators/inputClasses";
 import AppHead from "../../components/common/AppHead";
 import TransactionSuccessModal from "./TransactionSuccessModal";
-import { encrypt } from "../../utils/Encryptions";
+import { formatRupiah, toNum } from "../../utils/formatter";
 
 const Transactions = () => {
   const hasFetched = useRef(false);
   const issubmitting = useRef(false);
   const [cart, setCart] = useState([]);
   const [packages, setPackages] = useState([]);
-  const [customers, setCustomers] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
@@ -21,8 +20,8 @@ const Transactions = () => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [lastTransactionData, setLastTransactionData] = useState(null);
+  const abortControllerRef = useRef(null);
 
-  // VALIDASI FINAL - Menggabungkan state pelanggan ke dalam hook
   const { values, errors, handleChange, validate, setValues, setErrors } =
     useFormValidation(
       {
@@ -55,11 +54,8 @@ const Transactions = () => {
     try {
       const res = await TransactionService.getInitData();
       const data = res.data.data;
-      // console.log("Init Data:", data);
       setPackages(data.packages || []);
       setOutlets(data.outlets || []);
-      setCustomers(data.customers || []);
-
       const payData = data.payment_methods || [];
       setPaymentMethods(payData);
 
@@ -72,73 +68,105 @@ const Transactions = () => {
     }
   };
 
-  const handlePhoneChange = (val) => {
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, []);
+
+  const handlePhoneChange = async (val) => {
     handleChange("customer_phone", val);
-
-    const existing = customers.find((c) => c.phone === val);
-
-    if (existing) {
-      setValues((prev) => ({
-        ...prev,
-        customer_id: existing.id,
-        customer_name: existing.name, // Isi nama otomatis
-        customer_phone: val, // Pastikan nomor terbaru
-        is_new: false, // Kunci input nama (disabled)
-      }));
-
-      setErrors((prev) => ({ ...prev, customer_name: "" }));
-    } else {
-      // Jika pelanggan BARU (Nomor tidak ditemukan)
-      setValues((prev) => ({
-        ...prev,
-        customer_id: null,
-        customer_phone: val,
-        is_new: true,
-      }));
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
+
+    if (val.length < 10) {
+      setValues((prev) => ({ ...prev, customer_id: null, is_new: true }));
+      return;
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    try {
+      const res = await TransactionService.searchCustomer(
+        { phone: val },
+        { signal: controller.signal },
+      );
+
+      const existing = res.data.data;
+      if (existing) {
+        setValues((prev) => ({
+          ...prev,
+          customer_id: existing.id,
+          customer_name: existing.name,
+          is_new: false,
+        }));
+      } else {
+        setValues((prev) => ({
+          ...prev,
+          customer_id: null,
+          is_new: true,
+        }));
+      }
+    } catch (error) {}
   };
-  const safeNumber = (val) => (isNaN(Number(val)) ? 0 : Number(val));
-  const subtotal = cart.reduce(
-    (acc, item) => acc + safeNumber(item.price) * safeNumber(item.qty),
-    0,
-  );
+
+  // --- LOGIC PERHITUNGAN FINAL ---
+
+  const subtotal = cart.reduce((acc, item) => {
+    const harga = toNum(item.final_price);
+    const qty = toNum(item.qty);
+
+    return acc + harga * qty;
+  }, 0);
+
   const isCash = selectedPaymentMethod?.name?.toLowerCase().match(/cash|tunai/);
-  const change = isCash ? payAmount - subtotal : 0;
+  const payAmountNum = toNum(payAmount);
+  const change = isCash ? payAmountNum - subtotal : 0;
+  const totalHemat = cart.reduce((acc, item) => {
+    const hargaAsli = toNum(item.original_price);
+    const hargaFinal = toNum(item.final_price);
+    const qty = toNum(item.qty);
+    if (hargaAsli > hargaFinal) {
+      return acc + (hargaAsli - hargaFinal) * qty;
+    }
+    return acc;
+  }, 0);
 
   const addToCart = (pkg) => {
     if (cart.find((x) => x.id === pkg.id))
       return triggerToast("Layanan sudah ada.", "warning");
     setCart([...cart, { ...pkg, qty: 1, unit: pkg.unit }]);
+    setPayAmount(0);
   };
 
   const handleSubmit = async () => {
     if (issubmitting.current) return;
-    // console.log("Status Lock:", issubmitting.current);
     if (!validate()) return;
     if (cart.length === 0) return triggerToast("Keranjang kosong!", "warning");
     if (cart.some((item) => item.qty <= 0))
       return triggerToast("Input qty/berat!", "warning");
-    if (isCash && payAmount < subtotal)
+    if (isCash && payAmountNum < subtotal)
       return triggerToast("Uang kurang!", "error");
 
     issubmitting.current = true;
     setLoading(true);
     try {
       const payload = {
-        outlet_id: encrypt(values.outlet_id),
-        payment_method_id: encrypt(selectedPaymentMethod?.id),
+        outlet_id: values.outlet_id,
+        payment_method_id: selectedPaymentMethod?.id,
         customer: {
-          id: values.customer_id ? encrypt(values.customer_id) : null,
+          id: values.customer_id ? values.customer_id : null,
           name: values.customer_name,
           phone: values.customer_phone,
           is_new: values.is_new,
         },
-        // HANYA kirim ID dan QTY. Biarkan BE ambil harga asli dari DB
+
         items: cart.map((item) => ({
-          package_id: encrypt(item.id),
+          package_id: item.id,
           qty: item.qty,
         })),
-        // Kirim nominal uang yang diterima kasir secara mentah
+
         payment_amount: isCash ? payAmount : subtotal,
       };
 
@@ -262,21 +290,49 @@ const Transactions = () => {
             </span>
             Pilih Layanan
           </h2>
+
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
-            {packages.map((pkg) => (
-              <button
-                key={pkg.id}
-                onClick={() => addToCart(pkg)}
-                className="p-2 border border-gray-100 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left shadow-sm group"
-              >
-                <p className="font-bold text-[9px] md:text-[10px] truncate uppercase group-hover:text-emerald-700">
-                  {pkg.name}
-                </p>
-                <p className="text-[10px] text-emerald-600 font-bold mt-1">
-                  Rp{safeNumber(pkg.price).toLocaleString()}
-                </p>
-              </button>
-            ))}
+            {packages.map((pkg) => {
+              const originalPrice = Number(pkg.original_price || 0);
+              const finalPrice = Number(pkg.final_price || 0);
+              const hasDiscount = originalPrice > finalPrice;
+
+              return (
+                <button
+                  key={pkg.id}
+                  onClick={() => addToCart(pkg)}
+                  className="relative p-2.5 border border-gray-100 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left shadow-sm group bg-white overflow-hidden flex flex-col justify-between h-full min-h-[85px]"
+                >
+                  {hasDiscount && (
+                    <div className="absolute top-0 right-0 bg-red-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-10">
+                      PROMO
+                    </div>
+                  )}
+                  <div className="mb-2">
+                    <p className="font-extrabold text-[9px] md:text-[8px] leading-tight uppercase group-hover:text-emerald-700 line-clamp-2">
+                      {pkg.name}
+                    </p>
+                  </div>
+
+                  <div className="mt-auto">
+                    {hasDiscount && (
+                      <p className="text-[8px] text-gray-400 line-through leading-none mb-0.5">
+                        {formatRupiah(originalPrice)}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap items-baseline gap-0.5">
+                      <span className="text-[11px] text-emerald-600 font-black whitespace-nowrap">
+                        {formatRupiah(finalPrice)}
+                      </span>
+                      <span className="text-[8px] text-gray-400 font-bold uppercase">
+                        /{pkg.unit || "Pcs"}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -291,59 +347,76 @@ const Transactions = () => {
             Checkout
           </h2>
 
-          <div className="max-h-[250px] overflow-y-auto space-y-2 mb-4 pr-1">
-            {cart.map((item) => (
-              <div
-                key={item.id}
-                className="bg-gray-50 p-2 rounded-lg border border-gray-200 flex items-center gap-2 group"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-[9px] text-emerald-800 truncate uppercase mb-1">
-                    {item.name}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      className="w-16 border border-orange-400 p-0.5 rounded text-center text-xs font-black text-orange-600 outline-none"
-                      value={item.qty || ""}
-                      onChange={(e) =>
-                        setCart(
-                          cart.map((c) =>
-                            c.id === item.id
-                              ? { ...c, qty: parseFloat(e.target.value) || 0 }
-                              : c,
-                          ),
-                        )
+          <div className="max-h-[250px] overflow-y-auto space-y-2 mb-4 pr-1 scrollbar-thin">
+            {cart.map((item) => {
+              const qty = toNum(item.qty || 0);
+              const originalPrice = toNum(item.original_price || 0);
+              const finalPrice = toNum(item.final_price || 0);
+              const subtotalItem = qty * finalPrice;
+              const hasDiscount = originalPrice > finalPrice;
+
+              return (
+                <div
+                  key={item.id}
+                  className="bg-gray-50 p-2 rounded-lg border border-gray-200 flex items-center gap-2 group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[9px] text-emerald-800 truncate uppercase mb-1">
+                      {item.name}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="any"
+                        className="w-16 border border-orange-400 p-0.5 rounded text-center text-xs font-black text-orange-600 outline-none focus:ring-1 focus:ring-orange-200"
+                        value={item.qty || ""}
+                        onChange={(e) =>
+                          setCart(
+                            cart.map((c) =>
+                              c.id === item.id
+                                ? { ...c, qty: toNum(e.target.value) }
+                                : c,
+                            ),
+                          )
+                        }
+                      />
+                      <span className="text-[9px] font-bold text-gray-400 uppercase">
+                        {item.unit}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-right flex flex-col items-end justify-between self-stretch">
+                    <button
+                      onClick={() =>
+                        setCart(cart.filter((c) => c.id !== item.id))
                       }
-                    />
-                    <span className="text-[9px] font-bold text-gray-400 uppercase">
-                      {item.unit}
-                    </span>
+                      className="hover:bg-red-50 p-1 rounded transition-colors"
+                    >
+                      <Trash2
+                        size={12}
+                        className="text-red-300 group-hover:text-red-600"
+                      />
+                    </button>
+
+                    <div className="flex flex-col items-end">
+                      {/* Harga Coret per item jika ada diskon */}
+                      {hasDiscount && (
+                        <span className="text-[7px] text-gray-400 line-through leading-none">
+                          {formatRupiah(originalPrice * qty)}
+                        </span>
+                      )}
+                      <p className="font-black text-[10px] text-gray-700 leading-tight">
+                        {formatRupiah(subtotalItem)}
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right flex flex-col items-end gap-1">
-                  <button
-                    onClick={() =>
-                      setCart(cart.filter((c) => c.id !== item.id))
-                    }
-                    className="hover:bg-red-50 p-1 rounded transition-colors"
-                  >
-                    <Trash2
-                      size={14}
-                      className="text-red-400 hover:text-red-600"
-                    />
-                  </button>
-                  <p className="font-bold text-[10px]">
-                    Rp
-                    {(
-                      safeNumber(item.qty) * safeNumber(item.price)
-                    ).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
+
             {cart.length === 0 && (
-              <div className="py-10 flex flex-col items-center justify-center text-gray-300">
+              <div className="py-10 flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-100 rounded-xl">
                 <Box size={32} strokeWidth={1} />
                 <p className="text-[9px] font-bold uppercase mt-2">
                   Belum ada layanan
@@ -361,7 +434,7 @@ const Transactions = () => {
                   onClick={() => setSelectedPaymentMethod(m)}
                   className={`py-1.5 rounded text-[9px] font-black uppercase border transition-all ${selectedPaymentMethod?.id === m.id ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-gray-400 border-gray-200"}`}
                 >
-                  {m.name}
+                  {m.type}
                 </button>
               ))}
             </div>
@@ -371,32 +444,47 @@ const Transactions = () => {
                 Grand Total
               </span>
               <span className="text-lg font-black text-emerald-700">
-                Rp{subtotal.toLocaleString()}
+                Rp{formatRupiah(subtotal)}
               </span>
             </div>
 
             {isCash && (
-              <div className="space-y-1">
-                <input
-                  type="number"
-                  value={payAmount || ""}
-                  onChange={(e) =>
-                    setPayAmount(parseFloat(e.target.value) || 0)
-                  }
-                  className="w-full border-2 border-emerald-600 px-3 py-2 rounded-lg text-sm font-black text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-200"
-                  placeholder="UANG BAYAR (RP)"
-                />
-                <div className="flex justify-between text-[10px] px-1 font-bold">
-                  <span className="text-gray-400 uppercase">Kembali</span>
+              <div className="space-y-1 animate-in fade-in duration-300">
+                <label className="text-[9px] font-black text-emerald-600 px-1 uppercase">
+                  Input Pembayaran
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-black text-sm">
+                    Rp
+                  </span>
+                  <input
+                    type="number"
+                    // Gunakan onFocus agar kasir tidak perlu hapus angka 0 manual
+                    onFocus={(e) => e.target.select()}
+                    value={payAmount === 0 ? "" : payAmount}
+                    onChange={(e) => setPayAmount(toNum(e.target.value))}
+                    className="w-full border-2 border-emerald-600 pl-10 pr-3 py-2.5 rounded-xl text-lg font-black text-emerald-700 outline-none focus:ring-4 focus:ring-emerald-100 transition-all placeholder:text-emerald-200"
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="flex justify-between items-center text-[10px] px-1 font-extrabold mt-2">
+                  <span className="text-gray-400 uppercase tracking-tighter">
+                    {change < 0 ? "Kurang Bayar" : "Uang Kembali"}
+                  </span>
                   <span
-                    className={change < 0 ? "text-red-500" : "text-emerald-700"}
+                    className={`px-2 py-0.5 rounded ${
+                      change < 0
+                        ? "bg-red-50 text-red-600"
+                        : "bg-emerald-50 text-emerald-700"
+                    }`}
                   >
-                    Rp{Math.abs(change).toLocaleString()}
+                    {/* formatRupiah sudah cukup, Math.abs memastikan tidak ada tanda minus double */}
+                    {formatRupiah(Math.abs(change))}
                   </span>
                 </div>
               </div>
             )}
-
             <button
               onClick={handleSubmit}
               disabled={loading || cart.length === 0 || (isCash && change < 0)}
