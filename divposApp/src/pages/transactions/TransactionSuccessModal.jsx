@@ -2,6 +2,8 @@ import React, { useRef } from "react";
 import { CheckCircle, Printer, X } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import ReceiptPrint from "../../components/ReceiptPrint";
+// Gunakan formatter milik Mas A_so
+import { formatRupiah } from "../../utils/formatter";
 
 const TransactionSuccessModal = ({ isOpen, onClose, data }) => {
   const componentRef = useRef();
@@ -13,16 +15,13 @@ const TransactionSuccessModal = ({ isOpen, onClose, data }) => {
   if (!isOpen) return null;
 
   return (
-    // p-2 atau p-4 memberikan jarak aman dari tepi layar HP
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[999] p-2 md:p-4">
-      {/* max-h-[90vh] dan overflow-y-auto berjaga-jaga jika layar HP sangat pendek/landskap */}
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[95vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
-        {/* HEADER MODAL - Padding disesuaikan */}
+        {/* HEADER MODAL */}
         <div className="bg-emerald-600 p-5 md:p-6 text-white text-center relative">
           <button
             onClick={onClose}
             className="absolute right-3 top-3 p-2 hover:bg-white/20 rounded-full transition-colors"
-            aria-label="Close"
           >
             <X size={20} />
           </button>
@@ -46,25 +45,37 @@ const TransactionSuccessModal = ({ isOpen, onClose, data }) => {
                 Pelanggan
               </span>
               <span className="text-xs font-black text-gray-700 text-right break-words">
-                {data?.customer_name}
+                {data?.customer_name || "Pelanggan Umum"}
               </span>
             </div>
 
+            {/* Total */}
             <div className="flex justify-between items-center border-t border-gray-200 pt-2">
               <span className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase">
                 Total
               </span>
               <span className="text-sm md:text-base font-black text-emerald-600">
-                Rp {parseInt(data?.grand_total || 0).toLocaleString("id-ID")}
+                {formatRupiah(data?.grand_total)}
               </span>
             </div>
 
+            {/* Bayar */}
+            <div className="flex justify-between items-center border-t border-gray-100 pt-2">
+              <span className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase">
+                Bayar
+              </span>
+              <span className="text-sm font-bold text-gray-600">
+                {formatRupiah(data?.payment_amount)}
+              </span>
+            </div>
+
+            {/* Kembalian */}
             <div className="flex justify-between items-center border-t border-gray-200 pt-2">
               <span className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase">
                 Kembalian
               </span>
               <span className="text-sm md:text-base font-black text-orange-600">
-                Rp {parseInt(data?.change_amount || 0).toLocaleString("id-ID")}
+                {formatRupiah(data?.change_amount)}
               </span>
             </div>
           </div>
@@ -87,6 +98,7 @@ const TransactionSuccessModal = ({ isOpen, onClose, data }) => {
           </div>
         </div>
 
+        {/* Hidden Print Component */}
         <div style={{ display: "none" }}>
           <ReceiptPrint ref={componentRef} data={data} />
         </div>

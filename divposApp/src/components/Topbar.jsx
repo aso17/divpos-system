@@ -5,11 +5,9 @@ import {
   ChevronDown,
   Bell,
   Search,
-  CheckCircle2,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { assetUrl } from "../utils/Url";
 import { GetWithExpiry } from "../utils/Storage";
 
 export default function Topbar() {

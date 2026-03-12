@@ -11,7 +11,7 @@ const PackageService = {
 
   // Buat paket baru
   createPackage: (payload) => {
-    console.log(payload);
+    // console.log(payload);
     const finalPayload = {
       ...payload,
     };

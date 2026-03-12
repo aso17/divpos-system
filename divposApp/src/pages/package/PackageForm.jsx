@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import SubmitButton from "../../components/SubmitButton";
 import { rules } from "../../utils/validators/rules";
 import { inputClasses } from "../../utils/validators/inputClasses";
-import { formatRupiah, parseNumber } from "../../utils/formatter";
+import { formatRupiah, parseNumber, toNum } from "../../utils/formatter";
 import { useFormValidation } from "../../hooks/useFormValidation";
 
 // Import Service
@@ -145,6 +145,7 @@ export default function PackageForm({
         min_order: 1,
         is_active: true,
       });
+
       setDurValue(0);
       setDurType("hour");
     }
@@ -152,53 +153,43 @@ export default function PackageForm({
   }, [open, initialData, setValues, setErrors]);
 
   const handleManualChange = (name, value) => {
-    let cleanValue = value;
+    // 1. Ambil string bersih dulu (buang titik ribuan/Rp)
+    let raw = parseNumber(value);
+    let finalValue;
 
-    if (name === "discount_value") {
-      if (values.discount_type === "percentage") {
-        // 1. Hanya izinkan angka dan satu titik desimal
-        cleanValue = value.replace(/[^0-9.]/g, "");
+    // 2. Klasifikasikan cara penanganannya
+    if (
+      (name === "discount_value" && values.discount_type === "percentage") ||
+      name === "min_order"
+    ) {
+      // MODE DESIMAL: Kita jaga agar tetap string selama user ngetik "0."
+      finalValue = raw;
 
-        // 2. Hapus angka 0 di depan jika diikuti angka lain (misal 02 -> 2)
-        // Tapi tetap izinkan "0." (misal 0.5)
-        if (
-          cleanValue.length > 1 &&
-          cleanValue.startsWith("0") &&
-          cleanValue[1] !== "."
-        ) {
-          cleanValue = cleanValue.replace(/^0+/, "");
-        }
-      } else {
-        // Untuk mode Rupiah (Fixed), gunakan parseNumber yang sudah ada
-        cleanValue = Number(parseNumber(value));
-      }
-    } else if (name === "min_order") {
-      // Sama seperti persentase, bersihkan leading zeros tapi izinkan desimal
-      cleanValue = value.replace(/[^0-9.]/g, "");
+      // Buang nol di depan jika bukan desimal (misal 05 -> 5)
       if (
-        cleanValue.length > 1 &&
-        cleanValue.startsWith("0") &&
-        cleanValue[1] !== "."
+        finalValue.length > 1 &&
+        finalValue.startsWith("0") &&
+        finalValue[1] !== "."
       ) {
-        cleanValue = cleanValue.replace(/^0+/, "");
+        finalValue = finalValue.replace(/^0+/, "");
       }
     } else {
-      // Untuk harga (Price), tetap pakai parseNumber
-      cleanValue = Number(parseNumber(value));
+      // MODE RUPIAH/ANGKA BULAT: Langsung paksa jadi Number
+      // Ini yang memperbaiki masalah "ketik 30000 jadi 3"
+      finalValue = raw === "" ? 0 : Number(raw);
     }
 
-    handleChange(name, cleanValue);
+    // 3. Update State
+    handleChange(name, finalValue);
 
-    // Reset error jika ada input
-    if (cleanValue !== "") {
+    // 4. Reset Error
+    if (finalValue !== "" && finalValue !== null) {
       setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
+        const { [name]: removed, ...rest } = prev;
+        return rest;
       });
     }
   };
-
   const handleUnitChange = (uId) => {
     const selectedUnit = units.find((u) => u.id == uId);
     handleChange("unit_id", uId);
@@ -207,7 +198,7 @@ export default function PackageForm({
   };
 
   const calcFinal = () => {
-    const price = Number(parseNumber(values.price)) || 0;
+    const price = parseNumber(values.price) || 0;
 
     const discount = parseFloat(values.discount_value) || 0;
 

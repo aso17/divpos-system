@@ -25,7 +25,7 @@ const TransactionService = {
 
   // Simpan transaksi baru
   createTransaction: async (payload) => {
-    // console.log("Payload sebelum enkripsi:", payload);
+    console.log("Payload sebelum enkripsi:", payload);
 
     const finalPayload = {
       ...payload,

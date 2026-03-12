@@ -6,7 +6,7 @@ import { rules } from "../../utils/validators/rules";
 import { inputClasses } from "../../utils/validators/inputClasses";
 import AppHead from "../../components/common/AppHead";
 import TransactionSuccessModal from "./TransactionSuccessModal";
-import { formatRupiah, toNum } from "../../utils/formatter";
+import { formatRupiah, parseNumber, toNum } from "../../utils/formatter";
 
 const Transactions = () => {
   const hasFetched = useRef(false);
@@ -17,9 +17,11 @@ const Transactions = () => {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [payAmount, setPayAmount] = useState(0);
+  const [dpAmount, setDpAmount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [lastTransactionData, setLastTransactionData] = useState(null);
+
   const abortControllerRef = useRef(null);
 
   const { values, errors, handleChange, validate, setValues, setErrors } =
@@ -33,11 +35,9 @@ const Transactions = () => {
       },
       {
         customer_name: [
-          (v) => rules.required(v, "Nama pelanggan wajib diisi"),
           (v) => rules.safeString(v, "Nama mengandung karakter ilegal"),
         ],
         customer_phone: [
-          (v) => rules.required(v, "Nomor WA wajib diisi"),
           (v) => rules.phoneID(v, "Format nomor tidak valid (Gunakan 08/628)"),
         ],
         outlet_id: [(v) => rules.required(v, "Pilih outlet terlebih dahulu")],
@@ -121,8 +121,10 @@ const Transactions = () => {
   }, 0);
 
   const isCash = selectedPaymentMethod?.name?.toLowerCase().match(/cash|tunai/);
+  const dpAmountNum = toNum(dpAmount);
   const payAmountNum = toNum(payAmount);
-  const change = isCash ? payAmountNum - subtotal : 0;
+  const sisaTagihan = subtotal - dpAmountNum;
+  const change = isCash ? payAmountNum - sisaTagihan : 0;
   const totalHemat = cart.reduce((acc, item) => {
     const hargaAsli = toNum(item.original_price);
     const hargaFinal = toNum(item.final_price);
@@ -143,38 +145,48 @@ const Transactions = () => {
   const handleSubmit = async () => {
     if (issubmitting.current) return;
     if (!validate()) return;
+
+    // 1. Validasi Keranjang
     if (cart.length === 0) return triggerToast("Keranjang kosong!", "warning");
-    if (cart.some((item) => item.qty <= 0))
-      return triggerToast("Input qty/berat!", "warning");
-    if (isCash && payAmountNum < subtotal)
-      return triggerToast("Uang kurang!", "error");
+    if (cart.some((item) => toNum(item.qty) <= 0)) {
+      return triggerToast("Input qty/berat dengan benar!", "warning");
+    }
+
+    // 2. Validasi Pembayaran Tunai (Dicek terhadap sisa tagihan)
+    if (isCash && payAmountNum < sisaTagihan) {
+      return triggerToast("Uang tunai kurang dari sisa tagihan!", "error");
+    }
 
     issubmitting.current = true;
     setLoading(true);
+
     try {
       const payload = {
         outlet_id: values.outlet_id,
         payment_method_id: selectedPaymentMethod?.id,
         customer: {
-          id: values.customer_id ? values.customer_id : null,
-          name: values.customer_name,
-          phone: values.customer_phone,
+          id: values.customer_id || null,
+          name: values.customer_name.trim() || "General",
+          phone: values.customer_phone.replace(/\D/g, "") || null,
           is_new: values.is_new,
         },
-
         items: cart.map((item) => ({
           package_id: item.id,
-          qty: item.qty,
+          qty: toNum(item.qty),
         })),
-
-        payment_amount: isCash ? payAmount : subtotal,
+        // Nominal DP yang diinput
+        dp_amount: dpAmountNum,
+        // Jika Cash: kirim nominal yang diinput kasir.
+        // Jika QRIS/Lainnya: kirim sisa tagihan (pelunasan otomatis pas).
+        payment_amount: isCash ? payAmountNum : sisaTagihan,
       };
 
       const response = await TransactionService.createTransaction(payload);
 
-      // Reset
+      // 3. Reset State Setelah Sukses
       setCart([]);
       setPayAmount(0);
+      setDpAmount(0); // Penting agar DP tidak terbawa ke transaksi berikutnya
       setValues((prev) => ({
         ...prev,
         customer_id: null,
@@ -183,14 +195,17 @@ const Transactions = () => {
         is_new: true,
       }));
 
-      // handlePrint(response.data.data.id);
-      // console.log("Siap cetak ID:", response.data.data);
+      // Tampilkan Modal Sukses & Print
       setLastTransactionData(response.data.data);
       setShowModal(true);
+
+      // Reset flag submit
       issubmitting.current = false;
     } catch (error) {
       issubmitting.current = false;
-      triggerToast("Gagal simpan transaksi!", "error");
+      // Cek jika ada pesan error spesifik dari backend
+      const msg = error.response?.data?.message || "Gagal simpan transaksi!";
+      triggerToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -309,7 +324,7 @@ const Transactions = () => {
                     </div>
                   )}
                   <div className="mb-2">
-                    <p className="font-extrabold text-[9px] md:text-[8px] leading-tight uppercase group-hover:text-emerald-700 line-clamp-2">
+                    <p className="font-extrabold mt-2 text-[9px] md:text-[8px] leading-tight uppercase group-hover:text-emerald-700 line-clamp-2">
                       {pkg.name}
                     </p>
                   </div>
@@ -448,6 +463,35 @@ const Transactions = () => {
               </span>
             </div>
 
+            {/* INPUT DP / BOOKING FEE */}
+            <div className="space-y-1 mb-3">
+              <label className="text-[9px] font-black text-orange-600 px-1 uppercase">
+                DP / Booking Fee
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-600 font-black text-sm">
+                  Rp
+                </span>
+                <input
+                  type="text"
+                  value={dpAmount === 0 ? "" : formatRupiah(dpAmount)}
+                  onChange={(e) => setDpAmount(parseNumber(e.target.value))}
+                  className="w-full border-2 border-orange-400 pl-10 pr-3 py-2 rounded-xl text-md font-black text-orange-700 outline-none focus:ring-4 focus:ring-orange-100 transition-all"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/* SISA TAGIHAN INFO */}
+            <div className="flex justify-between items-center bg-gray-100 p-2 rounded-lg mb-3">
+              <span className="text-gray-500 font-bold text-[9px] uppercase">
+                Sisa Tagihan
+              </span>
+              <span className="text-md font-black text-gray-700">
+                Rp{formatRupiah(sisaTagihan)}
+              </span>
+            </div>
+
             {isCash && (
               <div className="space-y-1 animate-in fade-in duration-300">
                 <label className="text-[9px] font-black text-emerald-600 px-1 uppercase">
@@ -458,11 +502,13 @@ const Transactions = () => {
                     Rp
                   </span>
                   <input
-                    type="number"
-                    // Gunakan onFocus agar kasir tidak perlu hapus angka 0 manual
+                    type="text"
                     onFocus={(e) => e.target.select()}
-                    value={payAmount === 0 ? "" : payAmount}
-                    onChange={(e) => setPayAmount(toNum(e.target.value))}
+                    value={payAmount === 0 ? "" : formatRupiah(payAmount)}
+                    onChange={(e) => {
+                      const clean = parseNumber(e.target.value);
+                      setPayAmount(clean);
+                    }}
                     className="w-full border-2 border-emerald-600 pl-10 pr-3 py-2.5 rounded-xl text-lg font-black text-emerald-700 outline-none focus:ring-4 focus:ring-emerald-100 transition-all placeholder:text-emerald-200"
                     placeholder="0"
                   />

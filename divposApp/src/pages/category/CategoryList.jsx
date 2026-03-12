@@ -330,8 +330,6 @@ export default function CategoryList() {
                   Prioritas Level {category.priority}
                 </p>
               </div>
-
-              <div className="text-[8px] text-slate-400">ID #{category.id}</div>
             </div>
 
             {/* Actions */}
