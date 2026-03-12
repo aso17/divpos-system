@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Support\Facades\Validator;
+use App\Http\Requests\TransactionRequest;
 use App\Services\PackageService;
 use App\Services\CustomerService;
 use App\Services\OutletService;
@@ -15,7 +15,7 @@ use App\Http\Resources\TransactionPackageResource;
 use App\Http\Resources\TransactionOutletResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Helpers\CryptoHelper; 
+
 
 
 class TransactionController extends Controller
@@ -67,17 +67,17 @@ class TransactionController extends Controller
     }
    
 
-    public function getTransactionHistory(Request $request)
-    {
-        $data = $this->transactionService->getTransactionHistory($request->all());
-        $formattedData = TransactionResource::collection($data)->response()->getData(true);
+    // public function getTransactionHistory(Request $request)
+    // {
+    //     $data = $this->transactionService->getTransactionHistory($request->all());
+    //     $formattedData = TransactionResource::collection($data)->response()->getData(true);
 
-        return response()->json([
-            'success' => true,
-            'data'    => $formattedData,
-            'message' => "Riwayat transaksi berhasil diambil",
-        ], 200);
-    }
+    //     return response()->json([
+    //         'success' => true,
+    //         'data'    => $formattedData,
+    //         'message' => "Riwayat transaksi berhasil diambil",
+    //     ], 200);
+    // }
 
     public function getCustomers(Request $request)
     {
@@ -108,46 +108,35 @@ class TransactionController extends Controller
         return new CustomerResource($customer);
     }
 
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'customer.name' => 'required|string|max:100|regex:/^[a-zA-Z0-9\s\.]+$/', 
-            'customer.phone' => 'required|string|min:10|max:15|regex:/^[0-9]+$/',
-            'payment_amount' => 'required|numeric|min:0',
-            'items' => 'required|array|min:1',
-            'items.*.package_id' => 'required',
-            'items.*.qty' => 'required|numeric|min:0.1',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['status' => 'error', 'message' => $validator->errors()->first()], 422);
-        }
+    public function store(TransactionRequest $request)
+{
+    try {
         
-        try {
-            $data = [
-                'tenant_id'         => CryptoHelper::decrypt($request->tenant_id),
-                'outlet_id'         => CryptoHelper::decrypt($request->outlet_id),
-                'payment_method_id' => CryptoHelper::decrypt($request->payment_method_id),
-                'created_by'        => CryptoHelper::decrypt($request->created_by),
-                'customer'          => $request->input('customer'),
-                'items'             => $request->input('items'),
-                'payment_amount'    => (int) round($request->payment_amount), // Pastikan bulat sejak awal
-            ];
+        $payload = $request->validated();  
+        $transaction = $this->transactionService->createTransaction($payload);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Transaksi Berhasil',
+            'data' => new TransactionResource(
+                $transaction->load(['details', 'customer', 'outlet', 'initialPaymentMethod'])
+            )
+        ], 201);
 
-            if (!$data['tenant_id']) return response()->json(['message' => 'Invalid Context'], 400);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'status' => 'error', 
+            'message' => 'Validasi gagal', 
+            'errors' => $e->errors()
+        ], 422);
 
-            // Langsung serahkan ke Service tanpa hitung apapun di sini
-            $transaction = $this->transactionService->createTransaction($data);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Transaksi Berhasil',
-                'data' => $transaction->load(['details', 'customer', 'outlet', 'initialPaymentMethod'])
-            ], 201);
-
-        } catch (\Exception $e) {
-            // Exception akan menangkap throw dari service (misal: "Uang kurang")
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 422);
-        }
+    } catch (\Exception $e) {
+        
+        $code = ($e->getCode() < 400 || $e->getCode() > 599) ? 422 : $e->getCode();
+        
+        return response()->json([
+            'status' => 'error', 
+            'message' => $e->getMessage() 
+        ], $code);
     }
+}
 }

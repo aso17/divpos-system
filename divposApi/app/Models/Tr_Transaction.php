@@ -6,22 +6,26 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Auth;
 
 class Tr_Transaction extends Model
 {
     use SoftDeletes;
 
     protected $table = 'Tr_transactions';
-    const STATUS_PENDING = 'PENDING';
-    const STATUS_PROCESS = 'PROCESS';
-    const STATUS_READY   = 'READY';
-    const STATUS_TAKEN   = 'TAKEN';
-    const STATUS_CANCELED = 'CANCELED';
 
-    /**
-     * White-listing kolom yang boleh diisi secara massal.
-     * Ini menjamin hacker tidak bisa menyisipkan field 'id' atau field sensitif lainnya.
-     */
+    // --- Konstanta Status (Source of Truth) ---
+    const STATUS_PENDING   = 'PENDING';
+    const STATUS_PROCESS   = 'PROCESS';
+    const STATUS_READY     = 'READY';
+    const STATUS_TAKEN     = 'TAKEN';
+    const STATUS_CANCELED  = 'CANCELED';
+    const STATUS_COMPLETED = 'COMPLETED'; 
+
+    const PAY_UNPAID  = 'UNPAID';
+    const PAY_PARTIAL = 'PARTIAL';
+    const PAY_PAID    = 'PAID';
+
     protected $fillable = [
         'tenant_id',
         'outlet_id',
@@ -36,31 +40,55 @@ class Tr_Transaction extends Model
         'discount_amount',
         'tax_amount',
         'grand_total',
+        'dp_amount',          // Penambahan: Untuk menampung uang muka
         'payment_method_id',
-        'payment_amount',
-        'change_amount',
-        'total_paid',
+        'payment_amount',     // Uang fisik dari customer
+        'change_amount',      // Kembalian
+        'total_paid',         // Total bersih (DP + Payment - Change)
         'status',
         'payment_status',
         'notes',
+        'order_year',    
+        'order_month',
         'created_by',
         'updated_by',
     ];
 
-    /**
-     * Casting tipe data agar otomatis menjadi objek Carbon (untuk tanggal) 
-     * atau numeric (untuk harga) saat diakses.
-     */
     protected $casts = [
-        'order_date' => 'datetime',
-        'pickup_date' => 'datetime',
+        'order_date'         => 'datetime',
+        'pickup_date'        => 'datetime',
         'actual_pickup_date' => 'datetime',
-        'total_base_price' => 'decimal:2',
-        'grand_total' => 'decimal:2',
-        'total_paid' => 'decimal:2',
+        'order_year'         => 'integer', // Tambahkan cast integer
+        'order_month'        => 'integer',
+        'total_base_price'   => 'float',
+        'discount_amount'    => 'float',
+        'tax_amount'         => 'float',
+        'grand_total'        => 'float',
+        'dp_amount'          => 'float', // Penambahan: Casting untuk akurasi math
+        'payment_amount'     => 'float',
+        'change_amount'      => 'float',
+        'total_paid'         => 'float',
     ];
 
-    // --- RELASI ---
+    /**
+     * Boot logic untuk mengisi audit columns secara otomatis
+     */
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            if (Auth::check()) {
+                $model->created_by = Auth::id();
+            }
+        });
+
+        static::updating(function ($model) {
+            if (Auth::check()) {
+                $model->updated_by = Auth::id();
+            }
+        });
+    }
+
+    // --- RELASI TRANSKASIONAL ---
 
     public function details(): HasMany
     {
@@ -76,6 +104,8 @@ class Tr_Transaction extends Model
     {
         return $this->hasMany(Tr_StatusLog::class, 'transaction_id');
     }
+
+    // --- RELASI MASTER DATA ---
 
     public function customer(): BelongsTo
     {
@@ -95,5 +125,18 @@ class Tr_Transaction extends Model
     public function initialPaymentMethod(): BelongsTo
     {
         return $this->belongsTo(Ms_PaymentMethod::class, 'payment_method_id');
+    }
+
+    // --- RELASI AUDIT ---
+
+    public function creator(): BelongsTo
+    {
+        // Sesuaikan nama model User anda, biasanya 'User' atau 'Ms_user'
+        return $this->belongsTo(Ms_user::class, 'created_by'); 
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(Ms_user::class, 'updated_by');
     }
 }

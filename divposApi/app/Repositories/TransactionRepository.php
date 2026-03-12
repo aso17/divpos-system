@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\Tr_Transaction;
+use App\Models\Ms_Package;
 
 class TransactionRepository
 {
@@ -14,34 +15,63 @@ class TransactionRepository
     }
 
    public function getHistory($tenantId, $params)
-{
-    $perPage = $params['per_page'] ?? 10;
-    $keyword = $params['keyword'] ?? null;
+    {
+        $perPage = $params['per_page'] ?? 10;
+        $keyword = $params['keyword'] ?? null;
 
-    return $this->model->where('tenant_id', $tenantId)
-        ->when($keyword, function ($query) use ($keyword) {
-            $query->where(function($q) use ($keyword) {
-                // Cari berdasarkan Invoice
-                $q->where('invoice_no', 'like', "%{$keyword}%")
-                  // Atau cari berdasarkan nama/telp customer di tabel Ms_Customer
-                  ->orWhereHas('customer', function ($queryCustomer) use ($keyword) {
-                      $queryCustomer->where('name', 'like', "%{$keyword}%")
-                                    ->orWhere('phone', 'like', "%{$keyword}%");
-                  })
-                  // Atau cari berdasarkan nama customer manual (jika ada di tabel transaksi)
-                  ->orWhere('customer_name', 'like', "%{$keyword}%")
-                  ->orWhere('customer_phone', 'like', "%{$keyword}%");
-            });
-        })
-        ->with([
-            'customer', 
-            'outlet', 
-            'details', // Sudah diperbaiki dari 'items' ke 'details'
-            'initialPaymentMethod' // Tambahan agar bisa tampilkan "Cash/BCA" di history
-        ]) 
-        ->latest()
-        ->paginate($perPage);
-}
+        return $this->model->where('tenant_id', $tenantId)
+            ->when($keyword, function ($query) use ($keyword) {
+                $query->where(function($q) use ($keyword) {
+                    // Cari berdasarkan Invoice
+                    $q->where('invoice_no', 'like', "%{$keyword}%")
+                    // Atau cari berdasarkan nama/telp customer di tabel Ms_Customer
+                    ->orWhereHas('customer', function ($queryCustomer) use ($keyword) {
+                        $queryCustomer->where('name', 'like', "%{$keyword}%")
+                                        ->orWhere('phone', 'like', "%{$keyword}%");
+                    })
+                    // Atau cari berdasarkan nama customer manual (jika ada di tabel transaksi)
+                    ->orWhere('customer_name', 'like', "%{$keyword}%")
+                    ->orWhere('customer_phone', 'like', "%{$keyword}%");
+                });
+            })
+            ->with([
+                'customer', 
+                'outlet', 
+                'details', // Sudah diperbaiki dari 'items' ke 'details'
+                'initialPaymentMethod' // Tambahan agar bisa tampilkan "Cash/BCA" di history
+            ]) 
+            ->latest()
+            ->paginate($perPage);
+    }
+
+    public function getLastInvoice($tenantId, $yearNow,$monthNow)
+    {
+        return $this->model
+            ->withTrashed()
+            ->select(['id', 'invoice_no'])
+            ->where('tenant_id', $tenantId)
+            ->where('order_year', $yearNow)  // Query Integer
+            ->where('order_month', $monthNow) // Query Integer
+            ->orderBy('id', 'desc')
+            ->lockForUpdate()
+            ->first();
+    }
+
+    public function getPackagesByIds(array $ids)
+    {
+        return \App\Models\Ms_Package::with('unit')
+            ->whereIn('id', $ids)
+            ->where('is_active', true)
+            ->get();
+    }
+
+
+    public function getPackageById($packageId)
+    {
+        return Ms_Package::with(['unit'])
+            ->where('is_active', true)
+            ->find($packageId);
+    }
 
     public function create(array $data)
     {

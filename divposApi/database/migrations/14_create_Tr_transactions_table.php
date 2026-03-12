@@ -17,50 +17,53 @@ return new class extends Migration
             // --- Identitas & Relasi ---
             $table->foreignId('tenant_id')->constrained('Ms_tenants')->onDelete('cascade');
             $table->foreignId('outlet_id')->constrained('Ms_outlets')->onDelete('cascade');
-            $table->string('invoice_no', 25); // Contoh: INV/2024/0001
+            $table->string('invoice_no', 25); 
             
-            // Relasi Customer (Bisa nullable jika laundry kiloan tanpa data member lengkap)
             $table->unsignedBigInteger('customer_id')->nullable(); 
-            $table->string('customer_name', 100)->nullable(); // Backup jika customer_id null
+            $table->string('customer_name', 100)->nullable(); 
             $table->string('customer_phone', 20)->nullable();
 
-            // --- Tracking Waktu Laundry ---
-            $table->dateTime('order_date');
-            $table->dateTime('pickup_date')->nullable(); // Estimasi selesai
-            $table->dateTime('actual_pickup_date')->nullable(); // Waktu diambil oleh customer
+            // --- Tracking Waktu & Optimasi Query ---
+            $table->dateTimeTz('order_date'); // Menggunakan Timezone untuk akurasi POS
+            $table->dateTimeTz('pickup_date')->nullable(); 
+            $table->dateTimeTz('actual_pickup_date')->nullable(); 
+            $table->unsignedSmallInteger('order_year')->index(); // Untuk filter tahunan & Lock Invoice
+            $table->unsignedTinyInteger('order_month')->index(); // Untuk filter bulanan
 
-            // --- Financials (Perhitungan Harga) ---
-            $table->decimal('total_base_price', 15, 2)->default(0); // Harga sebelum diskon/pajak
+            // --- Financials ---
+            $table->decimal('total_base_price', 15, 2)->default(0); 
             $table->decimal('discount_amount', 15, 2)->default(0);
             $table->decimal('tax_amount', 15, 2)->default(0);
-            $table->decimal('grand_total', 15, 2)->default(0); // Nilai akhir yang harus dibayar
+            $table->decimal('grand_total', 15, 2)->default(0); 
 
-            // --- Pembayaran Kasir (Retail Logic) ---
-            // Digunakan untuk mencatat nominal yang diterima saat transaksi awal
+            // --- Pembayaran ---
+            $table->decimal('dp_amount', 15, 2)->default(0); 
             $table->foreignId('payment_method_id')->nullable()->constrained('Ms_payment_methods')->onDelete('set null');
-            $table->decimal('payment_amount', 15, 2)->default(0); // Uang yang diterima
-            $table->decimal('change_amount', 15, 2)->default(0);  // Kembalian
-            $table->decimal('total_paid', 15, 2)->default(0);    // Total akumulasi uang masuk (untuk Partial Payment)
+            $table->decimal('payment_amount', 15, 2)->default(0); 
+            $table->decimal('change_amount', 15, 2)->default(0);  
+            $table->decimal('total_paid', 15, 2)->default(0);    
 
-            // --- Status & Kondisi ---
-            $table->enum('status', ['PENDING', 'PROCESS', 'READY', 'TAKEN', 'CANCELED'])->default('PENDING');
-            $table->enum('payment_status', ['UNPAID', 'PARTIAL', 'PAID'])->default('UNPAID');
+            // --- Status (Menggunakan String agar Fleksibel) ---
+            $table->string('status', 20)->default('PENDING')->index(); 
+            $table->string('payment_status', 20)->default('UNPAID')->index();
             
-            $table->text('notes')->nullable(); // Catatan khusus
-           $table->unsignedBigInteger('created_by')->index(); // Wajib ada ID pembuat
-           $table->unsignedBigInteger('updated_by')->nullable()->index();
+            $table->text('notes')->nullable(); 
+            $table->unsignedBigInteger('created_by')->index(); 
+            $table->unsignedBigInteger('updated_by')->nullable()->index();
             
             $table->timestampsTz();
             $table->softDeletesTz();
 
-
+            // --- Audit Constraints ---
             $table->foreign('created_by')->references('id')->on('Ms_users')->onDelete('restrict');
             $table->foreign('updated_by')->references('id')->on('Ms_users')->onDelete('restrict');
 
-           // --- Indexing (Kecepatan Query) ---
+            // --- Composite Indexing untuk High Performance ---
             $table->unique(['tenant_id', 'invoice_no']); 
-            $table->index(['tenant_id', 'outlet_id', 'status'], 'idx_trans_tenant_outlet_status');                
-            $table->index(['tenant_id', 'order_date'], 'idx_trans_tenant_date');                
+            // Optimasi pencarian invoice terakhir (Tenant + Tahun + Invoice)
+            $table->index(['tenant_id', 'order_year', 'invoice_no'], 'idx_invoice_speed');
+            // Optimasi Dashboard/Laporan
+            $table->index(['tenant_id', 'outlet_id', 'status', 'payment_status'], 'idx_trans_report_fast'); 
             $table->index(['customer_phone'], 'idx_trans_cust_phone');
         });
     }

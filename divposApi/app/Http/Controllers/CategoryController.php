@@ -46,14 +46,12 @@ class CategoryController extends Controller
     {
         try {
             
-            $tenantId = $request->tenantId; 
-            $payload = $request->validated();
-            $payload['tenant_id'] = $tenantId;
-
+            
+            $payload = $request->validated();      
             $category = $this->service->storeCategory($payload);
-
             return response()->json([
                 'status' => 'success',
+                // "pa"=>$payload,
                 'message' => 'Kategori baru berhasil ditambahkan',
                 'data' => new CategoryResource($category)
             ], 201); 
@@ -74,14 +72,14 @@ class CategoryController extends Controller
     {
         try {
            
-            $tenantId = (int) $request->tenantId;        
+            $tenantId =$request->tenant_id;        
             $realId = $request->id;
             $payload = $request->validated();
             $category = $this->service->updateCategory($realId, $tenantId,$payload);
 
             return response()->json([
                 'status' => 'success',
-                'pa'=>$tenantId,
+                // 'pa'=>$tenantId,
                 'message' => 'Kategori berhasil diperbarui',
                 'data' => new CategoryResource($category)
             ], 200);

@@ -11,29 +11,25 @@ return new class extends Migration
         Schema::create('Tr_transaction_details', function (Blueprint $table) {
             $table->id();
             
-            // Relasi (Tetap pakai tenant_id untuk performa laporan)
+            // Relasi
             $table->foreignId('tenant_id')->constrained('Ms_tenants')->onDelete('cascade');
             $table->foreignId('transaction_id')->constrained('Tr_transactions')->onDelete('cascade');
-            
-            // Master Data (Nullable jika master dihapus)
             $table->foreignId('package_id')->nullable()->constrained('Ms_packages')->onDelete('set null');
             
-            // --- SNAPSHOT DATA (KRUSIAL UNTUK HISTORY) ---
-            // Simpan semua atribut master saat transaksi terjadi
+            // --- SNAPSHOT DATA ---
             $table->string('package_name', 100); 
-            $table->decimal('original_price', 15, 2); // Harga dasar paket saat itu
-            $table->string('unit', 10)->nullable(); // Satuan saat itu (Kg/Pcs)
-            // ---------------------------------------------
+            $table->decimal('original_price', 15, 2); 
+            $table->string('unit', 10)->nullable(); 
             
             // --- Perhitungan Harga per Baris ---
-            // qty sudah benar decimal
-            $table->decimal('qty', 10, 2); 
+            // PERBAIKAN: Ubah ke 12, 3 untuk akurasi timbangan Laundry (gram)
+            $table->decimal('qty', 12, 3)->default(0); 
             
-            // Harga final per unit setelah diskon (jika ada diskon item)
-            $table->decimal('price_per_unit', 15, 2); 
+            // Harga setelah diskon (jika ada) per unit
+            $table->decimal('price_per_unit', 15, 2)->default(0); 
             
-            // Total baris = qty * price_per_unit
-            $table->decimal('subtotal', 15, 2); 
+            // Total per item (qty * price_per_unit)
+            $table->decimal('subtotal', 15, 2)->default(0); 
             
             // --- Informasi Tambahan ---
             $table->string('notes', 255)->nullable(); 
@@ -41,8 +37,7 @@ return new class extends Migration
             $table->timestampsTz();
             $table->softDeletesTz();
 
-            // --- Indexing (Optimasi Laporan Detail) ---
-            // Komposit index untuk pencarian detail transaksi per tenant
+            // Indexing
             $table->index(['tenant_id', 'transaction_id'], 'idx_detail_tenant_trans');                
             $table->index('package_id', 'idx_detail_package');
         });

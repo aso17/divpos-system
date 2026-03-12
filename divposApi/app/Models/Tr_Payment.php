@@ -12,21 +12,18 @@ class Tr_Payment extends Model
 
     protected $table = 'Tr_payments';
 
-    /**
-     * White-listing kolom untuk keamanan Mass Assignment.
-     * Sangat krusial karena ini menyangkut data nominal uang (amount).
-     */
     protected $fillable = [
-        'tenant_id',
-        'transaction_id',
-        'payment_method_id',
-        'amount',
-        'payment_date',
-        'reference_no',
-        'paid_by',
-        'received_by',
-        'notes',
-    ];
+    'tenant_id',
+    'transaction_id',
+    'payment_method_id',
+    'payment_method_name', 
+    'amount',
+    'payment_date',
+    'reference_no',
+    'paid_by',
+    'received_by',
+    'notes',
+];
 
     /**
      * Casting tipe data.

@@ -18,21 +18,21 @@ return new class extends Migration
             // Relasi ke metode pembayaran (nullable)
             $table->foreignId('payment_method_id')->nullable()->constrained('Ms_payment_methods')->onDelete('set null');
             
-            // --- SNAPSHOT DATA (KRUSIAL) ---
-            // Simpan nama metode pembayaran saat itu (misal: "Transfer BCA")
+            // --- SNAPSHOT DATA ---
+            // Simpan nama metode pembayaran saat itu (misal: "Cash" atau "QRIS")
             $table->string('payment_method_name', 50); 
-            // -------------------------------
             
             // --- Detail Pembayaran ---
-            $table->decimal('amount', 15, 2); // Jumlah uang yang dibayarkan
-            $table->dateTime('payment_date'); // Waktu pembayaran
+            // Uang bersih yang masuk (sudah dipotong kembalian)
+            $table->decimal('amount', 15, 2); 
+            $table->dateTime('payment_date')->useCurrent(); 
             
             // --- Informasi Tambahan ---
-            $table->string('reference_no', 100)->nullable(); // Nomor referensi bayar
-            $table->string('paid_by', 100)->nullable(); // Nama pembayar
-            $table->string('received_by', 100); // Nama kasir (Panjang disesuaikan)
+            // Untuk QRIS, ini bisa diisi nomor referensi/ID transaksi dari provider
+            $table->string('reference_no', 100)->nullable(); 
+            // Nama kasir yang bertugas saat itu
+            $table->string('received_by', 100); 
             
-            // PERBAIKAN: Gunakan string(255) untuk konsistensi performa
             $table->string('notes', 255)->nullable(); 
             
             $table->timestampsTz();

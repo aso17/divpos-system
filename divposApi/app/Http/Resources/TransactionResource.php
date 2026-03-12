@@ -2,45 +2,46 @@
 
 namespace App\Http\Resources;
 
-use App\Helpers\CryptoHelper; 
+use App\Helpers\CryptoHelper;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class TransactionResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array<string, mixed>
-     */
     public function toArray($request)
     {
+        $user=Auth::user()->employee->full_name;
+
         return [
-            // Enkripsi ID agar aman di sisi Client (React)
-            'id'             => CryptoHelper::encrypt($this->id),
-            'invoice_no'     => $this->invoice_no,
+            'id'                => CryptoHelper::encrypt($this->id),
+            'invoice_no'        => $this->invoice_no,
+            'tenant_id'         => CryptoHelper::encrypt($this->tenant_id),
+            'outlet_id'         => CryptoHelper::encrypt($this->outlet_id),
             
-            // Mengambil nama dari relasi 'customer' (Ms_Customer)
-            // Jika null, gunakan kolom 'customer_name' manual yang ada di tabel transaksi
-            'customer_name'  => $this->customer->name ?? $this->customer_name ?? 'Umum',
-            'customer_phone' => $this->customer->phone ?? $this->customer_phone ?? '-',
+            // Customer Info
+            'customer_id'       => $this->customer_id ? CryptoHelper::encrypt($this->customer_id) : null,
+            'customer_name'     => $this->customer_name,
+            'customer_phone'    => $this->customer_phone,
+
+            // Financials
+            'total_base_price'  => (float) $this->total_base_price,
+            'grand_total'       => (float) $this->grand_total,
+            'payment_amount'    => (float) $this->payment_amount,
+            'change_amount'     => (float) $this->change_amount,
+            'total_paid'        => (float) $this->total_paid,
+
+            // Status
+            'status'            => $this->status,
+            'payment_status'    => $this->payment_status,
+            'order_date'        => $this->order_date,
+
+            // Relations (Menggunakan Resource lain jika sudah ada)
+            'details'           => TransactionDetailResource::collection($this->whenLoaded('details')),
+            'outlet'            => new OutletResource($this->whenLoaded('outlet')),
+            'payment_method'    => new PaymentMethodResource($this->whenLoaded('initialPaymentMethod')),
             
-            // Relasi ke Ms_Outlet
-            'outlet_name'    => $this->outlet->name ?? '-',
-            
-            // Sesuaikan dengan nama kolom di model Mas (grand_total)
-            'total_price'    => (float) ($this->grand_total ?? 0),
-            
-            // Gunakan nama relasi 'initialPaymentMethod' sesuai di Model Mas
-            'payment_method' => $this->initialPaymentMethod->name ?? '-',
-            
-            // Status untuk label di tabel
-            'status'         => $this->status,
-            'payment_status' => $this->payment_status,
-            
-            // Format tanggal konsisten dengan ServiceResource
-            'created_at'     => $this->created_at ? $this->created_at->format('Y-m-d H:i:s') : null,
-            'order_date'     => $this->order_date ? $this->order_date->format('Y-m-d H:i:s') : null,
+            'created_by'        => $user,
+            'created_at'        => $this->created_at,
         ];
     }
 }

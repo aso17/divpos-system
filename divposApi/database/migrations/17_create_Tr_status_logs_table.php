@@ -16,25 +16,23 @@ return new class extends Migration
             $table->foreignId('transaction_id')->constrained('Tr_transactions')->onDelete('cascade');
             
             // --- Detail Status ---
-            // Enum konsisten dengan Tr_transactions
-            $table->enum('status', ['PENDING', 'PROCESS', 'READY', 'TAKEN', 'CANCELED']);
+            // UBAH KE STRING: Menghilangkan error Check Violation di Postgres
+            $table->string('status', 20)->index(); 
             
             // --- Deskripsi & Pelaku ---
-            $table->string('changed_by', 100); // Nama/ID user yang mengubah status
+            $table->string('changed_by', 100); 
             
-            // PERBAIKAN: Gunakan string(255) untuk konsistensi performa
-            $table->string('notes', 255)->nullable(); 
-            
-            // PERBAIKAN: Beri batas panjang agar efisien
+            // Gabungkan notes dan description jika fungsinya sama, 
+            // atau tetap pisah tapi pastikan panjangnya cukup.
             $table->string('description', 255)->nullable(); 
+            $table->text('notes')->nullable(); // Gunakan text jika isinya bisa panjang
 
-             $table->timestampsTz();
+            $table->timestampsTz();
             $table->softDeletesTz();
 
             // --- Indexing ---
-            // Optimasi komposit untuk laporan status per transaksi
+            // Optimasi komposit: Mencari log berdasarkan transaksi milik tenant tertentu
             $table->index(['tenant_id', 'transaction_id'], 'idx_log_tenant_trans');
-            $table->index('status', 'idx_log_status');
         });
     }
 

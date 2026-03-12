@@ -17,30 +17,27 @@ class Tr_TransactionDetail extends Model
      * Kita masukkan semua kolom sesuai migrasi agar logic Service bisa
      * menyimpan array data secara kolektif.
      */
-    protected $fillable = [
-        'tenant_id',
-        'transaction_id',
-        'package_id',
-        'package_name',
-        'qty',
-        'unit',
-        'price_per_unit',
-        'discount_per_unit',
-        'subtotal',
-        'notes',
-    ];
+   protected $fillable = [
+    'tenant_id',
+    'transaction_id',
+    'package_id',
+    'package_name',
+    'original_price', // Tambahkan ini
+    'qty',
+    'unit',
+    'price_per_unit',
+    'discount_per_unit',
+    'subtotal',
+    'notes',
+];
 
-    /**
-     * Casting tipe data decimal agar tetap akurat (tidak menjadi string)
-     * saat dikirim ke Frontend.
-     */
-    protected $casts = [
-        'qty' => 'decimal:2',
-        'price_per_unit' => 'decimal:2',
-        'discount_per_unit' => 'decimal:2',
-        'subtotal' => 'decimal:2',
-    ];
-
+protected $casts = [
+    'qty' => 'decimal:2',
+    'original_price' => 'decimal:2', // Tambahkan ini agar akurat
+    'price_per_unit' => 'decimal:2',
+    'discount_per_unit' => 'decimal:2',
+    'subtotal' => 'decimal:2',
+];
     // --- RELASI ---
 
     /**

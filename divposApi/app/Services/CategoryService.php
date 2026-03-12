@@ -37,8 +37,8 @@ class CategoryService
     {
         
         
-        $category = $this->repository->findByIdAndTenant((int)$id, $tenantId);
-        if (!$category) throw new \Exception("Kategori tidak ditemukan");
+        $category = $this->repository->findByIdAndTenant((int)$id, (int)$tenantId);
+        if (!$category) throw new \Exception("Kategori tidak ditemukan".$tenantId."".$id);
         $data['tenant_id'] = $tenantId;
        
         return $this->repository->update($category, $data);
