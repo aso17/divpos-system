@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Resources\OutletResource;
 use App\Services\OutletService; 
@@ -48,9 +49,17 @@ class OutletController extends Controller
 public function store(OutletRequest $request)
 {
     try {
+
+         $user = Auth::user();
+         $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
+
         $payload = $request->validated();
-        $payload['tenant_id'] = (int) Auth::user()->tenant_id;
+        $payload['tenant_id'] = (int)$tenantId;
+
         $outlet = $this->outletService->createOutlet($payload);
+        
+        Cache::forget("init_data_tenant_transaction_" . $tenantId);
+
         return response()->json([
             'success' => true,
             'message' => 'Outlet berhasil dibuat',
@@ -71,11 +80,14 @@ public function store(OutletRequest $request)
 public function update(OutletRequest $request)
 {
     try {
-       
+       $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
         $decryptedId = $request->id;
         $payload = $request->validated();
-        $payload['tenant_id'] = (int) Auth::user()->tenant_id;
+        $payload['tenant_id'] = (int)$$tenantId;
         $outlet = $this->outletService->updateOutlet($decryptedId, $payload);
+
+        Cache::forget("init_data_tenant_transaction_" . $tenantId);
         return response()->json([
             'success' => $decryptedId,
             'message' => 'Outlet berhasil diperbarui.',
@@ -123,6 +135,8 @@ public function update(OutletRequest $request)
                     'message' => 'Data tidak ditemukan atau Anda tidak memiliki otoritas menghapus data ini.'
                 ], 404);
             }
+
+             Cache::forget("init_data_tenant_transaction_" . $tenantId);
 
             return response()->json([
                 'success' => true,

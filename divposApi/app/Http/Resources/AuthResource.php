@@ -30,7 +30,8 @@ class AuthResource extends JsonResource
                 : asset('assets/images/default-avatar.png'),
 
             // 🎯 Data Tenant: Sekarang aman untuk Owner maupun Staff 
-            // karena tenant_id di sini adalah hasil join Ms_tenants.id
+            // karena tenant_id di sini adalah hasil join Ms_tenants.
+            
             'tenant' => $this->tenant_id ? [
                     'id'            => CryptoHelper::encrypt($this->tenant_id),
                     'name'          => $this->tenant_name,

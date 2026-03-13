@@ -123,7 +123,7 @@ class TransactionService
                         'payment_method_name' => $methodName, 
                         'amount'              => $netPaymentToday,
                         'payment_date'        => now(),
-                        'received_by'         => $user->name ?? 'Kasir',
+                        'received_by'         => $user->full_name ?? 'Kasir',
                     ]);
                 }
 
@@ -131,7 +131,7 @@ class TransactionService
                 $transaction->logs()->create([
                     'tenant_id'   => $tenantId,
                     'status'      => $transactionStatus,
-                    'changed_by'  => $user->name ?? 'System',
+                    'changed_by'  => $user->full_name ?? 'System',
                     'description' => 'Transaksi berhasil diproses.',
                 ]);
 

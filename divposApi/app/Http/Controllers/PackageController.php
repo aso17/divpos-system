@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use App\Http\Resources\PackageResource;
 use App\Http\Requests\PackageRequest;
 use App\Services\PackageService; 
@@ -49,7 +50,9 @@ class PackageController extends Controller
       
     public function store(PackageRequest $request) 
     {
-        
+         $user = Auth::user();
+         $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
+
         $data = $this->packageService->createPackage($request->validated());
 
         if (!$data) {
@@ -57,6 +60,8 @@ class PackageController extends Controller
                 'message' => 'Gagal memproses data paket. Silakan cek log sistem.'
             ], 400);
         }
+
+        Cache::forget("init_data_tenant_transaction_" . $tenantId);
 
         return response()->json([
             'message' => 'Paket berhasil dibuat',
@@ -66,7 +71,8 @@ class PackageController extends Controller
 
    public function update(PackageRequest $request)
     {
-        
+        $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
         $validatedData = $request->validated();   
         $payload = array_merge($validatedData, [      
             'final_price' => $request->final_price, 
@@ -80,6 +86,7 @@ class PackageController extends Controller
             ], 400);
         }
 
+        Cache::forget("init_data_tenant_transaction_" . $tenantId);
         return response()->json([
             'message' => 'Paket berhasil diupdate',
             'data'    => new PackageResource($updated)
@@ -104,6 +111,7 @@ class PackageController extends Controller
             return response()->json(['message' => 'Data tidak ditemukan atau sudah dihapus'], 404);
         }
 
+          Cache::forget("init_data_tenant_transaction_" . $tenantId);
         return response()->json(['message' => 'Paket berhasil dihapus']);
     }
 }
