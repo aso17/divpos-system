@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Pencil, Trash2, PlusSquare, Box } from "lucide-react";
+import { Pencil, Trash2, PlusSquare, Box, Search, X } from "lucide-react";
 import TransactionService from "../../services/TransactionService";
 import { useFormValidation } from "../../hooks/useFormValidation";
 import { rules } from "../../utils/validators/rules";
@@ -11,7 +11,10 @@ import { formatRupiah, parseNumber, toNum } from "../../utils/formatter";
 const Transactions = () => {
   const hasFetched = useRef(false);
   const issubmitting = useRef(false);
+  const abortControllerRef = useRef(null);
+
   const [cart, setCart] = useState([]);
+  const [search, setSearch] = useState("");
   const [packages, setPackages] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
@@ -21,10 +24,9 @@ const Transactions = () => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [lastTransactionData, setLastTransactionData] = useState(null);
+  const [appSettings, setAppSettings] = useState({}); // FIXED: Inisialisasi sebagai Object {}
 
-  const abortControllerRef = useRef(null);
-
-  const { values, errors, handleChange, validate, setValues, setErrors } =
+  const { values, errors, handleChange, validate, setValues } =
     useFormValidation(
       {
         customer_id: null,
@@ -48,6 +50,9 @@ const Transactions = () => {
     if (hasFetched.current) return;
     fetchData();
     hasFetched.current = true;
+    return () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
   }, []);
 
   const fetchData = async () => {
@@ -56,6 +61,8 @@ const Transactions = () => {
       const data = res.data.data;
       setPackages(data.packages || []);
       setOutlets(data.outlets || []);
+      setAppSettings(data.app_setting || {}); // FIXED: Pastikan menerima Object
+
       const payData = data.payment_methods || [];
       setPaymentMethods(payData);
 
@@ -68,17 +75,9 @@ const Transactions = () => {
     }
   };
 
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) abortControllerRef.current.abort();
-    };
-  }, []);
-
   const handlePhoneChange = async (val) => {
     handleChange("customer_phone", val);
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    if (abortControllerRef.current) abortControllerRef.current.abort();
 
     if (val.length < 10) {
       setValues((prev) => ({ ...prev, customer_id: null, is_new: true }));
@@ -92,7 +91,6 @@ const Transactions = () => {
         { phone: val },
         { signal: controller.signal },
       );
-
       const existing = res.data.data;
       if (existing) {
         setValues((prev) => ({
@@ -102,59 +100,86 @@ const Transactions = () => {
           is_new: false,
         }));
       } else {
-        setValues((prev) => ({
-          ...prev,
-          customer_id: null,
-          is_new: true,
-        }));
+        setValues((prev) => ({ ...prev, customer_id: null, is_new: true }));
       }
-    } catch (error) {}
+    } catch (error) {
+      // Ignore abort errors
+    }
   };
 
-  // --- LOGIC PERHITUNGAN FINAL ---
+  const filteredPackages = packages.filter((pkg) =>
+    pkg.name.toLowerCase().includes(search.toLowerCase()),
+  );
 
-  const subtotal = cart.reduce((acc, item) => {
-    const harga = toNum(item.final_price);
-    const qty = toNum(item.qty);
+  // Helper Ambil Setting (FIXED: Untuk format Object Key-Value)
+  const getSetting = (key, defaultValue) => {
+    // 1. Pastikan appSettings adalah Array dan ada isinya
+    if (Array.isArray(appSettings) && appSettings.length > 0) {
+      // 2. Cari object yang punya key sesuai parameter
+      const setting = appSettings.find((s) => s.key === key);
 
-    return acc + harga * qty;
-  }, 0);
+      if (setting) {
+        const val = setting.value;
+
+        if (val === true || val === "true" || val === 1 || val === "1")
+          return true;
+        if (val === false || val === "false" || val === 0 || val === "0")
+          return false;
+        return val;
+      }
+    }
+    return defaultValue;
+  };
+
+  // Logic Perhitungan
+  const subtotal = cart.reduce(
+    (acc, item) => acc + toNum(item.final_price) * toNum(item.qty),
+    0,
+  );
 
   const isCash = selectedPaymentMethod?.name?.toLowerCase().match(/cash|tunai/);
   const dpAmountNum = toNum(dpAmount);
   const payAmountNum = toNum(payAmount);
   const sisaTagihan = subtotal - dpAmountNum;
   const change = isCash ? payAmountNum - sisaTagihan : 0;
-  const totalHemat = cart.reduce((acc, item) => {
-    const hargaAsli = toNum(item.original_price);
-    const hargaFinal = toNum(item.final_price);
-    const qty = toNum(item.qty);
-    if (hargaAsli > hargaFinal) {
-      return acc + (hargaAsli - hargaFinal) * qty;
-    }
-    return acc;
-  }, 0);
+  // 1. Ambil Setting Utama saja
+  const isDpEnabled_dp = getSetting("trx_enable_dp", false);
 
+  // 2. Fix deteksi object (Wajib agar tombol tidak terkunci terus)
+  const isSettingLoaded = appSettings && Object.keys(appSettings).length > 0;
+
+  // 3. Logic Validasi: Jika DP Aktif, total uang (DP + Bayar) tidak boleh 0
+  const isZeroPaymentInvalid = isDpEnabled_dp
+    ? dpAmountNum + payAmountNum <= 0
+    : false;
+
+  const isDisabled =
+    loading ||
+    !isSettingLoaded ||
+    cart.length === 0 ||
+    (isCash && isDpEnabled_dp && change < 0) ||
+    isZeroPaymentInvalid;
   const addToCart = (pkg) => {
     if (cart.find((x) => x.id === pkg.id))
       return triggerToast("Layanan sudah ada.", "warning");
-    setCart([...cart, { ...pkg, qty: 1, unit: pkg.unit }]);
-    setPayAmount(0);
+    setCart([...cart, { ...pkg, qty: 1 }]);
   };
+  // Tambahkan useEffect ini Mas A_so
+  useEffect(() => {
+    if (cart.length === 0) {
+      setDpAmount(0);
+      setPayAmount(0);
+    }
+  }, [cart.length]);
 
   const handleSubmit = async () => {
-    if (issubmitting.current) return;
-    if (!validate()) return;
-
-    // 1. Validasi Keranjang
+    if (issubmitting.current || !validate()) return;
     if (cart.length === 0) return triggerToast("Keranjang kosong!", "warning");
-    if (cart.some((item) => toNum(item.qty) <= 0)) {
-      return triggerToast("Input qty/berat dengan benar!", "warning");
-    }
+    if (cart.some((item) => toNum(item.qty) <= 0))
+      return triggerToast("Input qty dengan benar!", "warning");
 
-    // 2. Validasi Pembayaran Tunai (Dicek terhadap sisa tagihan)
-    if (isCash && payAmountNum < sisaTagihan) {
-      return triggerToast("Uang tunai kurang dari sisa tagihan!", "error");
+    if (isCash && isDpEnabled_dp && payAmountNum < sisaTagihan) {
+      return triggerToast("Pembayaran kurang!", "error");
     }
 
     issubmitting.current = true;
@@ -174,19 +199,15 @@ const Transactions = () => {
           package_id: item.id,
           qty: toNum(item.qty),
         })),
-        // Nominal DP yang diinput
         dp_amount: dpAmountNum,
-        // Jika Cash: kirim nominal yang diinput kasir.
-        // Jika QRIS/Lainnya: kirim sisa tagihan (pelunasan otomatis pas).
         payment_amount: isCash ? payAmountNum : sisaTagihan,
       };
 
       const response = await TransactionService.createTransaction(payload);
 
-      // 3. Reset State Setelah Sukses
       setCart([]);
       setPayAmount(0);
-      setDpAmount(0); // Penting agar DP tidak terbawa ke transaksi berikutnya
+      setDpAmount(0);
       setValues((prev) => ({
         ...prev,
         customer_id: null,
@@ -195,18 +216,13 @@ const Transactions = () => {
         is_new: true,
       }));
 
-      // Tampilkan Modal Sukses & Print
       setLastTransactionData(response.data.data);
       setShowModal(true);
-
-      // Reset flag submit
-      issubmitting.current = false;
     } catch (error) {
-      issubmitting.current = false;
-      // Cek jika ada pesan error spesifik dari backend
       const msg = error.response?.data?.message || "Gagal simpan transaksi!";
       triggerToast(msg, "error");
     } finally {
+      issubmitting.current = false;
       setLoading(false);
     }
   };
@@ -218,67 +234,73 @@ const Transactions = () => {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-3 p-2 md:p-4 bg-gray-100 min-h-screen font-sans">
-      <div className="w-full lg:w-3/5 flex flex-col gap-3">
+    <div className="flex flex-col lg:flex-row gap-4 p-3 md:p-5 bg-gradient-to-b from-gray-50 to-gray-100 min-h-screen font-sans">
+      {/* LEFT SIDE */}
+      <div className="w-full lg:w-3/5 flex flex-col gap-4">
         <AppHead title="Transaksi" />
 
-        {/* PANEL 1: INFORMASI TRANSAKSI */}
-        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="font-bold text-gray-700 text-[10px] mb-3 flex items-center gap-2 uppercase">
-            <span className="w-5 h-5 bg-emerald-600 text-white rounded-lg flex items-center justify-center shadow-sm">
+        {/* PANEL CUSTOMER */}
+        <div className="bg-white p-4 rounded-2xl shadow-md border border-gray-100">
+          <h2 className="font-bold text-gray-700 text-[10px] mb-4 flex items-center gap-2 uppercase tracking-wide">
+            <span className="w-6 h-6 bg-emerald-600 text-white rounded-lg flex items-center justify-center shadow">
               <Pencil size={12} strokeWidth={3} />
             </span>
             Informasi Transaksi
           </h2>
+
           <div className="space-y-3">
             <select
               value={values.outlet_id}
               onChange={(e) => handleChange("outlet_id", e.target.value)}
               className={
                 inputClasses({ error: !!errors.outlet_id }) +
-                " !text-[10px] !py-1 !px-2 font-bold bg-white h-8 !border-emerald-500 focus:!border-emerald-600 focus:!ring-emerald-100"
+                " !text-[11px] !py-2 !px-3 font-bold bg-white h-10 rounded-lg !border-emerald-500 focus:!border-emerald-600 focus:!ring-emerald-100"
               }
             >
               <option value="">-- Pilih Outlet --</option>
+
               {outlets.map((out) => (
                 <option key={out.id} value={out.id}>
                   {out.name}
                 </option>
               ))}
             </select>
+
             {errors.outlet_id && (
-              <p className="text-[9px] text-red-500 font-bold mt-1 italic">
+              <p className="text-[9px] text-red-500 font-bold italic">
                 {errors.outlet_id}
               </p>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <input
                   type="text"
                   className={
                     inputClasses({ error: !!errors.customer_phone }) +
-                    " !text-[10px] !py-1 !px-2 h-8 !border-emerald-500 focus:!border-emerald-600 focus:!ring-emerald-100"
+                    " !text-[11px] !py-2 !px-3 h-10 rounded-lg !border-emerald-500 focus:!border-emerald-600 focus:!ring-emerald-100"
                   }
                   value={values.customer_phone}
                   onChange={(e) => handlePhoneChange(e.target.value)}
                   placeholder="No. WhatsApp (08...)"
                 />
+
                 {errors.customer_phone && (
-                  <p className="text-[8px] text-red-500 font-bold mt-0.5 italic px-1">
+                  <p className="text-[8px] text-red-500 font-bold italic">
                     {errors.customer_phone}
                   </p>
                 )}
               </div>
+
               <div>
                 <input
                   type="text"
                   className={
                     inputClasses({ error: !!errors.customer_name }) +
-                    " !text-[10px] !py-1 !px-2 h-8 !border-emerald-500 focus:!border-emerald-600 focus:!ring-emerald-100 " +
+                    " !text-[11px] !py-2 !px-3 h-10 rounded-lg !border-emerald-500 focus:!border-emerald-600 focus:!ring-emerald-100 " +
                     (!values.is_new
-                      ? " bg-emerald-50 font-black text-emerald-800"
-                      : " bg-white")
+                      ? "bg-emerald-50 font-black text-emerald-800"
+                      : "bg-white")
                   }
                   value={values.customer_name}
                   onChange={(e) =>
@@ -287,8 +309,9 @@ const Transactions = () => {
                   disabled={!values.is_new}
                   placeholder="Nama Pelanggan"
                 />
+
                 {errors.customer_name && (
-                  <p className="text-[8px] text-red-500 font-bold mt-0.5 italic px-1">
+                  <p className="text-[8px] text-red-500 font-bold italic">
                     {errors.customer_name}
                   </p>
                 )}
@@ -297,51 +320,138 @@ const Transactions = () => {
           </div>
         </div>
 
-        {/* PANEL 2: PILIH LAYANAN */}
-        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 flex-1">
-          <h2 className="font-bold text-gray-700 text-[10px] mb-3 flex items-center gap-2 uppercase">
-            <span className="w-5 h-5 bg-emerald-600 text-white rounded-lg flex items-center justify-center shadow-sm">
-              <Box size={12} strokeWidth={3} />
-            </span>
-            Pilih Layanan
-          </h2>
+        {/* PANEL SERVICES */}
+        <div className="bg-white p-5 rounded-3xl shadow-lg border border-gray-100 flex flex-col flex-1">
+          {/* HEADER */}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-extrabold text-gray-700 text-xs flex items-center gap-2 uppercase tracking-wider">
+              <span className="w-7 h-7 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-sm">
+                <Box size={14} strokeWidth={2.5} />
+              </span>
+              Pilih Layanan
+            </h2>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
-            {packages.map((pkg) => {
-              const originalPrice = Number(pkg.original_price || 0);
-              const finalPrice = Number(pkg.final_price || 0);
+            <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">
+              {filteredPackages.length} layanan
+            </span>
+          </div>
+
+          {/* SEARCH BAR */}
+          <div className="mb-5 flex items-center gap-3">
+            <div className="relative w-full max-w-xs">
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari layanan..."
+                className="
+                w-full
+                border border-gray-200
+                bg-gray-50
+                rounded-xl
+                py-2
+                pl-9
+                pr-8
+                text-xs
+                font-semibold
+                transition
+                focus:outline-none
+                focus:bg-white
+                focus:ring-2
+                focus:ring-emerald-100
+                focus:border-emerald-500
+                "
+              />
+
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* SERVICES GRID */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-4 gap-3">
+            {filteredPackages.map((pkg) => {
+              const originalPrice = toNum(pkg.original_price);
+              const finalPrice = toNum(pkg.final_price);
               const hasDiscount = originalPrice > finalPrice;
 
               return (
                 <button
                   key={pkg.id}
                   onClick={() => addToCart(pkg)}
-                  className="relative p-2.5 border border-gray-100 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left shadow-sm group bg-white overflow-hidden flex flex-col justify-between h-full min-h-[85px]"
+                  className="
+                      relative
+                      p-3
+                      border border-gray-100
+                      rounded-2xl
+                      bg-white
+                      text-left
+                      flex flex-col justify-between
+                      min-h-[105px]
+
+                      shadow-sm
+                      hover:shadow-md
+                      hover:border-emerald-400
+                      hover:bg-emerald-50
+                      hover:-translate-y-[2px]
+                      active:scale-[0.98]
+
+                      transition-all
+                      duration-200
+                      group
+                      overflow-hidden
+                      "
                 >
+                  {/* PROMO */}
                   {hasDiscount && (
-                    <div className="absolute top-0 right-0 bg-red-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-10">
+                    <div className="absolute top-0 right-0 bg-red-500 text-white text-[8px] font-black px-2 py-[2px] rounded-bl-xl shadow-sm">
                       PROMO
                     </div>
                   )}
-                  <div className="mb-2">
-                    <p className="font-extrabold mt-2 text-[9px] md:text-[8px] leading-tight uppercase group-hover:text-emerald-700 line-clamp-2">
+
+                  {/* NAME */}
+                  <div className="mb-2 mt-3">
+                    <p
+                      className="
+                      font-extrabold
+                      text-[10px]
+                      leading-tight
+                      uppercase
+                      line-clamp-2
+                      text-gray-700
+                      group-hover:text-emerald-700
+                      "
+                    >
                       {pkg.name}
                     </p>
                   </div>
 
+                  {/* PRICE */}
                   <div className="mt-auto">
                     {hasDiscount && (
-                      <p className="text-[8px] text-gray-400 line-through leading-none mb-0.5">
+                      <p className="text-[8px] text-gray-400 line-through mb-[2px]">
                         {formatRupiah(originalPrice)}
                       </p>
                     )}
 
-                    <div className="flex flex-wrap items-baseline gap-0.5">
-                      <span className="text-[11px] text-emerald-600 font-black whitespace-nowrap">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-[13px] text-emerald-600 font-black">
                         {formatRupiah(finalPrice)}
                       </span>
+
                       <span className="text-[8px] text-gray-400 font-bold uppercase">
-                        /{pkg.unit || "Pcs"}
+                        /{pkg.unit || "pcs"}
                       </span>
                     </div>
                   </div>
@@ -349,201 +459,222 @@ const Transactions = () => {
               );
             })}
           </div>
+
+          {/* EMPTY STATE */}
+          {filteredPackages.length === 0 && (
+            <div className="py-14 flex flex-col items-center text-gray-300">
+              <Search size={36} strokeWidth={1.5} />
+
+              <p className="text-xs font-bold uppercase mt-3">
+                Layanan tidak ditemukan
+              </p>
+
+              <p className="text-[10px] text-gray-400 mt-1">
+                Coba kata kunci lain
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* KANAN: CHECKOUT */}
-      <div className="w-full lg:w-2/5 lg:sticky lg:top-4 lg:h-fit">
-        <div className="bg-white p-4 rounded-xl shadow-lg border-t-4 border-emerald-600 flex flex-col">
-          <h2 className="font-bold text-gray-700 text-[10px] border-b pb-3 mb-4 flex items-center gap-2 uppercase">
-            <span className="w-5 h-5 bg-emerald-600 text-white rounded-lg flex items-center justify-center shadow-sm">
+      {/* RIGHT SIDE CHECKOUT */}
+
+      <div className="w-full lg:w-2/5 lg:sticky lg:top-5 lg:h-fit">
+        <div className="bg-white p-5 rounded-2xl shadow-xl border border-gray-100 flex flex-col">
+          <h2 className="font-bold text-gray-700 text-[10px] border-b pb-3 mb-4 flex items-center gap-2 uppercase tracking-wide">
+            <span className="w-6 h-6 bg-emerald-600 text-white rounded-lg flex items-center justify-center shadow">
               <PlusSquare size={12} strokeWidth={3} />
             </span>
             Checkout
           </h2>
 
-          <div className="max-h-[250px] overflow-y-auto space-y-2 mb-4 pr-1 scrollbar-thin">
-            {cart.map((item) => {
-              const qty = toNum(item.qty || 0);
-              const originalPrice = toNum(item.original_price || 0);
-              const finalPrice = toNum(item.final_price || 0);
-              const subtotalItem = qty * finalPrice;
-              const hasDiscount = originalPrice > finalPrice;
+          {/* CART */}
 
-              return (
-                <div
-                  key={item.id}
-                  className="bg-gray-50 p-2 rounded-lg border border-gray-200 flex items-center gap-2 group"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-[9px] text-emerald-800 truncate uppercase mb-1">
-                      {item.name}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="any"
-                        className="w-16 border border-orange-400 p-0.5 rounded text-center text-xs font-black text-orange-600 outline-none focus:ring-1 focus:ring-orange-200"
-                        value={item.qty || ""}
-                        onChange={(e) =>
-                          setCart(
-                            cart.map((c) =>
-                              c.id === item.id
-                                ? { ...c, qty: toNum(e.target.value) }
-                                : c,
-                            ),
-                          )
-                        }
-                      />
-                      <span className="text-[9px] font-bold text-gray-400 uppercase">
-                        {item.unit}
-                      </span>
-                    </div>
-                  </div>
+          <div className="max-h-[260px] overflow-y-auto space-y-2 mb-4 pr-1 scrollbar-thin">
+            {cart.map((item) => (
+              <div
+                key={item.id}
+                className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex items-center gap-2 group"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-[10px] text-emerald-800 truncate uppercase mb-1">
+                    {item.name}
+                  </p>
 
-                  <div className="text-right flex flex-col items-end justify-between self-stretch">
-                    <button
-                      onClick={() =>
-                        setCart(cart.filter((c) => c.id !== item.id))
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="any"
+                      className="w-16 border border-orange-400 p-1 rounded text-center text-xs font-black text-orange-600 outline-none focus:ring-1 focus:ring-orange-200"
+                      value={item.qty || ""}
+                      onChange={(e) =>
+                        setCart(
+                          cart.map((c) =>
+                            c.id === item.id
+                              ? { ...c, qty: e.target.value }
+                              : c,
+                          ),
+                        )
                       }
-                      className="hover:bg-red-50 p-1 rounded transition-colors"
-                    >
-                      <Trash2
-                        size={12}
-                        className="text-red-300 group-hover:text-red-600"
-                      />
-                    </button>
+                    />
 
-                    <div className="flex flex-col items-end">
-                      {/* Harga Coret per item jika ada diskon */}
-                      {hasDiscount && (
-                        <span className="text-[7px] text-gray-400 line-through leading-none">
-                          {formatRupiah(originalPrice * qty)}
-                        </span>
-                      )}
-                      <p className="font-black text-[10px] text-gray-700 leading-tight">
-                        {formatRupiah(subtotalItem)}
-                      </p>
-                    </div>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase">
+                      {item.unit}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="text-right flex flex-col items-end justify-between self-stretch">
+                  <button
+                    onClick={() =>
+                      setCart(cart.filter((c) => c.id !== item.id))
+                    }
+                    className="hover:bg-red-50 p-1 rounded"
+                  >
+                    <Trash2 size={12} className="text-red-400" />
+                  </button>
+
+                  <div className="flex flex-col items-end">
+                    {toNum(item.original_price) > toNum(item.final_price) && (
+                      <span className="text-[7px] text-gray-400 line-through">
+                        {formatRupiah(
+                          toNum(item.original_price) * toNum(item.qty),
+                        )}
+                      </span>
+                    )}
+
+                    <p className="font-black text-[11px] text-gray-700">
+                      {formatRupiah(toNum(item.final_price) * toNum(item.qty))}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
 
             {cart.length === 0 && (
-              <div className="py-10 flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-100 rounded-xl">
+              <div className="py-12 flex flex-col items-center text-gray-300 border-2 border-dashed border-gray-100 rounded-xl">
                 <Box size={32} strokeWidth={1} />
-                <p className="text-[9px] font-bold uppercase mt-2">
+
+                <p className="text-[10px] font-bold uppercase mt-2">
                   Belum ada layanan
                 </p>
               </div>
             )}
           </div>
 
-          {/* PAYMENT SECTION */}
-          <div className="border-t pt-3 space-y-3">
-            <div className="grid grid-cols-3 gap-1">
+          {/* PAYMENT */}
+
+          <div className="border-t pt-4 space-y-3">
+            <div className="grid grid-cols-3 gap-2">
               {paymentMethods.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => setSelectedPaymentMethod(m)}
-                  className={`py-1.5 rounded text-[9px] font-black uppercase border transition-all ${selectedPaymentMethod?.id === m.id ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-gray-400 border-gray-200"}`}
+                  className={`py-2 rounded text-[10px] font-black uppercase border transition-all ${
+                    selectedPaymentMethod?.id === m.id
+                      ? "bg-emerald-600 text-white border-emerald-600"
+                      : "bg-white text-gray-400 border-gray-200"
+                  }`}
                 >
-                  {m.type}
+                  {m.name}
                 </button>
               ))}
             </div>
 
-            <div className="flex justify-between items-center bg-emerald-50 p-2 rounded-lg">
-              <span className="text-emerald-600 font-bold text-[10px] uppercase">
+            <div className="flex justify-between items-center bg-emerald-50 p-3 rounded-xl">
+              <span className="text-emerald-600 font-bold text-[11px] uppercase">
                 Grand Total
               </span>
-              <span className="text-lg font-black text-emerald-700">
+
+              <span className="text-xl font-black text-emerald-700">
                 Rp{formatRupiah(subtotal)}
               </span>
             </div>
 
-            {/* INPUT DP / BOOKING FEE */}
-            <div className="space-y-1 mb-3">
-              <label className="text-[9px] font-black text-orange-600 px-1 uppercase">
-                DP / Booking Fee
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-600 font-black text-sm">
-                  Rp
-                </span>
-                <input
-                  type="text"
-                  value={dpAmount === 0 ? "" : formatRupiah(dpAmount)}
-                  onChange={(e) => setDpAmount(parseNumber(e.target.value))}
-                  className="w-full border-2 border-orange-400 pl-10 pr-3 py-2 rounded-xl text-md font-black text-orange-700 outline-none focus:ring-4 focus:ring-orange-100 transition-all"
-                  placeholder="0"
-                />
-              </div>
-            </div>
+            {/* INPUT DP */}
 
-            {/* SISA TAGIHAN INFO */}
-            <div className="flex justify-between items-center bg-gray-100 p-2 rounded-lg mb-3">
-              <span className="text-gray-500 font-bold text-[9px] uppercase">
-                Sisa Tagihan
-              </span>
-              <span className="text-md font-black text-gray-700">
-                Rp{formatRupiah(sisaTagihan)}
-              </span>
-            </div>
-
-            {isCash && (
-              <div className="space-y-1 animate-in fade-in duration-300">
-                <label className="text-[9px] font-black text-emerald-600 px-1 uppercase">
-                  Input Pembayaran
+            {isDpEnabled_dp && (
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-orange-600 uppercase">
+                  DP / Booking Fee
                 </label>
+
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-black text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-600 font-black">
                     Rp
                   </span>
+
+                  <input
+                    type="text"
+                    value={dpAmount === 0 ? "" : formatRupiah(dpAmount)}
+                    onChange={(e) =>
+                      setDpAmount(parseNumber(e.target.value) || 0)
+                    }
+                    className="w-full border-2 border-orange-400 pl-10 pr-3 py-2 rounded-xl font-black text-orange-700 focus:ring-4 focus:ring-orange-100"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* INPUT BAYAR */}
+
+            {isCash && (
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-emerald-600 uppercase">
+                  Input Pembayaran
+                </label>
+
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-black">
+                    Rp
+                  </span>
+
                   <input
                     type="text"
                     onFocus={(e) => e.target.select()}
                     value={payAmount === 0 ? "" : formatRupiah(payAmount)}
-                    onChange={(e) => {
-                      const clean = parseNumber(e.target.value);
-                      setPayAmount(clean);
-                    }}
-                    className="w-full border-2 border-emerald-600 pl-10 pr-3 py-2.5 rounded-xl text-lg font-black text-emerald-700 outline-none focus:ring-4 focus:ring-emerald-100 transition-all placeholder:text-emerald-200"
+                    onChange={(e) =>
+                      setPayAmount(parseNumber(e.target.value) || 0)
+                    }
+                    className="w-full border-2 border-emerald-600 pl-10 pr-3 py-2.5 rounded-xl text-lg font-black text-emerald-700 focus:ring-4 focus:ring-emerald-100"
                     placeholder="0"
                   />
                 </div>
 
-                <div className="flex justify-between items-center text-[10px] px-1 font-extrabold mt-2">
-                  <span className="text-gray-400 uppercase tracking-tighter">
+                <div className="flex justify-between text-[10px] font-bold">
+                  <span className="text-gray-400 uppercase">
                     {change < 0 ? "Kurang Bayar" : "Uang Kembali"}
                   </span>
+
                   <span
-                    className={`px-2 py-0.5 rounded ${
-                      change < 0
-                        ? "bg-red-50 text-red-600"
-                        : "bg-emerald-50 text-emerald-700"
-                    }`}
+                    className={`${change < 0 ? "text-red-600" : "text-emerald-700"}`}
                   >
-                    {/* formatRupiah sudah cukup, Math.abs memastikan tidak ada tanda minus double */}
                     {formatRupiah(Math.abs(change))}
                   </span>
                 </div>
               </div>
             )}
+
             <button
               onClick={handleSubmit}
-              disabled={loading || cart.length === 0 || (isCash && change < 0)}
-              className={`w-full py-3 rounded-xl font-black text-white text-xs shadow-md uppercase transition-all
-                ${loading || cart.length === 0 || (isCash && change < 0) ? "bg-gray-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700 active:scale-95"}`}
+              disabled={isDisabled}
+              className={`w-full py-3 rounded-xl font-black text-white text-xs shadow-md uppercase transition-all ${
+                isDisabled
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-emerald-600 hover:bg-emerald-700 active:scale-95"
+              }`}
             >
-              {loading ? "Processing..." : "Simpan & Print"}
+              {loading
+                ? "Processing..."
+                : isZeroPaymentInvalid
+                  ? "Input Nominal Bayar/DP"
+                  : "Simpan & Print"}
             </button>
           </div>
         </div>
       </div>
 
-      {/* COMPONENT PRINT */}
       <TransactionSuccessModal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
