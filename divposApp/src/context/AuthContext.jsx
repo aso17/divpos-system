@@ -46,8 +46,8 @@ export const AuthProvider = ({ children }) => {
 
       // 4. Redirect ke login
       // Menggunakan window.location.href untuk memastikan state benar-benar bersih (hard reload)
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
+      if (window.location.pathname !== "/auth") {
+        window.location.href = "/auth";
       }
     }
   }, []);

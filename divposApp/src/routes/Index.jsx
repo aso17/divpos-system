@@ -9,7 +9,7 @@ import EmployeePage from "../pages/employees/EmployeeList";
 import CategoryPage from "../pages/category/CategoryList";
 import LayananPage from "../pages/masterservice/MasterServiceList";
 import TransactionPage from "../pages/transactions/Transactions";
-import TrxHistoryPage from "../pages/transactions/TransactionHistory";
+import TrxHistoryPage from "../pages/transactionsHistory/TransactionHistory";
 import RolePermissionsPage from "../pages/RolePermission/RolePermissionList";
 import LoginPage from "../pages/login/Login";
 import ProtectedRoute from "./ProtectedRoute";
@@ -22,8 +22,8 @@ export default function AppRoutes() {
       <Routes>
         {/* ================= PUBLIC ================= */}
         <Route element={<PublicRoute />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="/auth" element={<LoginPage />} />
+          <Route path="*" element={<Navigate to="/auth" replace />} />
         </Route>
 
         {/* ================ PROTECTED ================ */}

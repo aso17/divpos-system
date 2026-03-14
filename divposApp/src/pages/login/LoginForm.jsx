@@ -26,7 +26,7 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 relative z-0">
       {/* EMAIL */}
       <div className="space-y-1">
         <label className="text-[11px] font-semibold text-slate-500 tracking-wide">
@@ -37,8 +37,8 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
           <Mail
             size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2 
-                       text-slate-400 group-focus-within:text-emerald-600 
-                       transition-colors"
+          text-slate-400 group-focus-within:text-emerald-600 
+          transition-colors pointer-events-none"
           />
 
           <input
@@ -47,14 +47,15 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
             onChange={(e) => handleChange("email", e.target.value)}
             placeholder="nama@email.com"
             className={`
-              w-full pl-9 pr-3 py-2.5
-              rounded-xl text-xs sm:text-sm
-              bg-slate-50 border border-slate-200
-              focus:outline-none focus:ring-2 focus:ring-emerald-500/20 
-              focus:border-emerald-500
-              transition-all duration-200
-              ${errors.email ? "border-red-400 focus:ring-red-400/20" : ""}
-            `}
+            w-full pl-9 pr-3 py-2.5
+            rounded-xl text-xs sm:text-sm
+            bg-slate-50 border border-slate-200
+            focus:outline-none focus:ring-2 focus:ring-emerald-500/20 
+            focus:border-emerald-500
+            transition-all duration-200
+            relative z-0
+            ${errors.email ? "border-red-400 focus:ring-red-400/20" : ""}
+          `}
           />
         </div>
 
@@ -65,16 +66,29 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
 
       {/* PASSWORD */}
       <div className="space-y-1">
-        <label className="text-[11px] font-semibold text-slate-500 tracking-wide">
-          Password
-        </label>
+        <div className="flex justify-between items-center">
+          <label className="text-[11px] font-semibold text-slate-500 tracking-wide">
+            Password
+          </label>
+
+          {/* FORGOT PASSWORD */}
+          <button
+            type="button"
+            onClick={() =>
+              window.dispatchEvent(new CustomEvent("forgot-password"))
+            }
+            className="text-[10px] text-emerald-600 hover:underline font-medium"
+          >
+            Forgot password?
+          </button>
+        </div>
 
         <div className="relative group">
           <Lock
             size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2 
-                       text-slate-400 group-focus-within:text-emerald-600 
-                       transition-colors"
+          text-slate-400 group-focus-within:text-emerald-600 
+          transition-colors pointer-events-none"
           />
 
           <input
@@ -83,22 +97,23 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
             onChange={(e) => handleChange("password", e.target.value)}
             placeholder="••••••••"
             className={`
-              w-full pl-9 pr-10 py-2.5
-              rounded-xl text-xs sm:text-sm
-              bg-slate-50 border border-slate-200
-              focus:outline-none focus:ring-2 focus:ring-emerald-500/20 
-              focus:border-emerald-500
-              transition-all duration-200
-              ${errors.password ? "border-red-400 focus:ring-red-400/20" : ""}
-            `}
+            w-full pl-9 pr-10 py-2.5
+            rounded-xl text-xs sm:text-sm
+            bg-slate-50 border border-slate-200
+            focus:outline-none focus:ring-2 focus:ring-emerald-500/20 
+            focus:border-emerald-500
+            transition-all duration-200
+            relative z-0
+            ${errors.password ? "border-red-400 focus:ring-red-400/20" : ""}
+          `}
           />
 
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-1/2 -translate-y-1/2 
-                       text-slate-400 hover:text-emerald-600 
-                       transition-colors"
+          text-slate-400 hover:text-emerald-600 
+          transition-colors"
           >
             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
@@ -111,16 +126,24 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
         )}
       </div>
 
-      {/* SUBMIT BUTTON */}
-      <div className="pt-1">
+      <div className=" flex justify-center">
         <SubmitButton
           isSubmitting={isSubmitting}
-          label="Masuk"
+          label="LOGIN"
           loadingLabel="Logging in..."
-          className="w-full py-2.5 rounded-xl 
-                     text-xs sm:text-sm font-semibold 
-                     shadow-md active:scale-[0.98] 
-                     transition-all duration-200"
+          fullWidth={false}
+          className="
+          px-6 py-3 
+          rounded-full 
+          text-sm font-semibold 
+          text-white 
+          bg-emerald-410
+          shadow-lg 
+          hover:shadow-xl 
+          hover:scale-[1.02] 
+          transition-all duration-300
+          border border-transparent
+          "
         />
       </div>
     </form>
