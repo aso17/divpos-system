@@ -25,9 +25,10 @@ class TransactionService
         $this->logDbErrorRepo = $logDbErrorRepo;
     }
 
+    // ... (bagian atas tetap sama)
+
     public function createTransaction(array $data)
     {
-        // Validasi dasar sebelum masuk DB Transaction
         if (empty($data['items'])) {
             throw new \Exception("Minimal harus ada 1 layanan yang dipilih.");
         }
@@ -37,7 +38,7 @@ class TransactionService
                 $user = Auth::user();
                 $tenantId = $data['tenant_id'];
 
-                // 1. Snapshot Data Paket (Optimasi: ambil sekaligus)
+                // 1. Snapshot Data Paket
                 $packageIds = collect($data['items'])->pluck('package_id')->unique()->toArray();
                 $packages = $this->transactionRepo->getPackagesByIds($packageIds);
 
@@ -66,30 +67,49 @@ class TransactionService
                     ];
                 }
 
-                // 2. Kalkulasi Finansial
+                // --- 2. PERBAIKAN KALKULASI FINANSIAL (DEFENSIVE LOGIC) ---
                 $grandTotal    = (float) $totalBasePrice;
-                $dpAmount      = (float) ($data['dp_amount'] ?? 0); 
-                $paymentAmount = (float) ($data['payment_amount'] ?? 0); 
+                $method = Ms_PaymentMethod::find($data['payment_method_id']);
+                
+                // Ambil input asli kasir
+                $inputDP      = (float) ($data['dp_amount'] ?? 0); 
+                $inputPayment = (float) ($data['payment_amount'] ?? 0); 
 
-                $sisaTagihan   = $grandTotal - $dpAmount;
-                $changeAmount  = max(0, $paymentAmount - $sisaTagihan);
-                $netPaymentToday = $paymentAmount - $changeAmount;
-                $totalPaidAccumulated = min($grandTotal, $dpAmount + $netPaymentToday);
+                // A. DP tidak boleh melebihi Grand Total
+                $dpAmount = min($inputDP, $grandTotal);
+                
+                // B. Sisa yang harus dibayar setelah DP
+                $tagihanSetelahDP = $grandTotal - $dpAmount;
+
+                // C. Hitung Kembalian: Hanya jika Cash dan input > sisa tagihan
+                $changeAmount = 0;
+                $netPaymentToday = 0;
+
+                if ($method && $method->is_cash) {
+                    $changeAmount = max(0, $inputPayment - $tagihanSetelahDP);
+                    $netPaymentToday = $inputPayment - $changeAmount;
+                } else {
+                    
+                    // Jika QRIS/Transfer, net payment ya sebesar tagihan (karena uang masuk harus pas)
+                    // Atau gunakan input kasir tapi batasi maksimal sebesar tagihan
+                    $netPaymentToday = min($inputPayment, $tagihanSetelahDP);
+                    $changeAmount = 0; 
+                }
+
+                // D. Akumulasi Bayar (Untuk penentuan status)
+                $totalPaidAccumulated = $dpAmount + $netPaymentToday;
 
                 $paymentStatus = $this->determinePaymentStatus($totalPaidAccumulated, $grandTotal);
+                
+                // Transaksi selesai hanya jika Lunas
                 $transactionStatus = ($paymentStatus === Tr_Transaction::PAY_PAID) 
                     ? Tr_Transaction::STATUS_COMPLETED 
                     : Tr_Transaction::STATUS_PENDING;
 
-                $customerInfo = $this->handleCustomerLogic($data);
-                
-                // Ambil info metode pembayaran (Cache/Snapshot)
-                $method = Ms_PaymentMethod::find($data['payment_method_id']);
+                // --- 3. PROSES SIMPAN DATA ---
+                $customerInfo = $this->handleCustomerLogic($data);     
                 $methodName = $method ? $method->name : 'Unknown';
-                $yearNow = date('Y');
-                $monthNow = date('m');
-        
-                // 3. Simpan Header (Lock Invoice Number ditangani di Repo/generate)
+
                 $transaction = $this->transactionRepo->create([
                     'tenant_id'         => $tenantId,
                     'outlet_id'         => $data['outlet_id'],
@@ -102,26 +122,27 @@ class TransactionService
                     'grand_total'       => $grandTotal,
                     'dp_amount'         => $dpAmount,
                     'payment_method_id' => $data['payment_method_id'],
-                    'payment_amount'    => $paymentAmount,
+                    'payment_amount'    => $inputPayment, // Simpan input asli untuk audit
                     'change_amount'     => $changeAmount,
                     'total_paid'        => $totalPaidAccumulated,
                     'status'            => $transactionStatus,
-                    'order_year'        => $yearNow,
-                    'order_month'       => $monthNow,
+                    'order_year'        => date('Y'),
+                    'order_month'       => date('m'),
                     'payment_status'    => $paymentStatus,
                     'notes'             => $data['notes'] ?? null,
                 ]);
 
-                // 4. Batch Insert Details
+                // 4. Detail, 5. Payment History (Gunakan netPaymentToday + dpAmount)
                 $transaction->details()->createMany($calculatedItems);
 
-                // 5. Simpan History Pembayaran
-                if ($netPaymentToday > 0) {
+                // Catat history pembayaran jika ada uang masuk
+                $totalUangMasukReal = $dpAmount + $netPaymentToday;
+                if ($totalUangMasukReal > 0) {
                     $transaction->payments()->create([
                         'tenant_id'           => $tenantId,
                         'payment_method_id'   => $data['payment_method_id'],
                         'payment_method_name' => $methodName, 
-                        'amount'              => $netPaymentToday,
+                        'amount'              => $totalUangMasukReal,
                         'payment_date'        => now(),
                         'received_by'         => $user->full_name ?? 'Kasir',
                     ]);
@@ -132,11 +153,11 @@ class TransactionService
                     'tenant_id'   => $tenantId,
                     'status'      => $transactionStatus,
                     'changed_by'  => $user->full_name ?? 'System',
-                    'description' => 'Transaksi berhasil diproses.',
+                    'description' => 'Transaksi berhasil dibuat.',
                 ]);
 
                 return $transaction;
-            }, 5); // Angka 5 artinya mencoba ulang 5x jika terjadi deadlock otomatis oleh DB
+            }, 5);
 
         } catch (\Exception $e) {
             $this->handleLogError($e, $data);

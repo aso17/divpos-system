@@ -6,25 +6,28 @@ use App\Models\Ms_PaymentMethod;
 
 class MsPaymentMethodRepository
 {
-    public function getForTransaction($tenantId)
-    {
-        return Ms_paymentMethod::select([
-                'id', 
-                'name', 
-                'code', 
-                'type', 
-                'is_default'
-            ])
-            ->where(function($query) use ($tenantId) {
-                $query->where('tenant_id', $tenantId)
-                    ->orWhereNull('tenant_id'); 
-            })
-            ->where('is_active', true)
-            ->orderBy('is_default', 'desc') 
-            ->orderBy('name', 'asc')
-            ->get();
-    }
-
+   public function getForTransaction($tenantId)
+{
+    return Ms_paymentMethod::select([
+            'id', 
+            'name', 
+            'code', 
+            'type', 
+            'is_default',
+           
+            'is_cash',
+            'is_dp_enabled',
+            'allow_zero_pay'
+        ])
+        ->where(function($query) use ($tenantId) {
+            $query->where('tenant_id', $tenantId)
+                  ->orWhereNull('tenant_id'); 
+        })
+        ->where('is_active', true)
+        ->orderBy('is_default', 'desc') 
+        ->orderBy('name', 'asc')
+        ->get();
+}
     /**
      * Query dasar untuk mendapatkan list data dengan filter tenant & keyword.
      */

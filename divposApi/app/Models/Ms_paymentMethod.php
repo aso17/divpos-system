@@ -10,14 +10,10 @@ class Ms_PaymentMethod extends Model
 {
     use HasFactory, SoftDeletes;
 
-    /**
-     * Nama tabel yang didefinisikan secara eksplisit.
-     * Menggunakan PascalCase sesuai dengan skema migration.
-     */
     protected $table = 'Ms_payment_methods';
 
     /**
-     * Atribut yang dapat diisi (mass assignable).
+     * Tambahkan kolom-kolom logic baru ke dalam fillable
      */
     protected $fillable = [
         'tenant_id',
@@ -27,18 +23,24 @@ class Ms_PaymentMethod extends Model
         'account_name',
         'description',
         'is_active',
+        'is_cash',         // Tambahkan ini
+        'is_dp_enabled',   // Tambahkan ini
+        'allow_zero_pay',  // Tambahkan ini
         'created_by',
         'updated_by',
     ];
 
     /**
-     * Casting tipe data kolom.
+     * Casting tipe data agar Laravel membacanya sebagai Boolean (True/False)
      */
     protected $casts = [
-        'is_active' => 'boolean',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-        'deleted_at' => 'datetime',
+        'is_active'      => 'boolean',
+        'is_cash'        => 'boolean', // Pastikan dicast ke boolean
+        'is_dp_enabled'  => 'boolean', // Pastikan dicast ke boolean
+        'allow_zero_pay' => 'boolean', // Pastikan dicast ke boolean
+        'created_at'     => 'datetime',
+        'updated_at'     => 'datetime',
+        'deleted_at'     => 'datetime',
     ];
 
     /**

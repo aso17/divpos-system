@@ -59,7 +59,7 @@ public function getInitData()
             'packages'        => $this->packageService->getAllPackagesTransaction($tenantId),
             'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId),
             'payment_methods' => $this->paymentMethodService->getAllPaymentMethodsTransaction($tenantId),
-            'app_setting' => $this->AppSettingService->getSettingsForTenant($tenantId),
+            
         ];
     });
 
@@ -69,7 +69,7 @@ public function getInitData()
             'packages'        => TransactionPackageResource::collection($data['packages']),
             'outlets'         => TransactionOutletResource::collection($data['outlets']),
             'payment_methods' => TransactionPaymentMethodResource::collection($data['payment_methods']),
-            'app_setting' => AppSettingResource::collection($data['app_setting']),
+            
         ]
     ]);
 }
