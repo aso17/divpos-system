@@ -67,30 +67,46 @@ class TransactionRequest extends FormRequest
     }
 
     /**
+   /**
      * Logic tambahan setelah aturan dasar terpenuhi
      */
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
+            // Jika validasi dasar (required, numeric, dll) sudah gagal, stop.
             if ($validator->errors()->any()) return;
 
-            // Ambil data payment method dari DB berdasarkan ID yang sudah didekripsi
+            // Ambil data payment method dari DB
             $method = Ms_PaymentMethod::find($this->payment_method_id);
 
             if ($method) {
-                $totalPaid = (float)$this->payment_amount + (float)$this->dp_amount;
+                $dp = (float)$this->dp_amount;
+                $pay = (float)$this->payment_amount;
+                $totalInput = $dp + $pay;
 
-                // Jika metode pembayaran TIDAK mengizinkan bayar nol (bukan piutang)
-                // Tapi total bayar (DP + Payment) malah 0 atau kurang
-                if (!$method->allow_zero_pay && $totalPaid <= 0) {
+                // 1. VALIDASI ZERO PAY: Jika metode mewajibkan uang masuk (CASH/QRIS)
+                // Tapi kasir tidak isi DP maupun nominal Bayar
+                if (!$method->allow_zero_pay && $totalInput <= 0) {
                     $validator->errors()->add(
                         'payment_amount', 
-                        "Pembayaran dengan {$method->name} tidak boleh nol. Masukkan nominal bayar atau DP."
+                        "Metode {$method->name} mewajibkan pembayaran. Masukkan nominal bayar atau DP."
+                    );
+                }
+
+                // 2. VALIDASI DP DINAMIS: Mas A_so bilang Salon sering ada bayar awal (DP)
+                // Tapi kita cek dulu, apakah metodenya diizinkan untuk DP?
+                // Jika kasir input DP > 0 tapi settingan 'is_dp_enabled' FALSE
+                if ($dp > 0 && !$method->is_dp_enabled) {
+                    $validator->errors()->add(
+                        'dp_amount', 
+                        "Metode {$method->name} tidak mendukung pembayaran DP (Uang Muka)."
                     );
                 }
             }
         });
     }
+
+    
 
     public function messages(): array
     {

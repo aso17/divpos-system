@@ -65,7 +65,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Asia/Jakarta',
 
     /*
     |--------------------------------------------------------------------------
@@ -79,7 +79,8 @@ return [
     */
     
     'frontend_url' => env('FRONTEND_URL'),
-    'locale' => env('APP_LOCALE', 'en'),
+    // 'locale' => env('APP_LOCALE', 'en'),
+    'locale' => 'id',
 
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
 

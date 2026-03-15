@@ -14,36 +14,17 @@ class TransactionRepository
         $this->model = $model;
     }
 
-   public function getHistory($tenantId, $params)
-    {
-        $perPage = $params['per_page'] ?? 10;
-        $keyword = $params['keyword'] ?? null;
+  public function getBaseQuery($tenantId, $outletId = null)
+{
+    $query = Tr_Transaction::where('tenant_id', $tenantId);
 
-        return $this->model->where('tenant_id', $tenantId)
-            ->when($keyword, function ($query) use ($keyword) {
-                $query->where(function($q) use ($keyword) {
-                    // Cari berdasarkan Invoice
-                    $q->where('invoice_no', 'like', "%{$keyword}%")
-                    // Atau cari berdasarkan nama/telp customer di tabel Ms_Customer
-                    ->orWhereHas('customer', function ($queryCustomer) use ($keyword) {
-                        $queryCustomer->where('name', 'like', "%{$keyword}%")
-                                        ->orWhere('phone', 'like', "%{$keyword}%");
-                    })
-                    // Atau cari berdasarkan nama customer manual (jika ada di tabel transaksi)
-                    ->orWhere('customer_name', 'like', "%{$keyword}%")
-                    ->orWhere('customer_phone', 'like', "%{$keyword}%");
-                });
-            })
-            ->with([
-                'customer', 
-                'outlet', 
-                'details', // Sudah diperbaiki dari 'items' ke 'details'
-                'initialPaymentMethod' // Tambahan agar bisa tampilkan "Cash/BCA" di history
-            ]) 
-            ->latest()
-            ->paginate($perPage);
+    // Logic: Jika outletId ada (berarti user kasir/cabang), kunci datanya
+    if ($outletId) {
+        $query->where('outlet_id', $outletId);
     }
 
+    return $query;
+}
     public function getLastInvoice($tenantId, $yearNow,$monthNow)
     {
         return $this->model

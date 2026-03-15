@@ -3,15 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\TransactionRequest;
+use App\Http\Requests\PaymentUpdateRequest;
 use Illuminate\Support\Facades\Cache;
 use App\Services\PackageService;
 use App\Services\CustomerService;
 use App\Services\OutletService;
-use App\Services\AppSettingService;
 use App\Services\TransactionService;
 use App\Services\PaymentMethodService;
 use App\Http\Resources\TransactionResource;
-use App\Http\Resources\AppSettingResource;
+use App\Http\Resources\TransactionHistoryResource;
 use App\Http\Resources\TransactionPaymentMethodResource;
 use App\Http\Resources\CustomerResource;
 use App\Http\Resources\TransactionPackageResource;
@@ -23,22 +23,22 @@ use Illuminate\Support\Facades\Auth;
 
 class TransactionController extends Controller
 {
-    protected $packageService, $customerService, $transactionService, $outletService, $paymentMethodService,$AppSettingService;
+    protected $packageService, $customerService, $transactionService, $outletService, $paymentMethodService;
 
     public function __construct(
         PackageService $packageService, 
         CustomerService $customerService,
         OutletService $outletService,
         PaymentMethodService $paymentMethodService,
-        TransactionService $transactionService,
-        AppSettingService $AppSettingService
+        TransactionService $transactionService
+        
     ) {
         $this->packageService = $packageService;
         $this->customerService = $customerService;
         $this->outletService = $outletService;
         $this->paymentMethodService = $paymentMethodService;
         $this->transactionService = $transactionService;
-        $this->AppSettingService = $AppSettingService;
+       
     }
 
     
@@ -74,18 +74,32 @@ public function getInitData()
     ]);
 }
    
+   public function getTransactionHistory(Request $request)
+    {
+        try {
+            $data = $this->transactionService->getTransactionHistory($request->all());
+            
+            // Pakai HistoryResource agar response lebih ringan
+            $resource = TransactionHistoryResource::collection($data)->response()->getData(true);
 
-    // public function getTransactionHistory(Request $request)
-    // {
-    //     $data = $this->transactionService->getTransactionHistory($request->all());
-    //     $formattedData = TransactionResource::collection($data)->response()->getData(true);
+            return response()->json([
+                'success' => true,
+                'message' => "Riwayat transaksi berhasil diambil",
+                'data'    => [
+                    'data' => $resource['data'],
+                    'meta' => $resource['meta'],
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => "Gagal mengambil data: " . $e->getMessage(),
+            ], 500);
+        }
+    }
 
-    //     return response()->json([
-    //         'success' => true,
-    //         'data'    => $formattedData,
-    //         'message' => "Riwayat transaksi berhasil diambil",
-    //     ], 200);
-    // }
+
+
 
     public function getCustomers(Request $request)
     {
@@ -117,33 +131,59 @@ public function getInitData()
     }
 
     public function store(TransactionRequest $request)
+    {
+        try {
+            
+            $payload = $request->validated();  
+            $transaction = $this->transactionService->createTransaction($payload);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Transaksi Berhasil',
+                'data' => new TransactionResource(
+                    $transaction->load(['details', 'customer', 'outlet', 'initialPaymentMethod'])
+                )
+            ], 201);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error', 
+                'message' => 'Validasi gagal', 
+                'errors' => $e->errors()
+            ], 422);
+
+        } catch (\Exception $e) {
+            
+            $code = ($e->getCode() < 400 || $e->getCode() > 599) ? 422 : $e->getCode();
+            
+            return response()->json([
+                'status' => 'error', 
+                'message' => $e->getMessage() 
+            ], $code);
+        }
+    }
+
+
+  public function paymentUpdate(PaymentUpdateRequest $request)
 {
     try {
-        
-        $payload = $request->validated();  
-        $transaction = $this->transactionService->createTransaction($payload);
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Transaksi Berhasil',
-            'data' => new TransactionResource(
-                $transaction->load(['details', 'customer', 'outlet', 'initialPaymentMethod'])
-            )
-        ], 201);
+        $payload = $request->validated();    
+        $transaction = $this->transactionService->processPayment($payload);
 
-    } catch (\Illuminate\Validation\ValidationException $e) {
+        $transaction->load(['creator.employee', 'initialPaymentMethod', 'outlet', 'details']);
         return response()->json([
-            'status' => 'error', 
-            'message' => 'Validasi gagal', 
-            'errors' => $e->errors()
-        ], 422);
+            'success' => true,
+            'status'  => 'success',
+            'message' => 'Pelunasan Berhasil Disimpan',
+            'data'    => new TransactionHistoryResource($transaction)
+        ], 200);
 
     } catch (\Exception $e) {
-        
         $code = ($e->getCode() < 400 || $e->getCode() > 599) ? 422 : $e->getCode();
         
         return response()->json([
-            'status' => 'error', 
-            'message' => $e->getMessage() 
+            'success' => false,
+            'status'  => 'error',
+            'message' => $e->getMessage()
         ], $code);
     }
 }

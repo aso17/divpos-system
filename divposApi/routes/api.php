@@ -74,6 +74,7 @@ Route::middleware(['api', 'auth:sanctum'])->group(function () {
         Route::get('/outlets', [TransactionController::class, 'getOutlets']);
         Route::get('/payment-methods', [TransactionController::class, 'getPaymentMethods']);
         Route::post('/', [TransactionController::class, 'store']);
+        Route::post('/paymentUpdate', [TransactionController::class, 'paymentUpdate']);
     });
 
     /*
