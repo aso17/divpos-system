@@ -15,14 +15,6 @@ const TransactionService = {
     });
   },
 
-  getTransactionHistory: (params = {}) => {
-    return api.get("/transactions-history", {
-      params: {
-        ...params,
-      },
-    });
-  },
-
   // Simpan transaksi baru
   createTransaction: async (payload) => {
     console.log("Payload sebelum enkripsi:", payload);
@@ -33,6 +25,31 @@ const TransactionService = {
 
     try {
       const response = await api.post("/transactions", finalPayload);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getTransactionHistory: (params = {}) => {
+    return api.get("/transactions/history", {
+      params: {
+        ...params,
+      },
+    });
+  },
+  processPaymentHistory: async (payload) => {
+    console.log("Payload sebelum enkripsi:", payload);
+
+    const finalPayload = {
+      ...payload,
+    };
+
+    try {
+      const response = await api.post(
+        "/transactions/paymentUpdate",
+        finalPayload,
+      );
       return response;
     } catch (error) {
       throw error;

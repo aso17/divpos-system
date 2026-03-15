@@ -1,11 +1,12 @@
 import React, { useRef } from "react";
 import { CheckCircle, Printer, X } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
-import ReceiptPrint from "../../components/ReceiptPrint";
+import ReceiptPrint from "./ReceiptPrint";
 // Gunakan formatter milik Mas A_so
-import { formatRupiah } from "../../utils/formatter";
+import { formatRupiah } from "../utils/formatter";
 
 const TransactionSuccessModal = ({ isOpen, onClose, data }) => {
+  console.log(data);
   const componentRef = useRef();
 
   const handlePrint = useReactToPrint({

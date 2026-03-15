@@ -4,7 +4,7 @@ import { useFormValidation } from "../../hooks/useFormValidation";
 import { rules } from "../../utils/validators/rules";
 import { inputClasses } from "../../utils/validators/inputClasses";
 import AppHead from "../../components/common/AppHead";
-import TransactionSuccessModal from "./TransactionSuccessModal";
+import TransactionSuccessModal from "../../components/TransactionSuccessModal";
 import TransactionServiceForm from "./TransactionServiceForm";
 import TransactionCustomerForm from "./TransactionCustomerForm";
 import TransactionCartForm from "./TransactionCartForm";
