@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Auth;
 
 class Ms_Customer extends Model
 {
@@ -13,11 +14,6 @@ class Ms_Customer extends Model
 
     protected $table = 'Ms_customers';
 
-    /**
-     * Menggunakan $fillable untuk keamanan Mass Assignment.
-     * Kolom 'point' didaftarkan agar bisa diupdate melalui Service, 
-     * namun pastikan validasi di Controller ketat.
-     */
     protected $fillable = [
         'tenant_id',
         'name',
@@ -31,27 +27,37 @@ class Ms_Customer extends Model
         'updated_by',
     ];
 
-    /**
-     * Casting data agar memudahkan manipulasi di sisi aplikasi.
-     */
     protected $casts = [
         'is_active' => 'boolean',
         'point' => 'decimal:2',
     ];
 
+    /**
+     * AUTO FILL created_by & updated_by
+     */
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            if (Auth::check()) {
+                $model->created_by = Auth::id();
+                $model->updated_by = Auth::id();
+            }
+        });
+
+        static::updating(function ($model) {
+            if (Auth::check()) {
+                $model->updated_by = Auth::id();
+            }
+        });
+    }
+
     // --- RELASI ---
 
-    /**
-     * Relasi: Satu pelanggan bisa memiliki banyak riwayat transaksi laundry.
-     */
     public function transactions(): HasMany
     {
         return $this->hasMany(Tr_Transaction::class, 'customer_id');
     }
 
-    /**
-     * Relasi: Pelanggan terikat pada satu Tenant tertentu.
-     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Ms_Tenant::class, 'tenant_id');

@@ -26,46 +26,68 @@ class TransactionService
         $this->logDbErrorRepo = $logDbErrorRepo;
     }
 
-    public function getTransactionHistory(array $params)
+   public function getTransactionHistory(array $params)
     {
         try {
-            $user = Auth::user();
-            $perPage = $params['per_page'] ?? 10;
 
-            // Logic: Tentukan scope data (Owner vs Kasir)
-            $outletId = ($user->role !== 'OWNER') ? $user->outlet_id : null;
+        $user = Auth::user();
+        $perPage = $params['per_page'] ?? 10;
 
-            // 1. Ambil Base Query
-            $query = $this->transactionRepo->getBaseQuery($user->tenant_id, $outletId);
+        $tenantId = $user->tenant_id;
+        $outletId = null;
 
-            // 2. Eager Loading Selektif (Logic: Minimalisir query N+1)
-            // Kita tarik creator (User) dan initialPaymentMethod (Nama Metode Bayar)
+        if (is_null($tenantId)) {
+            $outletId = $user->employee->outlet_id ?? null;
+            $tenantId = $user->employee->tenant_id ?? null;
+        }
+
+        $query = $this->transactionRepo->getBaseQuery($tenantId, $outletId);
+
+        /**
+         * 2. EAGER LOADING (Hanya tarik kolom yang perlu saja)
+         */
         $query->with([
-                        'creator' => function($q) {
-                            $q->select('id')->with(['employee:id,user_id,full_name']); 
-                            // Sesuaikan FK user_id di tabel employee Mas
-                        },
-                        'initialPaymentMethod:id,name'
-                    ]);
+            // Hanya tarik kolom yang akan tampil di struk/tabel
+            'outlet:id,name,phone,city,address', 
+            
+            'creator' => function($q) {
+                // WAJIB: select 'id' agar relasi ke employee nyambung
+                $q->select('id')->with(['employee:id,user_id,full_name']); 
+            },
+            'initialPaymentMethod:id,name'
+        ]);
 
-            // 3. Optimasi Kolom (Logic: Ambil kolom audit & FK untuk relasi)
-            $query->select([
-                'id', 'invoice_no', 'customer_name', 'customer_phone', 
-                'order_date', 'grand_total', 'total_paid', 'status', 
-                'payment_status', 'created_by', 'payment_method_id'
-            ]);
+        /**
+         * 3. OPTIMASI KOLOM UTAMA
+         */
+        $query->select([
+            'id', 
+            'outlet_id', // WAJIB ada agar relasi 'outlet' bisa jalan
+            'invoice_no', 
+            'queue_number',
+            'customer_name', 
+            'customer_phone', 
+            'order_date', 
+            'grand_total', 
+            'total_paid', 
+            'status', 
+            'payment_status', 
+            'created_by', 
+            'payment_method_id'
+            // 'tenant_id' dihilangkan dari select jika tidak butuh di frontend
+        ]);
 
-            // 4. Search Logic
-            if (!empty($params['keyword'])) {
-                $keyword = $params['keyword'];
-                $query->where(function ($q) use ($keyword) {
-                    $q->where('invoice_no', 'like', $keyword . '%')
-                    ->orWhere('customer_phone', 'like', $keyword . '%')
-                    ->orWhere('customer_name', 'like', '%' . $keyword . '%');
-                });
-            }
+        // 4, 5, 6: Logic Search & Filter tetap sama (sudah efisien)
+        if (!empty($params['keyword'])) {
+            $keyword = $params['keyword'];
+            $query->where(function ($q) use ($keyword) {
+                $q->where('invoice_no', 'like', $keyword . '%')
+                  ->orWhere('customer_phone', 'like', $keyword . '%')
+                  ->orWhere('customer_name', 'like', '%' . $keyword . '%');
+            });
+        }
 
-            // 5. Filter Payment Status (Menggunakan Konstanta Model Mas)
+            // 5. Filter Payment Status
             if (!empty($params['payment_status']) && $params['payment_status'] !== 'ALL') {
                 if ($params['payment_status'] === 'UNPAID') {
                     $query->whereIn('payment_status', [
@@ -77,10 +99,9 @@ class TransactionService
                 }
             }
 
-            // 6. Filter Order Status (Menggunakan Konstanta Model Mas)
+            // 6. Filter Order Status
             if (!empty($params['status']) && $params['status'] !== 'ALL') {
                 if ($params['status'] === 'ACTIVE') {
-                    // Logic: Tampilkan yang belum selesai/diambil saja
                     $query->whereNotIn('status', [
                         Tr_Transaction::STATUS_TAKEN, 
                         Tr_Transaction::STATUS_CANCELED
@@ -90,7 +111,7 @@ class TransactionService
                 }
             }
 
-            // 7. Sortir & Eksekusi
+            // 7. Sortir (Terbaru di atas) & Eksekusi
             return $query->orderBy('order_date', 'desc')->paginate($perPage);
 
         } catch (\Exception $e) {
@@ -103,146 +124,149 @@ class TransactionService
         }
     }
 
-  public function createTransaction(array $data)
-{
-    if (empty($data['items'])) {
-        throw new \Exception("Minimal harus ada 1 layanan yang dipilih.");
-    }
+    public function createTransaction(array $data)
+    {
+        if (empty($data['items'])) {
+            throw new \Exception("Minimal harus ada 1 layanan yang dipilih.");
+        }
 
-    try {
-        return DB::transaction(function () use ($data) {
-            $user = Auth::user();
-            $tenantId = $data['tenant_id'];
+        try {
+            return DB::transaction(function () use ($data) {
+                $user = Auth::user();
+                $tenantId = $data['tenant_id'];
 
-            // 1. Snapshot Data Paket
-            $packageIds = collect($data['items'])->pluck('package_id')->unique()->toArray();
-            $packages = $this->transactionRepo->getPackagesByIds($packageIds);
+                // 1. Snapshot Data Paket
+                $packageIds = collect($data['items'])->pluck('package_id')->unique()->toArray();
+                $packages = $this->transactionRepo->getPackagesByIds($packageIds);
 
-            $calculatedItems = [];
-            $totalBasePrice = 0;
+                $calculatedItems = [];
+                $totalBasePrice = 0;
 
-            foreach ($data['items'] as $item) {
-                $package = $packages->firstWhere('id', $item['package_id']);
-                if (!$package) {
-                    throw new \Exception("Layanan ID {$item['package_id']} tidak ditemukan.");
+                foreach ($data['items'] as $item) {
+                    $package = $packages->firstWhere('id', $item['package_id']);
+                    if (!$package) {
+                        throw new \Exception("Layanan ID {$item['package_id']} tidak ditemukan.");
+                    }
+
+                    $subtotal = (float) ($package->final_price * $item['qty']);
+                    $totalBasePrice += $subtotal;
+
+                    $calculatedItems[] = [
+                        'tenant_id'      => $tenantId,
+                        'package_id'     => $package->id,
+                        'package_name'   => $package->name,
+                        'original_price' => $package->price,
+                        'unit'           => $package->unit->short_name ?? 'Pcs',
+                        'qty'            => $item['qty'],
+                        'price_per_unit' => $package->final_price,
+                        'subtotal'       => $subtotal,
+                        'notes'          => $item['notes'] ?? null,
+                    ];
                 }
 
-                $subtotal = (float) ($package->final_price * $item['qty']);
-                $totalBasePrice += $subtotal;
+                // --- 2. PERBAIKAN KALKULASI FINANSIAL (STRICT & DINAMIS) ---
+                $grandTotal = (float) $totalBasePrice;
+                $method = Ms_PaymentMethod::find($data['payment_method_id']);
+                if (!$method) throw new \Exception("Metode pembayaran tidak valid.");
 
-                $calculatedItems[] = [
-                    'tenant_id'      => $tenantId,
-                    'package_id'     => $package->id,
-                    'package_name'   => $package->name,
-                    'original_price' => $package->price,
-                    'unit'           => $package->unit->short_name ?? 'Pcs',
-                    'qty'            => $item['qty'],
-                    'price_per_unit' => $package->final_price,
-                    'subtotal'       => $subtotal,
-                    'notes'          => $item['notes'] ?? null,
-                ];
-            }
+                $inputDP      = (float) ($data['dp_amount'] ?? 0); 
+                $inputPayment = (float) ($data['payment_amount'] ?? 0); 
 
-            // --- 2. PERBAIKAN KALKULASI FINANSIAL (STRICT & DINAMIS) ---
-            $grandTotal = (float) $totalBasePrice;
-            $method = Ms_PaymentMethod::find($data['payment_method_id']);
-            if (!$method) throw new \Exception("Metode pembayaran tidak valid.");
-
-            $inputDP      = (float) ($data['dp_amount'] ?? 0); 
-            $inputPayment = (float) ($data['payment_amount'] ?? 0); 
-
-            // A. Handle DP: Cek apakah metode membolehkan DP
-            if ($inputDP > 0 && !$method->is_dp_enabled) {
-                throw new \Exception("Metode {$method->name} tidak mendukung pembayaran DP.");
-            }
-            $dpAmount = min($inputDP, $grandTotal);
-            $tagihanSetelahDP = $grandTotal - $dpAmount;
-
-            // B. Handle Pembayaran & Kembalian
-            $changeAmount = 0;
-            $netPaymentToday = 0;
-
-            if ($inputPayment > 0) {
-                if ($method->is_cash) {
-                    // Jika Cash: Tidak boleh kurang dari sisa tagihan
-                    if ($inputPayment < $tagihanSetelahDP) {
-                        throw new \Exception("Nominal bayar kurang. Total yang harus dibayar: Rp " . number_format($tagihanSetelahDP));
-                    }
-                    $changeAmount = $inputPayment - $tagihanSetelahDP;
-                    $netPaymentToday = $tagihanSetelahDP; // Hanya ambil sebesar tagihan untuk omzet
-                } else {
-                    // Jika Non-Cash (QRIS/Transfer): Harus PAS
-                    if (abs($inputPayment - $tagihanSetelahDP) > 0.01) {
-                        throw new \Exception("Pembayaran {$method->name} harus pas Rp " . number_format($tagihanSetelahDP));
-                    }
-                    $netPaymentToday = $inputPayment;
-                    $changeAmount = 0; 
+                // A. Handle DP: Cek apakah metode membolehkan DP
+                if ($inputDP > 0 && !$method->is_dp_enabled) {
+                    throw new \Exception("Metode {$method->name} tidak mendukung pembayaran DP.");
                 }
-            }
+                $dpAmount = min($inputDP, $grandTotal);
+                $tagihanSetelahDP = $grandTotal - $dpAmount;
 
-            // C. Akumulasi Bayar & Status
-            $totalPaidAccumulated = $dpAmount + $netPaymentToday;
-            $paymentStatus = $this->determinePaymentStatus($totalPaidAccumulated, $grandTotal);
-            
-            $transactionStatus = ($paymentStatus === Tr_Transaction::PAY_PAID) 
-                ? Tr_Transaction::STATUS_COMPLETED 
-                : Tr_Transaction::STATUS_PENDING;
+                // B. Handle Pembayaran & Kembalian
+                $changeAmount = 0;
+                $netPaymentToday = 0;
 
-            // --- 3. PROSES SIMPAN DATA ---
-            $customerInfo = $this->handleCustomerLogic($data);     
+                if ($inputPayment > 0) {
+                    if ($method->is_cash) {
+                        // Jika Cash: Tidak boleh kurang dari sisa tagihan
+                        if ($inputPayment < $tagihanSetelahDP) {
+                            throw new \Exception("Nominal bayar kurang. Total yang harus dibayar: Rp " . number_format($tagihanSetelahDP));
+                        }
+                        $changeAmount = $inputPayment - $tagihanSetelahDP;
+                        $netPaymentToday = $tagihanSetelahDP; // Hanya ambil sebesar tagihan untuk omzet
+                    } else {
+                        // Jika Non-Cash (QRIS/Transfer): Harus PAS
+                        if (abs($inputPayment - $tagihanSetelahDP) > 0.01) {
+                            throw new \Exception("Pembayaran {$method->name} harus pas Rp " . number_format($tagihanSetelahDP));
+                        }
+                        $netPaymentToday = $inputPayment;
+                        $changeAmount = 0; 
+                    }
+                }
 
-            $transaction = $this->transactionRepo->create([
-                'tenant_id'         => $tenantId,
-                'outlet_id'         => $data['outlet_id'],
-                'invoice_no'        => $this->generateInvoiceNumber($tenantId),
-                'customer_id'       => $customerInfo['id'],
-                'customer_name'     => $customerInfo['name'],
-                'customer_phone'    => $customerInfo['phone'],
-                'order_date'        => now(),
-                'total_base_price'  => $totalBasePrice,
-                'grand_total'       => $grandTotal,
-                'dp_amount'         => $dpAmount,
-                'payment_method_id' => $method->id,
-                'payment_amount'    => $inputPayment, // Audit Trail: Berapa uang fisik yang diterima
-                'change_amount'     => $changeAmount,  // Audit Trail: Berapa kembaliannya
-                'total_paid'        => $totalPaidAccumulated, // Total saldo masuk ke sistem
-                'status'            => $transactionStatus,
-                'payment_status'    => $paymentStatus,
-                'order_year'        => date('Y'),
-                'order_month'       => date('m'),
-                'notes'             => $data['notes'] ?? null,
-            ]);
+                // C. Akumulasi Bayar & Status
+                $totalPaidAccumulated = $dpAmount + $netPaymentToday;
+                $paymentStatus = $this->determinePaymentStatus($totalPaidAccumulated, $grandTotal);
+                
+                $transactionStatus = ($paymentStatus === Tr_Transaction::PAY_PAID) 
+                    ? Tr_Transaction::STATUS_COMPLETED 
+                    : Tr_Transaction::STATUS_PENDING;
 
-            // 4. Simpan Detail & History Payment
-            $transaction->details()->createMany($calculatedItems);
 
-            if ($totalPaidAccumulated > 0) {
-                $transaction->payments()->create([
-                    'tenant_id'           => $tenantId,
-                    'payment_method_id'   => $method->id,
-                    'payment_method_name' => $method->name,
-                    'amount'              => $totalPaidAccumulated,
-                    'payment_date'        => now(),
-                    'received_by'         => $user->employee->full_name ?? 'Kasir',
+               $numbers = $this->generateTransactionNumbers($tenantId);
+                // --- 3. PROSES SIMPAN DATA ---
+                $customerInfo = $this->handleCustomerLogic($data);     
+
+                $transaction = $this->transactionRepo->create([
+                    'tenant_id'         => $tenantId,
+                    'outlet_id'         => $data['outlet_id'],
+                    'invoice_no'   => $numbers['invoice_no'],
+                    'queue_number' => $numbers['queue_number'],
+                    'customer_id'       => $customerInfo['id'],
+                    'customer_name'     => $customerInfo['name'],
+                    'customer_phone'    => $customerInfo['phone'],
+                    'order_date'        => now(),
+                    'total_base_price'  => $totalBasePrice,
+                    'grand_total'       => $grandTotal,
+                    'dp_amount'         => $dpAmount,
+                    'payment_method_id' => $method->id,
+                    'payment_amount'    => $inputPayment, // Audit Trail: Berapa uang fisik yang diterima
+                    'change_amount'     => $changeAmount,  // Audit Trail: Berapa kembaliannya
+                    'total_paid'        => $totalPaidAccumulated, // Total saldo masuk ke sistem
+                    'status'            => $transactionStatus,
+                    'payment_status'    => $paymentStatus,
+                    'order_year'        => date('Y'),
+                    'order_month'       => date('m'),
+                    'notes'             => $data['notes'] ?? null,
                 ]);
-            }
 
-            // 5. Logging
-            $transaction->logs()->create([
-                'tenant_id'   => $tenantId,
-                'status'      => $transactionStatus,
-                'changed_by'  => $user->employee->full_name ?? 'System',
-                'description' => 'Transaksi dibuat dengan status ' . $paymentStatus,
-            ]);
+                // 4. Simpan Detail & History Payment
+                $transaction->details()->createMany($calculatedItems);
 
-            return $transaction;
-        }, 5);
+                if ($totalPaidAccumulated > 0) {
+                    $transaction->payments()->create([
+                        'tenant_id'           => $tenantId,
+                        'payment_method_id'   => $method->id,
+                        'payment_method_name' => $method->name,
+                        'amount'              => $totalPaidAccumulated,
+                        'payment_date'        => now(),
+                        'received_by'         => $user->employee->full_name ?? 'Kasir',
+                    ]);
+                }
 
-    } catch (\Exception $e) {
-        $this->handleLogError($e, $data);
-        throw $e;
+                // 5. Logging
+                $transaction->logs()->create([
+                    'tenant_id'   => $tenantId,
+                    'status'      => $transactionStatus,
+                    'changed_by'  => $user->employee->full_name ?? 'System',
+                    'description' => 'Transaksi dibuat dengan status ' . $paymentStatus,
+                ]);
+
+                return $transaction;
+            }, 5);
+
+        } catch (\Exception $e) {
+            $this->handleLogError($e, $data);
+            throw $e;
+        }
     }
-}
 
     private function determinePaymentStatus($paid, $total) 
     {
@@ -259,25 +283,50 @@ class TransactionService
             return ['id' => null, 'name' => $name, 'phone' => $phone];
         }
 
-        // firstOrCreate sudah cukup aman dalam DB Transaction
-        $customer = Ms_Customer::firstOrCreate(
-            ['tenant_id' => $data['tenant_id'], 'phone' => $phone],
-            ['name' => $name]
-        );
+        // 1. Cari atau buat customer
+    $customer = Ms_Customer::firstOrCreate(
+        ['tenant_id' => $data['tenant_id'], 'phone' => $phone],
+        ['name' => $name, 'point' => 0] // Set point 0 kalau baru dibuat
+    );
+
+    
+    $customer->increment('point', 1);
 
         return ['id' => $customer->id, 'name' => $customer->name, 'phone' => $customer->phone];
     }
 
-    private function generateInvoiceNumber($tenantId) 
+   
+
+
+    private function generateTransactionNumbers($tenantId) 
     {
-        $prefix = "INV/" . date('Ymd') . "/";       
         $yearNow = date('Y');
         $monthNow = date('m');
+        $today = date('Y-m-d');
         
-        $last = $this->transactionRepo->getLastInvoice($tenantId, $yearNow,$monthNow);
+        // 1. Ambil record terakhir yang sudah di-LOCK
+        $last = $this->transactionRepo->getLastInvoice($tenantId, $yearNow, $monthNow);
         
+        // --- LOGIKA INVOICE (Urut per bulan/tahun) ---
+        $prefix = "INV/" . date('Ymd') . "/";
         $count = $last ? ((int) substr($last->invoice_no, -4)) + 1 : 1;
-        return $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $invoiceNo = $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+
+        // --- LOGIKA QUEUE (Reset harian per outlet) ---
+        $newQueue = 1; // Default jika hari baru
+        if ($last) {
+            // Cek apakah tanggal di record terakhir sama dengan hari ini
+            $lastDate = $last->order_date ? $last->order_date->format('Y-m-d') : null;
+            
+            if ($lastDate === $today) {
+                $newQueue = (int)$last->queue_number + 1;
+            }
+        }
+
+        return [
+            'invoice_no'   => $invoiceNo,
+            'queue_number' => $newQueue
+        ];
     }
 
     private function handleLogError(\Exception $e, array $data)

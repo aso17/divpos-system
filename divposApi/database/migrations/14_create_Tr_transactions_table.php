@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('Ms_tenants')->onDelete('cascade');
             $table->foreignId('outlet_id')->constrained('Ms_outlets')->onDelete('cascade');
             $table->string('invoice_no', 25); 
-            
+            $table->unsignedSmallInteger('queue_number')->nullable()->index();
             $table->unsignedBigInteger('customer_id')->nullable(); 
             $table->string('customer_name', 100)->nullable(); 
             $table->string('customer_phone', 20)->nullable();
@@ -48,6 +48,7 @@ return new class extends Migration
             $table->string('payment_status', 20)->default('UNPAID')->index();
             
             $table->text('notes')->nullable(); 
+            
             $table->unsignedBigInteger('created_by')->index(); 
             $table->unsignedBigInteger('updated_by')->nullable()->index();
             
@@ -60,6 +61,8 @@ return new class extends Migration
 
             // --- Composite Indexing untuk High Performance ---
             $table->unique(['tenant_id', 'invoice_no']); 
+            
+            $table->index(['outlet_id', 'order_date', 'queue_number'], 'idx_queue_logic');
             // Optimasi pencarian invoice terakhir (Tenant + Tahun + Invoice)
             $table->index(['tenant_id', 'order_year', 'invoice_no'], 'idx_invoice_speed');
             // Optimasi Dashboard/Laporan

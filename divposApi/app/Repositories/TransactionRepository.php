@@ -14,27 +14,30 @@ class TransactionRepository
         $this->model = $model;
     }
 
-  public function getBaseQuery($tenantId, $outletId = null)
-{
-    $query = Tr_Transaction::where('tenant_id', $tenantId);
+    public function getBaseQuery($tenantId, $outletId = null)
+    {
+        $query = Tr_Transaction::where('tenant_id', $tenantId);
 
-    // Logic: Jika outletId ada (berarti user kasir/cabang), kunci datanya
-    if ($outletId) {
-        $query->where('outlet_id', $outletId);
+        // Logic: Jika outletId ada (berarti user kasir/cabang), kunci datanya
+        if ($outletId) {
+            $query->where('outlet_id', $outletId);
+        }
+
+        return $query;
     }
 
-    return $query;
-}
-    public function getLastInvoice($tenantId, $yearNow,$monthNow)
+
+   public function getLastInvoice($tenantId, $yearNow, $monthNow)
     {
         return $this->model
             ->withTrashed()
-            ->select(['id', 'invoice_no'])
+            // Ambil queue_number dan order_date juga
+            ->select(['id', 'invoice_no', 'queue_number', 'order_date']) 
             ->where('tenant_id', $tenantId)
-            ->where('order_year', $yearNow)  // Query Integer
-            ->where('order_month', $monthNow) // Query Integer
+            ->where('order_year', $yearNow)
+            ->where('order_month', $monthNow)
             ->orderBy('id', 'desc')
-            ->lockForUpdate()
+            ->lockForUpdate() // Mengunci baris terakhir untuk keamanan
             ->first();
     }
 

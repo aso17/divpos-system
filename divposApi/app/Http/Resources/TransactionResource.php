@@ -17,6 +17,9 @@ class TransactionResource extends JsonResource
         return [
             'id'                => CryptoHelper::encrypt($this->id),
             'invoice_no'        => $this->invoice_no,
+            'queue_number' => $this->queue_number 
+                            ? str_pad($this->queue_number, 2, '0', STR_PAD_LEFT) 
+                            : '00',
             
             // Customer Info
             'customer_name'     => $this->customer_name,

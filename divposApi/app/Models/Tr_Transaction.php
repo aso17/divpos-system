@@ -30,6 +30,7 @@ class Tr_Transaction extends Model
         'tenant_id',
         'outlet_id',
         'invoice_no',
+        'queue_number',
         'customer_id',
         'customer_name',
         'customer_phone',
@@ -60,6 +61,7 @@ class Tr_Transaction extends Model
         'actual_pickup_date' => 'datetime',
         'order_year'         => 'integer', // Tambahkan cast integer
         'order_month'        => 'integer',
+        'queue_number'        => 'integer',
         'total_base_price'   => 'float',
         'discount_amount'    => 'float',
         'tax_amount'         => 'float',

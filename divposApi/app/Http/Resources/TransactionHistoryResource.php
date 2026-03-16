@@ -15,36 +15,39 @@ class TransactionHistoryResource extends JsonResource
         return [
             'id'             => CryptoHelper::encrypt($this->id),
             'invoice_no'     => $this->invoice_no,
+            'queue_number' => $this->queue_number 
+                            ? str_pad($this->queue_number, 2, '0', STR_PAD_LEFT) 
+                            : '00',
             
             // 2. Customer
             'customer_name'  => $this->customer_name ?? 'Pelanggan Umum',
             'customer_phone' => $this->customer_phone ?? '-',
             
-            // 3. Finansial (Data Dasar)
+            // 3. Finansial
             'grand_total'    => (float) $this->grand_total,
             'total_paid'     => (float) $this->total_paid,
             'remaining_bill' => $remaining > 0 ? (float) $remaining : 0,
 
-            /**
-             * 4. KHUSUS UNTUK MODAL SUKSES & PRINT
-             * Kita ambil nilai transaksi terakhir jika ada. 
-             * 'latest_payment' dan 'latest_change' ini diset manual di Controller/Service 
-             * saat proses pelunasan berhasil.
-             */
-            'details' => TransactionDetailResource::collection($this->whenLoaded('details')),
-            'outlet'  => new OutletResource($this->whenLoaded('outlet')),
+            // 4. KHUSUS PRINT & DETAIL
+            // Pakai whenLoaded agar List History tidak berat, tapi tetap muncul saat dipanggil
+            'details'        => TransactionDetailResource::collection($this->whenLoaded('details')),
+            
+            // PERBAIKAN: Gunakan optional chaining (?->) agar tidak crash jika outlet null
+            'outlet'         => $this->outlet ? new OutletResource($this->outlet) : null,
+            
             'payment_amount' => (float) ($this->latest_payment ?? $this->payment_amount),
             'change_amount'  => (float) ($this->latest_change ?? $this->change_amount),
             
-            // 5. Status & Styling
+            // 5. Status
             'payment_status' => $this->payment_status,
             'status'         => $this->status,
             
-            // 6. Audit & Relasi
-            'cashier'        => $this->creator->employee->full_name ?? 'System',
+            // 6. Audit & Relasi (Gunakan optional untuk keamanan)
+            // Jalur: Creator -> Employee -> Full Name
+            'cashier'        => $this->creator?->employee?->full_name ?? 'System',
             'payment_method' => $this->initialPaymentMethod->name ?? '-',
 
-            // 7. Waktu (Sudah sinkron dengan Asia/Jakarta di config Mas tadi)
+            // 7. Waktu
             'order_date'     => $this->order_date ? $this->order_date->format('d M Y H:i') : '-',
             'human_date'     => $this->order_date ? $this->order_date->diffForHumans() : '-',
         ];

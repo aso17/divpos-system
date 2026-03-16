@@ -42,54 +42,62 @@ class TransactionController extends Controller
     }
 
     
-public function getInitData()
-{
-    $user = Auth::user();
-    $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
+    public function getInitData()
+    {
+        $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
 
-    if (!$tenantId) {
-        return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 403);
+        if (!$tenantId) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 403);
+        }
+
+        // Gunakan Cache Remember
+        $cacheKey = "init_data_tenant_transaction_{$tenantId}";
+        
+        $data = Cache::remember($cacheKey, now()->addHours(24), function () use ($tenantId) {
+            return [
+                'packages'        => $this->packageService->getAllPackagesTransaction($tenantId),
+                'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId),
+                'payment_methods' => $this->paymentMethodService->getAllPaymentMethodsTransaction($tenantId),
+                
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'packages'        => TransactionPackageResource::collection($data['packages']),
+                'outlets'         => TransactionOutletResource::collection($data['outlets']),
+                'payment_methods' => TransactionPaymentMethodResource::collection($data['payment_methods']),
+                
+            ]
+        ]);
     }
-
-    // Gunakan Cache Remember
-    $cacheKey = "init_data_tenant_transaction_{$tenantId}";
-    
-    $data = Cache::remember($cacheKey, now()->addHours(24), function () use ($tenantId) {
-        return [
-            'packages'        => $this->packageService->getAllPackagesTransaction($tenantId),
-            'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId),
-            'payment_methods' => $this->paymentMethodService->getAllPaymentMethodsTransaction($tenantId),
-            
-        ];
-    });
-
-    return response()->json([
-        'status' => 'success',
-        'data' => [
-            'packages'        => TransactionPackageResource::collection($data['packages']),
-            'outlets'         => TransactionOutletResource::collection($data['outlets']),
-            'payment_methods' => TransactionPaymentMethodResource::collection($data['payment_methods']),
-            
-        ]
-    ]);
-}
    
-   public function getTransactionHistory(Request $request)
+    public function getTransactionHistory(Request $request)
     {
         try {
+            // 1. Ambil data dari Service (Data sudah ter-load with() dan ter-select kolomnya)
             $data = $this->transactionService->getTransactionHistory($request->all());
             
-            // Pakai HistoryResource agar response lebih ringan
-            $resource = TransactionHistoryResource::collection($data)->response()->getData(true);
+            /**
+             * 2. ANALISIS RE-LOADING:
+             * Karena di Service kita sudah pakai ->with(['outlet', 'creator.employee', 'initialPaymentMethod']),
+             * Kita HANYA perlu meload 'details' di sini jika memang Service belum meloadnya.
+             * Ini jauh lebih hemat performa.
+             */
+            $data->getCollection()->loadMissing(['details']);
 
+            // 3. Gunakan Resource secara elegan
+            // Tidak perlu manual pecah meta/links, Resource::collection sudah pintar.
+            $resource = TransactionHistoryResource::collection($data)->response()->getData(true);
+            
             return response()->json([
                 'success' => true,
                 'message' => "Riwayat transaksi berhasil diambil",
-                'data'    => [
-                    'data' => $resource['data'],
-                    'meta' => $resource['meta'],
-                ],
+                'data'    => $resource, // Ini otomatis berisi { data: [], links: {}, meta: {} }
             ], 200);
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -97,7 +105,6 @@ public function getInitData()
             ], 500);
         }
     }
-
 
 
 
@@ -163,28 +170,28 @@ public function getInitData()
     }
 
 
-  public function paymentUpdate(PaymentUpdateRequest $request)
-{
-    try {
-        $payload = $request->validated();    
-        $transaction = $this->transactionService->processPayment($payload);
+    public function paymentUpdate(PaymentUpdateRequest $request)
+    {
+        try {
+            $payload = $request->validated();    
+            $transaction = $this->transactionService->processPayment($payload);
 
-        $transaction->load(['creator.employee', 'initialPaymentMethod', 'outlet', 'details']);
-        return response()->json([
-            'success' => true,
-            'status'  => 'success',
-            'message' => 'Pelunasan Berhasil Disimpan',
-            'data'    => new TransactionHistoryResource($transaction)
-        ], 200);
+            $transaction->load(['creator.employee', 'initialPaymentMethod', 'outlet', 'details']);
+            return response()->json([
+                'success' => true,
+                'status'  => 'success',
+                'message' => 'Pelunasan Berhasil Disimpan',
+                'data'    => new TransactionHistoryResource($transaction)
+            ], 200);
 
-    } catch (\Exception $e) {
-        $code = ($e->getCode() < 400 || $e->getCode() > 599) ? 422 : $e->getCode();
-        
-        return response()->json([
-            'success' => false,
-            'status'  => 'error',
-            'message' => $e->getMessage()
-        ], $code);
+        } catch (\Exception $e) {
+            $code = ($e->getCode() < 400 || $e->getCode() > 599) ? 422 : $e->getCode();
+            
+            return response()->json([
+                'success' => false,
+                'status'  => 'error',
+                'message' => $e->getMessage()
+            ], $code);
+        }
     }
-}
 }
