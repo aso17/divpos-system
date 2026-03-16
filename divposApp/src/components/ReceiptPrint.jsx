@@ -3,14 +3,17 @@ import "../assets/css/ReceiptPrint.css";
 import { formatRupiah } from "../utils/formatter";
 
 const ReceiptPrint = React.forwardRef(({ data }, ref) => {
-  // --- NORMALISASI DATA (Agar sinkron antara Transaksi Baru & History) ---
+  // --- NORMALISASI DATA ---
   const outlet = data?.outlet || {};
   const customerName = data?.customer_name || "Pelanggan Umum";
 
-  // Deteksi Kasir: Cek 'cashier' (Resource History) atau 'created_by' (Resource Baru)
+  // Format Nomor Antrean (Selalu 2 digit: 01, 02, dst)
+  const queueNumber = data?.queue_number
+    ? String(data.queue_number).padStart(2, "0")
+    : "00";
+
   const cashier = data?.cashier || data?.created_by || "Staff";
 
-  // Deteksi Metode Bayar: Cek string langsung atau nested object
   const paymentMethod =
     typeof data?.payment_method === "string"
       ? data.payment_method
@@ -18,7 +21,6 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
         data?.initial_payment_method?.name ||
         "TUNAI";
 
-  // Format Tanggal: Gunakan order_date yang sudah jadi string dari BE, atau format created_at
   const displayDate =
     data?.order_date ||
     (data?.created_at
@@ -32,7 +34,13 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
     <div ref={ref} className="receipt-container">
       {data ? (
         <div className="receipt-content">
-          {/* HEADER SECTION */}
+          {/* 1. NOMOR ANTRIAN (Sangat Menonjol untuk Laundry) */}
+          <div className="queue-section">
+            <div className="queue-label">Nomor Urut</div>
+            <div className="queue-number">{queueNumber}</div>
+          </div>
+
+          {/* 2. HEADER SECTION */}
           <div className="receipt-header">
             <h1 className="shop-name">{outlet.name || "OUTLET KAMI"}</h1>
             <p className="shop-address">{outlet.address || ""}</p>
@@ -43,7 +51,7 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
 
           <div className="dashed-line"></div>
 
-          {/* TRANSACTION INFO */}
+          {/* 3. TRANSACTION INFO */}
           <div className="receipt-info">
             <div className="info-row">
               <span className="label">No. Invoice</span>
@@ -65,7 +73,7 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
 
           <div className="dashed-line"></div>
 
-          {/* ITEMS TABLE */}
+          {/* 4. ITEMS TABLE */}
           <table className="receipt-table">
             <thead>
               <tr>
@@ -84,6 +92,7 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
                     </div>
                   </td>
                   <td align="center" className="item-qty">
+                    {/* Menggunakan parseFloat untuk menangani angka desimal timbangan laundry */}
                     {parseFloat(item.qty)} <small>{item.unit || ""}</small>
                   </td>
                   <td align="right" className="item-subtotal">
@@ -96,7 +105,7 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
 
           <div className="dashed-line"></div>
 
-          {/* TOTALS SECTION */}
+          {/* 5. TOTALS SECTION */}
           <div className="receipt-footer">
             <div className="footer-row">
               <span className="label">GRAND TOTAL</span>
@@ -105,7 +114,6 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
               </span>
             </div>
 
-            {/* Field Khusus Pelunasan/History (Hanya muncul jika field total_paid tersedia) */}
             {data.total_paid !== undefined && (
               <div className="footer-row">
                 <span className="label">TOTAL TERBAYAR</span>
@@ -126,7 +134,7 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
 
           <div className="dashed-line"></div>
 
-          {/* STATUS BADGE */}
+          {/* 6. STATUS BANNER */}
           <div className="status-section">
             <div className={`status-banner ${data.payment_status}`}>
               {data.payment_status === "PAID"
@@ -135,12 +143,15 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
             </div>
           </div>
 
-          {/* FOOTER MESSAGE */}
+          {/* 7. FOOTER MESSAGE (Disesuaikan untuk Laundry/Service) */}
           <div className="thanks-section">
-            <p className="thanks-title">Terima Kasih Atas Kunjungan Anda</p>
+            <p className="thanks-title">Terima Kasih Atas Kepercayaan Anda</p>
             <p className="thanks-subtitle">
-              Barang yang sudah dibawa tidak dapat dikomplain/dikembalikan
+              {data.payment_status !== "PAID"
+                ? "Simpan nota ini untuk bukti pengambilan"
+                : "Kepuasan Anda adalah Prioritas Kami"}
             </p>
+            <p className="thanks-notice">Sampai Jumpa Kembali</p>
           </div>
         </div>
       ) : (

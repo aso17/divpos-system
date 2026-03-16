@@ -1,15 +1,16 @@
-import { useMemo, useEffect, useState, useCallback } from "react";
+import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import {
   useReactTable,
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
+import { useReactToPrint } from "react-to-print";
 import History from "lucide-react/dist/esm/icons/history";
 import Search from "lucide-react/dist/esm/icons/search";
 import X from "lucide-react/dist/esm/icons/x";
 import Eye from "lucide-react/dist/esm/icons/eye";
 import Printer from "lucide-react/dist/esm/icons/printer";
-import Filter from "lucide-react/dist/esm/icons/filter";
+// import Filter from "lucide-react/dist/esm/icons/filter";
 import Wallet from "lucide-react/dist/esm/icons/wallet";
 import Clock from "lucide-react/dist/esm/icons/clock";
 import CheckCircle2 from "lucide-react/dist/esm/icons/check-circle-2";
@@ -19,15 +20,21 @@ import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
 import TransactionService from "../../services/TransactionService";
-import { formatRupiah, parseNumber, toNum } from "../../utils/formatter";
-import ProcessPaymentHistory from "./ProcessPaymentHistory.";
+import { formatRupiah } from "../../utils/formatter";
+import ProcessPaymentHistory from "./ProcessPaymentHistory";
+import DetailPaymentModal from "./DetailPaymentModal";
 import TransactionSuccessModal from "../../components/TransactionSuccessModal";
+import ReceiptPrint from "../../components/ReceiptPrint";
 
 export default function TransactionHistory() {
   const [data, setData] = useState([]);
+  const [dataToPrint, setDataToPrint] = useState(null);
+  const printRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastTransactionData, setLastTransactionData] = useState(null);
+  const [selectedTrx, setSelectedTrx] = useState(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [searchTerm, setSearchTerm] = useState("");
@@ -53,7 +60,7 @@ export default function TransactionHistory() {
 
         if (isMounted) {
           const result = res.data?.data;
-          // console.log(result);
+          console.log(result);
           setData(result?.data || []);
           setTotalCount(Number(result?.meta?.total || 0));
         }
@@ -73,6 +80,43 @@ export default function TransactionHistory() {
       isMounted = false;
     };
   }, [fetchHistory]);
+
+  // 2. Sesuaikan hook useReactToPrint
+  const handlePrint = useReactToPrint({
+    // Gunakan contentRef, bukan content
+    contentRef: printRef,
+    documentTitle: `Nota_${dataToPrint?.invoice_no || "Transaksi"}`,
+  });
+
+  const handleOpenPrintPayment = (trx) => {
+    // Kita buat "Clone" data yang sudah diperbaiki khusus untuk kebutuhan Struk
+    const receiptData = {
+      ...trx,
+      // Fix Outlet: Jika BE kirim null, kita isi dengan identitas salon Mas
+      outlet: trx.outlet || {
+        name: "NDAH SALON",
+        address: "Jl. Alamat Salon Mas No. 123",
+        city: "Kota Mas",
+        phone: "08xxxxxxx",
+      },
+      // Fix Pembayaran: Jika belum bayar, jangan tampilkan 0,
+      // tapi tampilkan apa adanya atau sesuaikan labelnya nanti di UI
+      payment_amount: trx.payment_amount || 0,
+      change_amount: trx.change_amount || 0,
+    };
+
+    console.log(receiptData);
+    setDataToPrint(receiptData);
+
+    // Pastikan menggunakan contentRef jika sudah upgrade react-to-print v3
+    setTimeout(() => {
+      handlePrint();
+    }, 500);
+  };
+  const handleOpenDetailPayment = (trx) => {
+    setSelectedTrx(trx);
+    setIsDetailOpen(true);
+  };
 
   const handleOpenPaymentModal = (trx) => {
     setPaymentModal({ isOpen: true, data: trx });
@@ -96,7 +140,7 @@ export default function TransactionHistory() {
         id: "no",
         header: "NO",
         cell: ({ row, table }) => (
-          <span className="text-slate-400 font-medium text-[10px]">
+          <span className="text-slate-400 font-medium text-xxs">
             {table.getState().pagination.pageIndex *
               table.getState().pagination.pageSize +
               row.index +
@@ -112,7 +156,7 @@ export default function TransactionHistory() {
 
           return (
             <div className="flex flex-col">
-              <span className="text-slate-800 font-semibold text-xs uppercase">
+              <span className="text-slate-800 font-semibold text-xxs uppercase">
                 {trx.invoice_no}
               </span>
               <span className="text-slate-400 text-xxs">
@@ -131,7 +175,7 @@ export default function TransactionHistory() {
 
           return (
             <div className="flex flex-col">
-              <span className="text-emerald-700 font-semibold text-xs uppercase">
+              <span className="text-emerald-700 font-semibold text-xxs uppercase">
                 {trx.customer_name}
               </span>
               <span className="text-slate-400 text-xxs">
@@ -151,7 +195,7 @@ export default function TransactionHistory() {
 
           return (
             <div className="flex flex-col">
-              <span className="text-slate-800 font-semibold text-xs">
+              <span className="text-slate-800 font-semibold text-xxs">
                 {formatRupiah(trx.grand_total)}
               </span>
 
@@ -174,7 +218,7 @@ export default function TransactionHistory() {
 
           return (
             <span
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold border ${
+              className={`px-2.5 py-1 rounded-md text-xxs font-semibold border ${
                 isPaid
                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                   : "bg-rose-50 text-rose-700 border-rose-200"
@@ -198,7 +242,7 @@ export default function TransactionHistory() {
           const isUnpaid = trx.payment_status !== "PAID";
 
           return (
-            <div className="flex gap-2 justify-center">
+            <div className="flex gap-2 justify-end">
               {/* Tombol Bayar Muncul Cuma Kalau Belum Lunas */}
               {isUnpaid && (
                 <button
@@ -211,6 +255,7 @@ export default function TransactionHistory() {
               )}
 
               <button
+                onClick={() => handleOpenDetailPayment(trx)}
                 title="detail"
                 className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition"
               >
@@ -218,7 +263,8 @@ export default function TransactionHistory() {
               </button>
 
               <button
-                title="detail"
+                title="print"
+                onClick={() => handleOpenPrintPayment(trx)}
                 className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition"
               >
                 <Printer size={14} />
@@ -385,7 +431,10 @@ export default function TransactionHistory() {
                 )}
 
                 {/* Tombol Detail - Lebar Tetap (Sama dengan tombol Bayar agar simetris) */}
-                <button className="w-24 py-1 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase shadow-sm flex items-center justify-center gap-2 h-10 shrink-0">
+                <button
+                  onClick={() => handleOpenDetailPayment(trx)}
+                  className="w-24 py-1 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase shadow-sm flex items-center justify-center gap-2 h-10 shrink-0"
+                >
                   <Eye size={12} /> Detail
                 </button>
 
@@ -472,6 +521,17 @@ export default function TransactionHistory() {
         onClose={() => setShowSuccessModal(false)}
         data={lastTransactionData}
       />
+
+      <DetailPaymentModal
+        isOpen={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
+        transaction={selectedTrx}
+      />
+
+      {/* --- KOMPONEN PRINT (Tersembunyi) --- */}
+      <div className="hidden">
+        <ReceiptPrint ref={printRef} data={dataToPrint} />
+      </div>
     </div>
   );
 }

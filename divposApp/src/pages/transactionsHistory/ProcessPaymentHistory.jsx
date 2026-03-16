@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import X from "lucide-react/dist/esm/icons/x";
 import Wallet from "lucide-react/dist/esm/icons/wallet";
-import { formatRupiah } from "../../utils/formatter";
+import { formatRupiah, parseNumber, toNum } from "../../utils/formatter";
 import TransactionService from "../../services/TransactionService";
 
 export default function ProcessPaymentHistory({
@@ -14,7 +14,7 @@ export default function ProcessPaymentHistory({
   const [loading, setLoading] = useState(false);
 
   const remainingBill = transaction
-    ? Number(transaction.grand_total) - Number(transaction.total_paid)
+    ? toNum(transaction.grand_total) - toNum(transaction.total_paid)
     : 0;
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function ProcessPaymentHistory({
 
     if (loading) return;
 
-    if (Number(amount) < remainingBill) {
+    if (toNum(amount) < remainingBill) {
       return triggerToast(
         `Nominal harus minimal ${formatRupiah(remainingBill)} untuk melunasi`,
         "warning",
@@ -40,7 +40,7 @@ export default function ProcessPaymentHistory({
     try {
       const payload = {
         transaction_id: transaction.id,
-        payment_amount: Number(amount),
+        payment_amount: toNum(amount),
       };
 
       const res = await TransactionService.processPaymentHistory(payload);
@@ -109,6 +109,23 @@ export default function ProcessPaymentHistory({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Customer Detail Section */}
+          <div className="bg-slate-50/50 p-3 rounded-2xl border border-dashed border-slate-200">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500">
+                {transaction?.customer_name?.substring(0, 2).toUpperCase() ||
+                  "GU"}
+              </div>
+              <div>
+                <p className="text-[11px] font-black text-slate-700 leading-none">
+                  {transaction?.customer_name || "Pelanggan Umum"}
+                </p>
+                <p className="text-[9px] text-slate-400 font-bold mt-1">
+                  {transaction?.customer_phone || "-"}
+                </p>
+              </div>
+            </div>
+          </div>
           {/* Info Card */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
@@ -139,22 +156,26 @@ export default function ProcessPaymentHistory({
                 Rp
               </div>
               <input
-                type="number"
+                type="text"
                 autoFocus
                 className="w-full pl-10 pr-4 py-4 bg-slate-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none font-black text-xl transition-all text-slate-800"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                value={formatRupiah(amount)}
+                onChange={(e) => {
+                  // PERBAIKAN 2: Simpan dalam bentuk angka murni agar tidak bentrok dengan formatter
+                  const val = parseNumber(e.target.value);
+                  setAmount(val || 0);
+                }}
                 onFocus={(e) => e.target.select()}
                 placeholder="0"
                 disabled={loading}
               />
             </div>
 
-            {Number(amount) > remainingBill && (
+            {toNum(amount) > remainingBill && (
               <div className="flex items-center gap-1.5 ml-1 animate-in slide-in-from-top-1 duration-200">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 <p className="text-[10px] font-bold text-emerald-600 italic">
-                  Kembalian: {formatRupiah(Number(amount) - remainingBill)}
+                  Kembalian: {formatRupiah(toNum(amount) - remainingBill)}
                 </p>
               </div>
             )}

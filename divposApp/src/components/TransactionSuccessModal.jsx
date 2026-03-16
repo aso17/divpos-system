@@ -6,7 +6,7 @@ import ReceiptPrint from "./ReceiptPrint";
 import { formatRupiah } from "../utils/formatter";
 
 const TransactionSuccessModal = ({ isOpen, onClose, data }) => {
-  console.log(data);
+  // console.log(data);
   const componentRef = useRef();
 
   const handlePrint = useReactToPrint({

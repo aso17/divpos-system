@@ -39,7 +39,7 @@ const TransactionService = {
     });
   },
   processPaymentHistory: async (payload) => {
-    console.log("Payload sebelum enkripsi:", payload);
+    // console.log("Payload sebelum enkripsi:", payload);
 
     const finalPayload = {
       ...payload,
