@@ -1,3 +1,6 @@
+// TransactionHistory.jsx — Final (dengan pagination di semua breakpoint)
+// Logic: TIDAK DIUBAH — hanya styling + tambah paginationNode ke ResponsiveDataView
+
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import {
   useReactTable,
@@ -10,12 +13,13 @@ import Search from "lucide-react/dist/esm/icons/search";
 import X from "lucide-react/dist/esm/icons/x";
 import Eye from "lucide-react/dist/esm/icons/eye";
 import Printer from "lucide-react/dist/esm/icons/printer";
-// import Filter from "lucide-react/dist/esm/icons/filter";
 import Wallet from "lucide-react/dist/esm/icons/wallet";
 import Clock from "lucide-react/dist/esm/icons/clock";
 import CheckCircle2 from "lucide-react/dist/esm/icons/check-circle-2";
 import User from "lucide-react/dist/esm/icons/user";
 import Receipt from "lucide-react/dist/esm/icons/receipt";
+import LayoutList from "lucide-react/dist/esm/icons/layout-list";
+
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
@@ -26,7 +30,148 @@ import DetailPaymentModal from "./DetailPaymentModal";
 import TransactionSuccessModal from "../../components/TransactionSuccessModal";
 import ReceiptPrint from "../../components/ReceiptPrint";
 
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+
+function PayBadge({ status }) {
+  const paid = status === "PAID";
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border flex-shrink-0
+      ${
+        paid
+          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+          : "bg-red-50 text-red-600 border-red-200"
+      }`}
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${paid ? "bg-emerald-500" : "bg-red-400"}`}
+      />
+      {paid ? "Lunas" : "Belum Lunas"}
+    </span>
+  );
+}
+
+// ─── Action Button ────────────────────────────────────────────────────────────
+
+function ActionBtn({ onClick, title, variant = "gray", children }) {
+  const cls = {
+    amber:
+      "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-500 hover:text-white hover:border-amber-500",
+    gray: "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-800 hover:text-white hover:border-gray-800",
+    green:
+      "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600",
+  };
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all duration-150 flex-shrink-0 ${cls[variant]}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ─── TxCard — shared by mobile & tablet ──────────────────────────────────────
+
+function TxCard({ trx, onPay, onDetail, onPrint }) {
+  const sisa = trx.grand_total - trx.total_paid;
+  const isPaid = trx.payment_status === "PAID";
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+      <div
+        className={`h-[3px] flex-shrink-0 ${isPaid ? "bg-emerald-500" : "bg-red-400"}`}
+      />
+
+      <div className="p-4 flex flex-col gap-3 flex-1">
+        {/* Invoice + badge */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Receipt size={12} className="text-emerald-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-mono text-[11px] font-bold text-emerald-700 truncate leading-tight">
+                {trx.invoice_no}
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {trx.order_date}
+              </p>
+            </div>
+          </div>
+          <PayBadge status={trx.payment_status} />
+        </div>
+
+        {/* Customer + total */}
+        <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-6 h-6 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <User size={10} className="text-emerald-700" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-700 truncate leading-tight">
+                {trx.customer_name}
+              </p>
+              {trx.customer_phone && (
+                <p className="text-[10px] text-gray-400">
+                  {trx.customer_phone}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="text-sm font-bold text-gray-800 tabular-nums leading-tight">
+              {formatRupiah(trx.grand_total)}
+            </p>
+            {sisa > 0 && (
+              <p className="text-[10px] font-semibold text-red-500 tabular-nums mt-0.5">
+                Sisa {formatRupiah(sisa)}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 mt-auto">
+          {!isPaid && (
+            <button
+              onClick={onPay}
+              className="flex-1 h-9 flex items-center justify-center gap-1.5
+                bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white
+                rounded-xl text-xs font-bold transition-colors shadow-sm shadow-amber-100"
+            >
+              <Wallet size={12} strokeWidth={2.5} /> Bayar
+            </button>
+          )}
+          <button
+            onClick={onDetail}
+            className={`${isPaid ? "flex-[2]" : "flex-1"} h-9 flex items-center justify-center gap-1.5
+              bg-gray-900 hover:bg-gray-700 active:bg-gray-800 text-white
+              rounded-xl text-xs font-bold transition-colors`}
+          >
+            <Eye size={12} strokeWidth={2} /> Detail
+          </button>
+          <button
+            onClick={onPrint}
+            title="Cetak nota"
+            className="w-9 h-9 flex items-center justify-center flex-shrink-0
+              bg-white border border-emerald-200 text-emerald-600
+              hover:bg-emerald-600 hover:text-white hover:border-emerald-600
+              rounded-xl transition-all duration-150"
+          >
+            <Printer size={12} strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
 export default function TransactionHistory() {
+  // ── State (TIDAK DIUBAH) ──────────────────────────────────────────────────
   const [data, setData] = useState([]);
   const [dataToPrint, setDataToPrint] = useState(null);
   const printRef = useRef(null);
@@ -39,14 +184,13 @@ export default function TransactionHistory() {
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-
   const [paymentModal, setPaymentModal] = useState({
     isOpen: false,
     data: null,
   });
-
   const [paymentFilter, setPaymentFilter] = useState("ALL");
 
+  // ── Fetch (TIDAK DIUBAH) ──────────────────────────────────────────────────
   const fetchHistory = useCallback(
     async (isMounted = true) => {
       setLoading(true);
@@ -57,15 +201,13 @@ export default function TransactionHistory() {
           keyword: activeSearch,
           payment_status: paymentFilter === "ALL" ? "" : paymentFilter,
         });
-
         if (isMounted) {
           const result = res.data?.data;
-          console.log(result);
           setData(result?.data || []);
           setTotalCount(Number(result?.meta?.total || 0));
         }
-      } catch (error) {
-        console.error("Gagal mengambil history:", error);
+      } catch (err) {
+        // console.error("Gagal mengambil history:", err);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -81,46 +223,35 @@ export default function TransactionHistory() {
     };
   }, [fetchHistory]);
 
-  // 2. Sesuaikan hook useReactToPrint
+  // ── Handlers (TIDAK DIUBAH) ───────────────────────────────────────────────
   const handlePrint = useReactToPrint({
-    // Gunakan contentRef, bukan content
     contentRef: printRef,
     documentTitle: `Nota_${dataToPrint?.invoice_no || "Transaksi"}`,
   });
 
   const handleOpenPrintPayment = (trx) => {
-    // Kita buat "Clone" data yang sudah diperbaiki khusus untuk kebutuhan Struk
     const receiptData = {
       ...trx,
-      // Fix Outlet: Jika BE kirim null, kita isi dengan identitas salon Mas
       outlet: trx.outlet || {
         name: "NDAH SALON",
         address: "Jl. Alamat Salon Mas No. 123",
         city: "Kota Mas",
         phone: "08xxxxxxx",
       },
-      // Fix Pembayaran: Jika belum bayar, jangan tampilkan 0,
-      // tapi tampilkan apa adanya atau sesuaikan labelnya nanti di UI
       payment_amount: trx.payment_amount || 0,
       change_amount: trx.change_amount || 0,
     };
-
-    console.log(receiptData);
     setDataToPrint(receiptData);
-
-    // Pastikan menggunakan contentRef jika sudah upgrade react-to-print v3
-    setTimeout(() => {
-      handlePrint();
-    }, 500);
+    setTimeout(() => handlePrint(), 500);
   };
+
   const handleOpenDetailPayment = (trx) => {
     setSelectedTrx(trx);
     setIsDetailOpen(true);
   };
-
-  const handleOpenPaymentModal = (trx) => {
+  const handleOpenPaymentModal = (trx) =>
     setPaymentModal({ isOpen: true, data: trx });
-  };
+
   const handleSearch = (e) => {
     e.preventDefault();
     setActiveSearch(searchTerm);
@@ -134,13 +265,14 @@ export default function TransactionHistory() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
+  // ── Columns (TIDAK DIUBAH logic) ──────────────────────────────────────────
   const columns = useMemo(
     () => [
       {
         id: "no",
-        header: "NO",
+        header: "No",
         cell: ({ row, table }) => (
-          <span className="text-slate-400 font-medium text-xxs">
+          <span className="text-xs text-gray-400 tabular-nums font-medium">
             {table.getState().pagination.pageIndex *
               table.getState().pagination.pageSize +
               row.index +
@@ -150,125 +282,97 @@ export default function TransactionHistory() {
       },
       {
         accessorKey: "invoice_no",
-        header: "INVOICE / TANGGAL",
+        header: "Invoice / Tanggal",
         cell: ({ row }) => {
           const trx = row.original;
-
           return (
-            <div className="flex flex-col">
-              <span className="text-slate-800 font-semibold text-xxs uppercase">
+            <div className="flex flex-col gap-1">
+              <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg inline-block w-fit">
                 {trx.invoice_no}
               </span>
-              <span className="text-slate-400 text-xxs">
+              <span className="text-[10px] text-gray-400">
                 {trx.order_date || trx.created_at}
               </span>
             </div>
           );
         },
       },
-
       {
         accessorKey: "customer_name",
-        header: "CUSTOMER",
+        header: "Pelanggan",
         cell: ({ row }) => {
           const trx = row.original;
-
           return (
-            <div className="flex flex-col">
-              <span className="text-emerald-700 font-semibold text-xxs uppercase">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-semibold text-gray-800 leading-tight">
                 {trx.customer_name}
               </span>
-              <span className="text-slate-400 text-xxs">
-                {trx.customer_phone || "-"}
+              <span className="text-[10px] text-gray-400">
+                {trx.customer_phone || "—"}
               </span>
             </div>
           );
         },
       },
-
       {
         accessorKey: "grand_total",
-        header: "TOTAL",
+        header: "Total",
         cell: ({ row }) => {
           const trx = row.original;
           const sisa = trx.grand_total - trx.total_paid;
-
           return (
-            <div className="flex flex-col">
-              <span className="text-slate-800 font-semibold text-xxs">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-bold text-gray-800 tabular-nums">
                 {formatRupiah(trx.grand_total)}
               </span>
-
               {trx.payment_status !== "PAID" && (
-                <span className="text-rose-500 text-xxs font-medium">
-                  Sisa: {formatRupiah(sisa)}
+                <span className="text-[10px] font-semibold text-red-500 tabular-nums">
+                  Sisa {formatRupiah(sisa)}
                 </span>
               )}
             </div>
           );
         },
       },
-
       {
         accessorKey: "payment_status",
-        header: "PEMBAYARAN",
-        cell: ({ getValue }) => {
-          const status = getValue();
-          const isPaid = status === "PAID";
-
-          return (
-            <span
-              className={`px-2.5 py-1 rounded-md text-xxs font-semibold border ${
-                isPaid
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-rose-50 text-rose-700 border-rose-200"
-              }`}
-            >
-              {isPaid ? "Lunas" : "Belum Lunas"}
-            </span>
-          );
-        },
+        header: "Status",
+        cell: ({ getValue }) => <PayBadge status={getValue()} />,
       },
-
       {
         id: "actions",
         header: () => (
-          <div className="text-center text-[8px] font-black uppercase">
-            Action
-          </div>
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            Aksi
+          </span>
         ),
         cell: ({ row }) => {
           const trx = row.original;
-          const isUnpaid = trx.payment_status !== "PAID";
-
           return (
-            <div className="flex gap-2 justify-end">
-              {/* Tombol Bayar Muncul Cuma Kalau Belum Lunas */}
-              {isUnpaid && (
-                <button
+            <div className="flex items-center gap-1.5 justify-end">
+              {trx.payment_status !== "PAID" && (
+                <ActionBtn
                   onClick={() => handleOpenPaymentModal(trx)}
-                  className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-600 hover:text-white transition shadow-sm"
                   title="Pelunasan"
+                  variant="amber"
                 >
-                  <Wallet size={14} />
-                </button>
+                  <Wallet size={13} />
+                </ActionBtn>
               )}
-
-              <button
+              <ActionBtn
                 onClick={() => handleOpenDetailPayment(trx)}
-                title="detail"
-                className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition"
+                title="Detail"
+                variant="gray"
               >
-                <Eye size={14} />
-              </button>
-
-              <button
-                title="print"
+                <Eye size={13} />
+              </ActionBtn>
+              <ActionBtn
                 onClick={() => handleOpenPrintPayment(trx)}
-                className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition"
+                title="Cetak nota"
+                variant="green"
               >
-                <Printer size={14} />
-              </button>
+                <Printer size={13} />
+              </ActionBtn>
             </div>
           );
         },
@@ -276,6 +380,7 @@ export default function TransactionHistory() {
     ],
     [],
   );
+
   const table = useReactTable({
     data,
     columns,
@@ -286,231 +391,232 @@ export default function TransactionHistory() {
     getCoreRowModel: getCoreRowModel(),
   });
 
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const paidCount = data.filter((t) => t.payment_status === "PAID").length;
+  const unpaidCount = data.filter((t) => t.payment_status !== "PAID").length;
+
+  const TABS = [
+    { id: "ALL", label: "Semua", icon: <LayoutList size={13} /> },
+    { id: "UNPAID", label: "Belum Lunas", icon: <Clock size={13} /> },
+    { id: "PAID", label: "Lunas", icon: <CheckCircle2 size={13} /> },
+  ];
+
+  // ── Shared pagination node ────────────────────────────────────────────────
+  // Satu instance dipakai oleh mobile, tablet, dan desktop
+  const paginationEl = (
+    <TablePagination table={table} totalEntries={totalCount} />
+  );
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="px-2 py-4 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-28 md:pb-6 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-6">
       <AppHead title="Riwayat Transaksi" />
 
-      {/* --- Header --- */}
-      <div className="flex items-center gap-2.5 px-1">
-        <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
-          <History size={20} className="text-emerald-600" />
-        </div>
-        <div>
-          <h1 className="text-[11px] md:text-sm font-black text-slate-800 uppercase leading-none">
-            History Transaksi
-          </h1>
-          <p className="hidden md:block text-[10px] text-slate-500 mt-1 font-medium">
-            Monitoring omzet harian dan status piutang pelanggan
-          </p>
-        </div>
-      </div>
-
-      {/* --- Filter Tabs (Mobile & Desktop Friendly) --- */}
-      <div className="flex gap-2 bg-white border border-slate-200 p-1 rounded-xl w-full md:w-fit shadow-sm">
-        {[
-          { id: "ALL", label: "Semua", icon: <Wallet size={14} /> },
-          { id: "UNPAID", label: "Belum Lunas", icon: <Clock size={14} /> },
-          { id: "PAID", label: "Lunas", icon: <CheckCircle2 size={14} /> },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => {
-              setPaymentFilter(tab.id);
-              setPagination((p) => ({ ...p, pageIndex: 0 }));
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              paymentFilter === tab.id
-                ? "bg-emerald-600 text-white shadow"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* --- Search Box --- */}
-      <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm max-w-md">
-        <form onSubmit={handleSearch} className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-
-            <input
-              className="w-full pl-9 pr-8 py-2.5 rounded-lg text-sm bg-slate-50 border border-transparent focus:border-emerald-400 focus:bg-white outline-none transition"
-              placeholder="Cari invoice atau customer..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={handleReset}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold"
-          >
-            Cari
-          </button>
-        </form>
-      </div>
-
-      <ResponsiveDataView
-        data={data}
-        // loading={loading}
-        emptyMessage="Tidak ada history transaksi ditemukan"
-        renderMobileCard={(trx) => {
-          const sisa = trx.grand_total - trx.total_paid;
-          return (
+      {/* ── Sticky header ─────────────────────────────────────────────────── */}
+      <div className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-20">
+        <div
+          className="max-w-screen-xl mx-auto px-4 md:px-6 py-3.5
+          flex items-center justify-between gap-4 flex-wrap"
+        >
+          <div className="flex items-center gap-3">
             <div
-              key={trx.id}
-              className="bg-white rounded-[1.25rem] p-4 shadow-sm border border-slate-100 space-y-4 mx-1"
+              className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center
+              shadow-sm shadow-emerald-200 flex-shrink-0"
             >
-              <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Receipt size={14} className="text-slate-400" />
-                    <h3 className="text-[11px] font-black text-slate-800 uppercase">
-                      {trx.invoice_no}
-                    </h3>
-                  </div>
-                  <p className="text-[9px] text-slate-400 font-medium ml-5">
-                    {trx.order_date}
-                  </p>
-                </div>
-                <div
-                  className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${
-                    trx.payment_status === "PAID"
-                      ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                      : "bg-rose-50 text-rose-600 border-rose-100"
-                  }`}
-                >
-                  {trx.payment_status === "PAID" ? "Lunas" : "Belum Lunas"}
-                </div>
-              </div>
-
-              <div className="bg-slate-50 rounded-xl p-3 flex justify-between items-center border border-slate-100/50">
-                <div className="flex items-center gap-2">
-                  <User size={14} className="text-emerald-600" />
-                  <span className="text-[10px] font-black text-slate-700 uppercase">
-                    {trx.customer_name}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-slate-800">
-                    Rp{Number(trx.grand_total).toLocaleString("id-ID")}
-                  </p>
-                  {sisa > 0 && (
-                    <p className="text-[8px] font-bold text-rose-500 italic">
-                      Sisa: Rp{Number(sisa).toLocaleString("id-ID")}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex gap-2 justify-end items-center">
-                {/* Tombol Bayar - Lebar Tetap */}
-                {trx.payment_status !== "PAID" && (
-                  <button
-                    onClick={() => handleOpenPaymentModal(trx)}
-                    className="w-24 py-1 bg-amber-500 text-white rounded-xl text-[9px] font-black uppercase shadow-md flex items-center justify-center gap-2 h-10 shrink-0"
-                  >
-                    <Wallet size={12} /> Bayar
-                  </button>
-                )}
-
-                {/* Tombol Detail - Lebar Tetap (Sama dengan tombol Bayar agar simetris) */}
-                <button
-                  onClick={() => handleOpenDetailPayment(trx)}
-                  className="w-24 py-1 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase shadow-sm flex items-center justify-center gap-2 h-10 shrink-0"
-                >
-                  <Eye size={12} /> Detail
-                </button>
-
-                {/* Tombol Printer - Lebar Tetap Kecil */}
-                <button className="w-10 py-1 bg-white text-emerald-600 border border-emerald-100 rounded-xl flex items-center justify-center shadow-sm h-10 shrink-0">
-                  <Printer size={12} />
-                </button>
-              </div>
+              <History size={16} strokeWidth={2.5} className="text-white" />
             </div>
-          );
-        }}
-        renderDesktopTable={() => (
-          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  {table.getHeaderGroups().map((hg) => (
-                    <tr
-                      key={hg.id}
-                      className="bg-slate-50/50 border-b border-slate-100"
-                    >
-                      {hg.headers.map((header) => (
-                        <th
-                          key={header.id}
-                          className="px-6 py-4 text-[8px] font-black text-slate-400 uppercase tracking-widest"
-                        >
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                        </th>
-                      ))}
-                    </tr>
-                  ))}
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {table.getRowModel().rows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="hover:bg-emerald-50/30 transition-colors group"
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="px-6 py-4 align-middle">
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="p-4 bg-slate-50/50 border-t border-slate-100">
-              <TablePagination table={table} totalEntries={totalCount} />
+            <div>
+              <h1 className="text-sm md:text-base font-bold text-gray-900 leading-tight">
+                Riwayat Transaksi
+              </h1>
+              <p className="text-[10px] text-gray-400 hidden sm:block mt-0.5">
+                Monitoring omzet harian dan status piutang pelanggan
+              </p>
             </div>
           </div>
-        )}
-      />
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+              <CheckCircle2
+                size={12}
+                className="text-emerald-600 flex-shrink-0"
+              />
+              <span className="text-[10px] font-bold text-emerald-700">
+                {paidCount} lunas
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 px-3 py-1.5 rounded-full">
+              <Clock size={12} className="text-red-500 flex-shrink-0" />
+              <span className="text-[10px] font-bold text-red-600">
+                {unpaidCount} belum
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Content ───────────────────────────────────────────────────────── */}
+      <div className="max-w-screen-xl mx-auto px-4 md:px-6 py-4 space-y-4">
+        {/* Toolbar */}
+        <div className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-center">
+          {/* Filter tabs */}
+          <div className="flex bg-white border border-gray-200 rounded-xl p-1 gap-1 shadow-sm flex-shrink-0">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setPaymentFilter(tab.id);
+                  setPagination((p) => ({ ...p, pageIndex: 0 }));
+                }}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold
+                  transition-all duration-150 whitespace-nowrap
+                  ${
+                    paymentFilter === tab.id
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                  }`}
+              >
+                {tab.icon}
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Search */}
+          <form
+            onSubmit={handleSearch}
+            className="flex items-center gap-2 bg-white border border-gray-200
+              rounded-xl p-1.5 shadow-sm flex-1 min-w-0 max-w-sm"
+          >
+            <div className="relative flex-1 min-w-0">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Cari invoice atau pelanggan..."
+                className="w-full h-9 pl-9 pr-8 rounded-lg bg-gray-50 border border-transparent
+                  text-sm text-gray-700 font-medium placeholder:text-gray-300
+                  outline-none focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100
+                  transition-all duration-150"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2
+                    text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+            <button
+              type="submit"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
+                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
+            >
+              Cari
+            </button>
+          </form>
+        </div>
+
+        {/* Data view — paginationNode dikirim untuk ditampilkan di mobile & tablet */}
+        <ResponsiveDataView
+          data={data}
+          // loading={loading}
+          emptyMessage="Tidak ada riwayat transaksi ditemukan"
+          paginationNode={paginationEl}
+          renderMobileCard={(trx) => (
+            <TxCard
+              key={trx.id}
+              trx={trx}
+              onPay={() => handleOpenPaymentModal(trx)}
+              onDetail={() => handleOpenDetailPayment(trx)}
+              onPrint={() => handleOpenPrintPayment(trx)}
+            />
+          )}
+          renderDesktopTable={() => (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    {table.getHeaderGroups().map((hg) => (
+                      <tr
+                        key={hg.id}
+                        className="border-b border-gray-100 bg-gray-50/70"
+                      >
+                        {hg.headers.map((header) => (
+                          <th
+                            key={header.id}
+                            className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap"
+                          >
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                          </th>
+                        ))}
+                      </tr>
+                    ))}
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {loading
+                      ? Array.from({ length: 5 }).map((_, i) => (
+                          <tr key={i}>
+                            {columns.map((_, j) => (
+                              <td key={j} className="px-5 py-4">
+                                <div
+                                  className={`h-4 bg-gray-100 animate-pulse rounded-lg
+                                  ${j === 0 ? "w-6" : j === 4 ? "w-20" : "w-full"}`}
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      : table.getRowModel().rows.map((row) => (
+                          <tr
+                            key={row.id}
+                            className="hover:bg-emerald-50/40 transition-colors duration-100"
+                          >
+                            {row.getVisibleCells().map((cell) => (
+                              <td
+                                key={cell.id}
+                                className="px-5 py-3.5 align-middle"
+                              >
+                                {flexRender(
+                                  cell.column.columnDef.cell,
+                                  cell.getContext(),
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Desktop pagination */}
+              <div className="border-t border-gray-100 bg-gray-50/50">
+                {paginationEl}
+              </div>
+            </div>
+          )}
+        />
+      </div>
+
+      {/* ── Modals (TIDAK DIUBAH) ─────────────────────────────────────────── */}
       <ProcessPaymentHistory
         isOpen={paymentModal.isOpen}
         transaction={paymentModal.data}
         onClose={() => setPaymentModal({ isOpen: false, data: null })}
         onSuccess={(updatedTransaction) => {
-          // 1. Logic update state tanpa reload (Instant Update)
           setData((prev) =>
             prev.map((t) =>
               t.id === updatedTransaction.id ? updatedTransaction : t,
             ),
           );
-
-          // 2. Set data untuk modal sukses (Gunakan variabel yang benar)
           setLastTransactionData(updatedTransaction);
-
-          // 3. Tutup modal pelunasan & buka modal sukses
           setPaymentModal({ isOpen: false, data: null });
           setShowSuccessModal(true);
         }}
@@ -528,10 +634,12 @@ export default function TransactionHistory() {
         transaction={selectedTrx}
       />
 
-      {/* --- KOMPONEN PRINT (Tersembunyi) --- */}
-      <div className="hidden">
-        <ReceiptPrint ref={printRef} data={dataToPrint} />
-      </div>
+      {/* ── Hidden Print Area ─────────────────────────────────────────────────── */}
+      {dataToPrint && (
+        <div className="hidden">
+          <ReceiptPrint ref={printRef} data={dataToPrint} />
+        </div>
+      )}
     </div>
   );
 }

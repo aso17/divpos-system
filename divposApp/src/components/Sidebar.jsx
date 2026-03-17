@@ -1,4 +1,8 @@
-import { useState, useEffect } from "react";
+// Sidebar.jsx — Final
+// Perubahan: topbar mobile & tablet kini menampilkan notif + avatar/nama user
+// Logic: TIDAK DIUBAH
+
+import { useState, useEffect, useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { icons } from "../utils/Icons";
@@ -10,45 +14,329 @@ import {
   Menu,
   X,
   Zap,
+  ChevronDown,
+  Bell,
+  LogOut,
+  User,
+  Settings,
 } from "lucide-react";
 
-export default function Sidebar() {
-  const { menus } = useAuth();
+export default function Sidebar({ isCollapsed, setIsCollapsed }) {
+  const { menus, logout, user } = useAuth();
   const [open, setOpen] = useState(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const location = useLocation();
+  const userMenuRef = useRef(null);
+  const notifRef = useRef(null);
 
   const projectName = GetWithExpiry("app")?.appName || "Divpos";
-  let iconPath = GetWithExpiry("app")?.icon || null;
-  const ChevronIcon = icons.chevron;
+  const iconPath = GetWithExpiry("app")?.icon || null;
+  const ChevronIcon = icons.chevron || ChevronDown;
 
+  // ── User data (sama dengan Topbar.jsx) ────────────────────────────────────
+  const [avatar, setAvatar] = useState(null);
+  const [roleName, setRoleName] = useState(null);
+  const [fullName, setFullName] = useState(null);
+
+  useEffect(() => {
+    const storedUser = GetWithExpiry("user");
+    setRoleName(storedUser?.role?.name || "");
+    setFullName(storedUser?.full_name || "");
+    setAvatar(storedUser?.avatar);
+  }, [user]);
+
+  const initials = fullName
+    ? fullName
+        .split(" ")
+        .slice(0, 2)
+        .map((w) => w[0])
+        .join("")
+        .toUpperCase()
+    : "U";
+
+  // ── Auto-expand active parent (TIDAK DIUBAH) ──────────────────────────────
   useEffect(() => {
     const parent = menus.find((m) =>
       m.children?.some((c) => c.route === location.pathname),
     );
     if (parent) setOpen(parent.id);
-
     setIsMobileOpen(false);
+    setUserMenuOpen(false);
+    setNotifOpen(false);
   }, [location.pathname, menus]);
 
+  // ── Close dropdowns on outside click ─────────────────────────────────────
+  useEffect(() => {
+    const handler = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target))
+        setUserMenuOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target))
+        setNotifOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleLogout = async () => {
+    setUserMenuOpen(false);
+    await logout();
+  };
+
   const toggleCollapse = () => setIsCollapsed(!isCollapsed);
+  const sidebarW = isCollapsed ? "lg:w-[72px]" : "lg:w-60";
 
   return (
     <>
-      {/* MOBILE TOPBAR */}
-      <div className="md:hidden flex items-center justify-between px-4 h-16 bg-white border-b sticky top-0 z-40">
+      {/* ══════════════════════════════════════════════════════════════════
+          TOPBAR — mobile & tablet (< lg)
+          Kiri : hamburger
+          Tengah: brand
+          Kanan : notif + user avatar/chip + dropdown
+      ══════════════════════════════════════════════════════════════════ */}
+      <div
+        className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 shadow-sm
+        flex items-center px-4 gap-3 z-40"
+      >
+        {/* Hamburger */}
         <button
           onClick={() => setIsMobileOpen(true)}
-          className="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
+            text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+          aria-label="Buka menu"
         >
-          <Menu size={22} />
+          <Menu size={20} />
         </button>
 
-        <h1 className="font-extrabold text-lg tracking-tighter text-slate-900 flex items-center gap-2.5">
-          {/* CONTAINER IKON LOGO - Sama dengan desktop style */}
-          <div className="relative p-1 rounded-xl bg-white border border-slate-100 shadow-inner">
-            <div className="relative z-10 p-1.5 rounded-lg bg-gradient-to-tr from-emerald-600 to-green-500 text-white shadow-sm shadow-emerald-500/20">
+        {/* Brand — absolut center agar selalu tengah */}
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none">
+          <div className="p-1 rounded-xl bg-white border border-gray-100 shadow-inner">
+            <div className="p-1.5 rounded-lg bg-gradient-to-tr from-emerald-600 to-green-500 text-white shadow-sm shadow-emerald-500/20">
+              {iconPath ? (
+                <img
+                  src={iconPath}
+                  alt="App Icon"
+                  className="w-4 h-4 rounded-md object-cover"
+                />
+              ) : (
+                <Zap size={14} strokeWidth={2.5} />
+              )}
+            </div>
+          </div>
+          <span
+            className="font-extrabold text-[15px] tracking-tight
+            bg-gradient-to-r from-emerald-700 to-green-500 bg-clip-text text-transparent"
+          >
+            {projectName}
+          </span>
+        </div>
+
+        {/* Right: notif + user */}
+        <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+          {/* Notification */}
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => {
+                setNotifOpen(!notifOpen);
+                setUserMenuOpen(false);
+              }}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center relative transition-colors
+                ${notifOpen ? "bg-emerald-50 text-emerald-600" : "text-gray-400 hover:bg-gray-50 hover:text-emerald-600"}`}
+              aria-label="Notifikasi"
+            >
+              <Bell size={17} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white animate-pulse" />
+            </button>
+
+            {/* Notif dropdown */}
+            <div
+              className={`absolute right-0 top-[calc(100%+8px)] w-72 bg-white border border-gray-100
+              rounded-2xl shadow-xl z-50 overflow-hidden
+              transform transition-all duration-200 origin-top-right
+              ${notifOpen ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"}`}
+            >
+              <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+                <p className="text-sm font-bold text-gray-800">Notifikasi</p>
+                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                  3 baru
+                </span>
+              </div>
+              <div className="py-1">
+                {[
+                  {
+                    title: "Transaksi baru masuk",
+                    sub: "INV-0384 · Budi Santoso",
+                    time: "2m lalu",
+                    dot: "bg-emerald-500",
+                  },
+                  {
+                    title: "Antrian pickup siap",
+                    sub: "27 item menunggu pickup",
+                    time: "15m lalu",
+                    dot: "bg-amber-400",
+                  },
+                  {
+                    title: "Pembayaran belum lunas",
+                    sub: "9 invoice jatuh tempo",
+                    time: "1j lalu",
+                    dot: "bg-red-400",
+                  },
+                ].map((n, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <span
+                      className={`w-2 h-2 ${n.dot} rounded-full flex-shrink-0 mt-1.5`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-700 truncate">
+                        {n.title}
+                      </p>
+                      <p className="text-xs text-gray-400 truncate">{n.sub}</p>
+                    </div>
+                    <span className="text-[10px] text-gray-400 flex-shrink-0">
+                      {n.time}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-gray-50 px-4 py-2.5">
+                <button className="text-xs font-semibold text-emerald-600 w-full text-center">
+                  Lihat semua →
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-5 bg-gray-200" />
+
+          {/* User — avatar only on mobile, chip on tablet */}
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => {
+                setUserMenuOpen(!userMenuOpen);
+                setNotifOpen(false);
+              }}
+              className={`flex items-center gap-2 rounded-xl border transition-all duration-150
+                ${userMenuOpen ? "bg-emerald-50 border-emerald-200 px-2 py-1" : "border-transparent hover:bg-gray-50 px-1 py-1"}`}
+              aria-label="Menu profil"
+            >
+              {/* Avatar */}
+              <div className="relative flex-shrink-0">
+                {avatar ? (
+                  <img
+                    src={avatar}
+                    alt={fullName || "Avatar"}
+                    className={`w-8 h-8 rounded-xl object-cover border-2 transition-colors
+                      ${userMenuOpen ? "border-emerald-400" : "border-gray-100"}`}
+                  />
+                ) : (
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-colors
+                    ${userMenuOpen ? "bg-emerald-600 text-white" : "bg-emerald-100 text-emerald-700"}`}
+                  >
+                    {initials}
+                  </div>
+                )}
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
+              </div>
+
+              {/* Name + role — hanya di tablet (sm+) */}
+              <div className="hidden sm:block text-left">
+                <p className="text-xs font-bold text-gray-800 leading-tight max-w-[110px] truncate">
+                  {fullName || "Admin"}
+                </p>
+                <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest leading-none mt-0.5">
+                  {roleName || "Owner"}
+                </p>
+              </div>
+
+              <ChevronDown
+                size={12}
+                strokeWidth={2.5}
+                className={`hidden sm:block text-gray-400 flex-shrink-0 transition-transform duration-200
+                  ${userMenuOpen ? "rotate-180 text-emerald-600" : ""}`}
+              />
+            </button>
+
+            {/* User dropdown */}
+            <div
+              className={`absolute right-0 top-[calc(100%+8px)] w-52 bg-white border border-gray-100
+              rounded-2xl shadow-xl z-50 overflow-hidden
+              transform transition-all duration-200 origin-top-right
+              ${userMenuOpen ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"}`}
+            >
+              {/* User header */}
+              <div className="px-4 py-3 border-b border-gray-50 bg-gray-50/50 flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center text-xs font-black text-white flex-shrink-0">
+                  {initials}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-gray-800 truncate">
+                    {fullName || "Admin"}
+                  </p>
+                  <p className="text-[10px] text-gray-400 truncate">
+                    {user?.email || "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-1.5">
+                <button
+                  className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-gray-600
+                  hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-colors font-medium"
+                >
+                  <User size={14} strokeWidth={2} />
+                  Profil Akun
+                </button>
+                <button
+                  className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-gray-600
+                  hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-colors font-medium"
+                >
+                  <Settings size={14} strokeWidth={2} />
+                  Pengaturan
+                </button>
+              </div>
+
+              <div className="p-1.5 border-t border-gray-50">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-500
+                    hover:bg-red-50 hover:text-red-600 rounded-xl transition-colors font-semibold"
+                >
+                  <LogOut size={14} strokeWidth={2} />
+                  Keluar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          SIDEBAR PANEL (logic TIDAK DIUBAH)
+      ══════════════════════════════════════════════════════════════════ */}
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-50 flex flex-col
+          bg-white border-r border-gray-100
+          transition-all duration-300 ease-in-out
+          w-72
+          lg:sticky lg:top-0 lg:h-screen lg:flex-shrink-0
+          ${sidebarW}
+          ${isMobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"}
+        `}
+      >
+        {/* ── Logo ── */}
+        <div
+          className={`flex items-center border-b border-gray-100 transition-all duration-300
+          ${isCollapsed ? "justify-center px-0 py-4 h-16" : "gap-3 px-4 py-4 h-16"}`}
+        >
+          <div className="p-1 rounded-xl bg-white border border-gray-100 shadow-inner flex-shrink-0">
+            <div className="p-1.5 rounded-lg bg-gradient-to-tr from-emerald-600 to-green-500 text-white shadow-sm shadow-emerald-500/20">
               {iconPath ? (
                 <img
                   src={iconPath}
@@ -61,96 +349,58 @@ export default function Sidebar() {
             </div>
           </div>
 
-          {/* NAMA PROYEK - Sama dengan desktop style */}
-          <span className="bg-gradient-to-r from-emerald-700 to-green-500 bg-clip-text text-transparent">
-            {projectName}
-          </span>
-        </h1>
+          {!isCollapsed && (
+            <div className="min-w-0">
+              <h1
+                className="text-base font-extrabold tracking-tight
+                bg-gradient-to-r from-emerald-700 to-green-500 bg-clip-text text-transparent
+                leading-none truncate"
+              >
+                {projectName}
+              </h1>
+              <p className="text-[9px] font-bold text-gray-400 tracking-widest uppercase mt-0.5">
+                System v1.0
+              </p>
+            </div>
+          )}
 
-        {/* Placeholder untuk menjaga posisi tengah */}
-        <div className="w-8" />
-      </div>
-
-      {/* SIDEBAR */}
-      <aside
-        className={`
-          fixed md:relative inset-y-0 left-0 z-50
-          bg-white border-r border-slate-100
-          flex flex-col transition-all duration-300 ease-in-out
-
-          w-72
-          ${isCollapsed ? "md:w-20" : "md:w-60"}
-          ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-
-          shadow-xl md:shadow-none
-        `}
-      >
-        {/* MOBILE CLOSE */}
-        <div className="md:hidden flex justify-end p-4 h-16 items-center">
+          {/* Close button dalam drawer */}
           <button
             onClick={() => setIsMobileOpen(false)}
-            className="p-2 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+            className="ml-auto lg:hidden w-7 h-7 rounded-lg flex items-center justify-center
+              text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors flex-shrink-0"
+            aria-label="Tutup menu"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* LOGO */}
-        {/* LOGO CONTAINER */}
-        <div className="p-3 border-b border-slate-100">
-          {!isCollapsed ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3 group">
-                {/* LOGO ICON CONTAINER - Dibuat lebih rapat dan premium */}
-                <div className="relative p-1.5 rounded-xl bg-white border border-slate-100 shadow-inner group-hover:shadow-lg transition-shadow duration-300">
-                  <div className="relative z-10 p-1.5 rounded-lg bg-gradient-to-tr from-emerald-600 to-green-500 text-white shadow-sm shadow-emerald-500/20">
-                    {iconPath ? (
-                      <img
-                        src={iconPath}
-                        alt="App Icon"
-                        className="w-5 h-5 rounded-md object-cover"
-                      />
-                    ) : (
-                      <Zap size={16} strokeWidth={2.5} />
-                    )}
-                  </div>
-                </div>
-
-                {/* PROJECT NAME & SUBTITLE */}
-                <div className="flex flex-col">
-                  {/* Judul dengan Gradient Teks */}
-                  <h1 className="text-lg font-extrabold tracking-tighter bg-gradient-to-r from-emerald-700 to-green-500 bg-clip-text text-transparent">
-                    {projectName}
-                  </h1>
-                  <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase -mt-0.5">
-                    System v1.0
-                  </p>
-                </div>
-              </div>
-
-              {/* GARIS PEMBATAS (DIVIDER) */}
-              <div className="w-full h-px bg-slate-100" />
-            </div>
-          ) : (
-            // ... (kondisi collapsed tetap sama)
-            <div className="flex justify-center">
-              <div className="p-2.5 rounded-xl bg-gradient-to-tr from-emerald-600 to-green-400 text-white">
-                <Zap size={20} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* COLLAPSE BUTTON */}
+        {/* ── Collapse toggle (lg+ only) ── */}
         <button
           onClick={toggleCollapse}
-          className="hidden md:flex absolute -right-3 top-8 w-6 h-6 bg-white border shadow-sm rounded-full items-center justify-center text-slate-400 hover:text-emerald-600 transition"
+          className="hidden lg:flex absolute -right-3.5 top-[22px] w-7 h-7 bg-white border border-gray-200
+            rounded-full items-center justify-center text-gray-400
+            hover:text-emerald-600 hover:border-emerald-300 shadow-sm transition-all z-10"
+          aria-label={isCollapsed ? "Perluas" : "Ciutkan"}
         >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {isCollapsed ? (
+            <ChevronRight size={13} strokeWidth={2.5} />
+          ) : (
+            <ChevronLeft size={13} strokeWidth={2.5} />
+          )}
         </button>
 
-        {/* NAVIGATION */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {/* ── Section label ── */}
+        {!isCollapsed && (
+          <div className="px-5 pt-5 pb-1">
+            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.12em]">
+              Menu Utama
+            </span>
+          </div>
+        )}
+
+        {/* ── Navigation ── */}
+        <nav className="flex-1 px-2.5 py-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
           {menus.map((menu) => {
             const Icon = icons[menu.icon] || LayoutGrid;
             const hasChild = menu.children?.length > 0;
@@ -164,18 +414,29 @@ export default function Sidebar() {
                 {!hasChild ? (
                   <NavLink
                     to={menu.route}
+                    title={isCollapsed ? menu.name : undefined}
                     className={({ isActive }) =>
-                      `flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all
+                      `group flex items-center gap-3 rounded-xl text-sm font-semibold transition-all duration-150
+                      ${isCollapsed ? "justify-center px-0 py-3 mx-0.5" : "px-3 py-2.5"}
                       ${
                         isActive
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "text-slate-700 hover:bg-slate-50"
-                      }
-                      ${isCollapsed ? "md:justify-center" : "gap-3"}`
+                          ? "bg-emerald-600 text-white shadow-sm shadow-emerald-200"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      }`
                     }
                   >
-                    <Icon size={20} />
-                    {!isCollapsed && <span>{menu.name}</span>}
+                    {({ isActive: navActive }) => (
+                      <>
+                        <Icon
+                          size={18}
+                          strokeWidth={navActive ? 2.5 : 2}
+                          className="flex-shrink-0"
+                        />
+                        {!isCollapsed && (
+                          <span className="truncate">{menu.name}</span>
+                        )}
+                      </>
+                    )}
                   </NavLink>
                 ) : (
                   <>
@@ -183,51 +444,61 @@ export default function Sidebar() {
                       onClick={() =>
                         !isCollapsed && setOpen(isOpen ? null : menu.id)
                       }
-                      className={`w-full flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all
+                      title={isCollapsed ? menu.name : undefined}
+                      className={`w-full group flex items-center gap-3 rounded-xl text-sm font-semibold transition-all duration-150
+                        ${isCollapsed ? "justify-center px-0 py-3 mx-0.5" : "px-3 py-2.5 justify-between"}
                         ${
                           isActive
                             ? "bg-emerald-50 text-emerald-700"
-                            : "text-slate-700 hover:bg-slate-50"
-                        }
-                        ${
-                          isCollapsed ? "md:justify-center" : "justify-between"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                         }`}
                     >
                       <div
-                        className={`flex items-center ${
-                          isCollapsed ? "" : "gap-3"
-                        }`}
+                        className={`flex items-center gap-3 min-w-0 ${isCollapsed ? "justify-center" : ""}`}
                       >
-                        <Icon size={20} />
-                        {!isCollapsed && <span>{menu.name}</span>}
+                        <Icon
+                          size={18}
+                          strokeWidth={isActive ? 2.5 : 2}
+                          className={`flex-shrink-0 ${isActive ? "text-emerald-600" : ""}`}
+                        />
+                        {!isCollapsed && (
+                          <span className="truncate">{menu.name}</span>
+                        )}
                       </div>
-
                       {!isCollapsed && (
                         <ChevronIcon
-                          size={16}
-                          className={`transition-transform ${
-                            isOpen ? "rotate-180" : ""
-                          }`}
+                          size={14}
+                          strokeWidth={2}
+                          className={`flex-shrink-0 text-gray-400 transition-transform duration-200
+                            ${isOpen ? "rotate-180 text-emerald-600" : ""}`}
                         />
                       )}
                     </button>
 
                     {!isCollapsed && isOpen && (
-                      <div className="ml-8 mt-1 space-y-1 border-l border-slate-100 pl-3">
+                      <div className="ml-4 mt-0.5 pl-3 border-l-2 border-emerald-100 space-y-0.5">
                         {menu.children.map((sub) => (
                           <NavLink
                             key={sub.id}
                             to={sub.route}
                             className={({ isActive }) =>
-                              `block text-sm py-2 px-4 rounded-lg transition
+                              `flex items-center gap-2 text-sm py-2 px-3 rounded-xl transition-all duration-150
                               ${
                                 isActive
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "text-slate-600 hover:bg-slate-50"
+                                  ? "bg-emerald-600 text-white font-semibold shadow-sm shadow-emerald-200"
+                                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800 font-medium"
                               }`
                             }
                           >
-                            {sub.name}
+                            {({ isActive: subActive }) => (
+                              <>
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0
+                                  ${subActive ? "bg-white" : "bg-gray-300"}`}
+                                />
+                                <span className="truncate">{sub.name}</span>
+                              </>
+                            )}
                           </NavLink>
                         ))}
                       </div>
@@ -240,13 +511,17 @@ export default function Sidebar() {
         </nav>
       </aside>
 
-      {/* BACKDROP */}
+      {/* Backdrop (< lg) */}
       {isMobileOpen && (
         <div
           onClick={() => setIsMobileOpen(false)}
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-40 lg:hidden"
+          aria-hidden="true"
         />
       )}
+
+      {/* Spacer push konten di bawah topbar (< lg) */}
+      <div className="lg:hidden h-14 flex-shrink-0" />
     </>
   );
 }

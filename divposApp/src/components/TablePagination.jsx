@@ -1,3 +1,6 @@
+// components/TablePagination.jsx
+// Update: layout responsif — compact di mobile, penuh di desktop
+
 import {
   ChevronLeft,
   ChevronRight,
@@ -9,88 +12,142 @@ export default function TablePagination({ table, totalEntries }) {
   const { pageIndex, pageSize } = table.options.state.pagination;
 
   const totalRows = totalEntries || 0;
-  // Kalkulasi manual total halaman
   const pageCount = Math.ceil(totalRows / pageSize) || 1;
-
-  // PAKAI LOGIC MANUAL (Jangan pakai fungsi table.getCan... dulu)
-  const canPreviousPage = pageIndex > 0;
-  const canNextPage = pageIndex < pageCount - 1;
-
+  const canPrev = pageIndex > 0;
+  const canNext = pageIndex < pageCount - 1;
   const startRow = totalRows === 0 ? 0 : pageIndex * pageSize + 1;
   const endRow = Math.min((pageIndex + 1) * pageSize, totalRows);
 
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 bg-white border-t border-slate-100">
-      <div className="flex flex-col gap-0.5">
-        <p className="text-xs text-slate-500 font-medium">
-          Showing <span className="text-slate-900">{startRow}</span> to{" "}
-          <span className="text-slate-900">{endRow}</span> of{" "}
-          <span className="text-slate-900">{totalRows}</span> entries
-        </p>
+  // ── Compact page numbers with ellipsis ────────────────────────────────────
+  const buildPages = () => {
+    const delta = 1;
+    const pages = [];
+    for (let i = 0; i < pageCount; i++) {
+      if (
+        i === 0 ||
+        i === pageCount - 1 ||
+        (i >= pageIndex - delta && i <= pageIndex + delta)
+      ) {
+        pages.push(i);
+      }
+    }
+    const result = [];
+    let prev = null;
+    for (const p of pages) {
+      if (prev !== null && p - prev > 1) result.push("...");
+      result.push(p);
+      prev = p;
+    }
+    return result;
+  };
 
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-            Page
-          </span>
-          {/* pageIndex + 1 agar tampilan mulai dari angka 1, bukan 0 */}
-          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 text-xs font-bold">
-            {pageIndex + 1}
-          </span>
-          <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-            of {pageCount}
-          </span>
-        </div>
+  const pages = buildPages();
+
+  const NavBtn = ({ onClick, disabled, label, children }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center
+        text-gray-400 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50
+        disabled:opacity-30 disabled:cursor-not-allowed
+        disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-400
+        transition-all duration-150 flex-shrink-0"
+    >
+      {children}
+    </button>
+  );
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3">
+      {/* ── Left: entry info + per-page ── */}
+      <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
+        <select
+          value={pageSize}
+          onChange={(e) => table.setPageSize(Number(e.target.value))}
+          className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-semibold
+            text-gray-600 outline-none cursor-pointer
+            hover:border-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100
+            transition-all"
+        >
+          {[5, 10, 20, 50].map((s) => (
+            <option key={s} value={s}>
+              {s} baris
+            </option>
+          ))}
+        </select>
+
+        <div className="w-px h-4 bg-gray-200 hidden sm:block" />
+
+        <p className="text-xs text-gray-400">
+          <span className="font-semibold text-gray-600">
+            {startRow}–{endRow}
+          </span>{" "}
+          dari <span className="font-semibold text-gray-600">{totalRows}</span>{" "}
+          data
+        </p>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <select
-            value={pageSize}
-            onChange={(e) => table.setPageSize(Number(e.target.value))}
-            className="h-9 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold bg-slate-50/50 outline-none cursor-pointer hover:border-blue-400 transition-all"
-          >
-            {[5, 10, 20, 50].map((size) => (
-              <option key={size} value={size}>
-                {size} / page
-              </option>
-            ))}
-          </select>
+      {/* ── Right: page navigation ── */}
+      <div className="flex items-center gap-1.5">
+        <NavBtn
+          onClick={() => table.setPageIndex(0)}
+          disabled={!canPrev}
+          label="Pertama"
+        >
+          <ChevronsLeft size={14} strokeWidth={2.5} />
+        </NavBtn>
+        <NavBtn
+          onClick={() => table.previousPage()}
+          disabled={!canPrev}
+          label="Sebelumnya"
+        >
+          <ChevronLeft size={14} strokeWidth={2.5} />
+        </NavBtn>
+
+        {/* Page number pills */}
+        <div className="flex items-center gap-1">
+          {pages.map((p, i) =>
+            p === "..." ? (
+              <span
+                key={`e${i}`}
+                className="w-8 text-center text-xs text-gray-300"
+              >
+                ···
+              </span>
+            ) : (
+              <button
+                key={p}
+                type="button"
+                onClick={() => table.setPageIndex(p)}
+                className={`w-8 h-8 rounded-lg text-xs font-semibold transition-all duration-150
+                  ${
+                    p === pageIndex
+                      ? "bg-emerald-600 text-white border border-emerald-600 shadow-sm shadow-emerald-200"
+                      : "border border-gray-200 bg-white text-gray-500 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50"
+                  }`}
+              >
+                {p + 1}
+              </button>
+            ),
+          )}
         </div>
 
-        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-          <button
-            type="button"
-            onClick={() => table.setPageIndex(0)}
-            disabled={!canPreviousPage}
-            className="h-8 w-8 flex items-center justify-center rounded-lg disabled:opacity-20 hover:bg-blue-50 hover:text-blue-600 transition-all"
-          >
-            <ChevronsLeft size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={() => table.previousPage()}
-            disabled={!canPreviousPage}
-            className="h-8 w-8 flex items-center justify-center rounded-lg disabled:opacity-20 hover:bg-blue-50 hover:text-blue-600 transition-all"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={() => table.nextPage()}
-            disabled={!canNextPage}
-            className="h-8 w-8 flex items-center justify-center rounded-lg disabled:opacity-20 hover:bg-blue-50 hover:text-blue-600 transition-all"
-          >
-            <ChevronRight size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={() => table.setPageIndex(pageCount - 1)}
-            disabled={!canNextPage}
-            className="h-8 w-8 flex items-center justify-center rounded-lg disabled:opacity-20 hover:bg-blue-50 hover:text-blue-600 transition-all"
-          >
-            <ChevronsRight size={16} />
-          </button>
-        </div>
+        <NavBtn
+          onClick={() => table.nextPage()}
+          disabled={!canNext}
+          label="Berikutnya"
+        >
+          <ChevronRight size={14} strokeWidth={2.5} />
+        </NavBtn>
+        <NavBtn
+          onClick={() => table.setPageIndex(pageCount - 1)}
+          disabled={!canNext}
+          label="Terakhir"
+        >
+          <ChevronsRight size={14} strokeWidth={2.5} />
+        </NavBtn>
       </div>
     </div>
   );

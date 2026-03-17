@@ -77,32 +77,46 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
           <table className="receipt-table">
             <thead>
               <tr>
-                <th align="left">Layanan</th>
-                <th align="center">Qty</th>
-                <th align="right">Total</th>
+                <th align="left" style={{ width: "50%" }}>
+                  Layanan
+                </th>
+                <th align="center" style={{ width: "20%" }}>
+                  Qty
+                </th>
+                <th align="right" style={{ width: "30%" }}>
+                  Total
+                </th>
               </tr>
             </thead>
             <tbody>
               {data.details?.map((item, index) => (
                 <tr key={index}>
-                  <td className="item-name">
-                    {item.package_name || item.name}
+                  <td className="item-name-cell">
+                    <span className="item-name">
+                      {item.package_name || item.name}
+                    </span>
                     <div className="item-price">
                       @{formatRupiah(item.price_per_unit || item.price)}
                     </div>
                   </td>
-                  <td align="center" className="item-qty">
-                    {/* Menggunakan parseFloat untuk menangani angka desimal timbangan laundry */}
+                  <td
+                    align="center"
+                    className="item-qty"
+                    style={{ verticalAlign: "top" }}
+                  >
                     {parseFloat(item.qty)} <small>{item.unit || ""}</small>
                   </td>
-                  <td align="right" className="item-subtotal">
+                  <td
+                    align="right"
+                    className="item-subtotal"
+                    style={{ verticalAlign: "top" }}
+                  >
                     {formatRupiah(item.subtotal)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-
           <div className="dashed-line"></div>
 
           {/* 5. TOTALS SECTION */}

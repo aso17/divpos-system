@@ -1,181 +1,173 @@
 /* Container Utama */
 .receipt-container {
-  width: 300px; /* Standar kertas thermal 80mm, sesuaikan ke 220px jika pakai 58mm */
+  width: 280px; /* Ukuran pas untuk printer 80mm */
   margin: 0 auto;
   padding: 10px;
-  font-family: "Courier New", Courier, monospace; /* Font khas struk belanja */
+  background-color: #fff;
+  /* Font Monospace wajib agar angka lurus sejajar vertikal */
+  font-family: "Courier New", Courier, monospace;
   font-size: 9pt;
   color: #000;
-  background: #fff;
+  line-height: 1.2;
 }
 
-/* 1. SEKSI NOMOR ANTREAN (YANG BARU) */
+/* Nomor Antrean Gaya ATM */
 .queue-section {
   text-align: center;
-  border: 2px solid #000;
+  border: 1.5px solid #000; /* Border solid lebih tegas saat di-print */
+  margin-bottom: 10px;
   padding: 10px 0;
-  margin-bottom: 15px;
 }
-
 .queue-label {
-  font-size: 10pt;
+  font-size: 8pt;
   font-weight: bold;
-  display: block;
+  text-transform: uppercase;
 }
-
 .queue-number {
-  font-size: 40pt; /* Sangat besar agar jelas */
-  font-weight: 900;
+  font-size: 42pt;
+  font-weight: bold;
+  margin: 0;
   line-height: 1;
-  margin: 5px 0 0 0;
 }
 
-/* 2. HEADER OUTLET */
+/* Header Outlet */
 .receipt-header {
   text-align: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
-
 .shop-name {
-  font-size: 14pt;
+  font-size: 12pt;
   font-weight: bold;
   margin: 0;
   text-transform: uppercase;
 }
-
 .shop-address,
 .shop-contact {
   font-size: 8pt;
   margin: 2px 0;
 }
 
-/* 3. INFO TRANSAKSI */
-.receipt-info {
-  margin: 10px 0;
+.dashed-line {
+  border-top: 1px dashed #000;
+  margin: 8px 0;
+  height: 0;
 }
 
+/* Info Transaksi */
+.receipt-info {
+  font-size: 8.5pt;
+  margin-bottom: 5px;
+}
 .info-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 2px;
 }
 
-/* 4. TABEL LAYANAN */
+/* PERBAIKAN TOTAL TABEL: MENGUNCI JALUR KOLOM */
 .receipt-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 10px 0;
+  font-size: 8.5pt;
+  table-layout: fixed; /* MENGUNCI LEBAR AGAR TIDAK TABRAKAN */
 }
 
+/* Mengatur Jatah Lebar Masing-masing Kolom */
+.receipt-table th:nth-child(1),
+.receipt-table td:nth-child(1) {
+  width: 55%;
+  text-align: left;
+} /* Layanan */
+.receipt-table th:nth-child(2),
+.receipt-table td:nth-child(2) {
+  width: 15%;
+  text-align: center;
+} /* Qty */
+.receipt-table th:nth-child(3),
+.receipt-table td:nth-child(3) {
+  width: 30%;
+  text-align: right;
+} /* Total */
+
 .receipt-table th {
+  border-top: 1px dashed #000;
   border-bottom: 1px dashed #000;
-  padding-bottom: 5px;
-  font-size: 8pt;
+  padding: 5px 0;
+}
+
+.receipt-table td {
+  padding: 5px 0;
+  word-wrap: break-word; /* Teks panjang otomatis ganti baris */
+  vertical-align: top;
 }
 
 .item-name {
-  padding: 5px 0;
   font-weight: bold;
+  display: block;
 }
-
 .item-price {
+  font-size: 7.5pt;
   font-weight: normal;
-  font-size: 8pt;
 }
 
-.item-qty {
-  font-size: 9pt;
-}
-
-.item-subtotal {
-  font-weight: bold;
-}
-
-/* 5. BAGIAN TOTALS */
+/* Bagian Footer & Pembayaran */
 .receipt-footer {
   margin-top: 5px;
 }
-
 .footer-row {
   display: flex;
   justify-content: space-between;
   padding: 2px 0;
 }
-
-.bold {
-  font-weight: bold;
-}
-
 .total-bold {
   border-top: 1px solid #000;
-  margin-top: 5px;
   padding-top: 5px;
   font-weight: bold;
   font-size: 11pt;
 }
 
-/* 6. BANNER STATUS */
+/* Status Banner (Sangat Kontras) */
 .status-section {
-  margin: 15px 0;
   text-align: center;
+  margin: 15px 0;
 }
-
 .status-banner {
   display: inline-block;
   padding: 5px 15px;
   border: 1px solid #000;
   font-weight: bold;
 }
-
 .status-banner.PAID {
-  background-color: #000;
-  color: #fff; /* Lunas dibuat invert agar kasir cepat membedakan */
+  background-color: #000; /* Hitam pekat */
+  color: #fff; /* Teks putih */
 }
 
-/* 7. PESAN PENUTUP */
+/* Pesan Penutup */
 .thanks-section {
   text-align: center;
+  font-size: 8pt;
   margin-top: 15px;
 }
-
 .thanks-title {
   font-weight: bold;
-  margin-bottom: 5px;
 }
 
-.thanks-subtitle {
-  font-size: 8pt;
-  margin: 0;
-}
-
-.thanks-notice {
-  font-size: 7pt;
-  margin-top: 10px;
-  font-style: italic;
-  border-top: 1px dashed #ccc;
-  padding-top: 5px;
-}
-
-/* Utility: Garis Putus-putus */
-.dashed-line {
-  border-top: 1px dashed #000;
-  margin: 10px 0;
-}
-
-/* Sembunyikan saat di layar browser biasa jika diperlukan, 
-   tapi biarkan muncul saat mode Print */
+/* SETTING KHUSUS PRINT */
 @media print {
-  body * {
-    visibility: hidden;
+  @page {
+    margin: 0;
+    size: portrait; /* Memaksa mode tegak */
   }
-  .receipt-container,
-  .receipt-container * {
-    visibility: visible;
+  body {
+    margin: 0;
   }
   .receipt-container {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+    width: 100% !important;
+    max-width: 100%;
+    padding: 10px;
+  }
+  /* Mengatasi masalah warna di bbrp browser */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }

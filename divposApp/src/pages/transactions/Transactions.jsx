@@ -1,3 +1,6 @@
+// Transactions.jsx
+// Logic: TIDAK DIUBAH — hanya styling layout wrapper
+
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import TransactionService from "../../services/TransactionService";
 import { useFormValidation } from "../../hooks/useFormValidation";
@@ -9,6 +12,8 @@ import TransactionServiceForm from "./TransactionServiceForm";
 import TransactionCustomerForm from "./TransactionCustomerForm";
 import TransactionCartForm from "./TransactionCartForm";
 import { formatRupiah, parseNumber, toNum } from "../../utils/formatter";
+
+import ReceiptText from "lucide-react/dist/esm/icons/receipt-text";
 
 const Transactions = () => {
   const hasFetched = useRef(false);
@@ -45,46 +50,43 @@ const Transactions = () => {
       },
     );
 
-  // --- 1. DATA EXTRACTION ---
+  // ── Data extraction (TIDAK DIUBAH) ──────────────────────────────────────────
   const {
     is_cash = false,
     is_dp_enabled = false,
     allow_zero_pay = false,
   } = selectedPaymentMethod || {};
 
-  // --- 2. LOGIC PERHITUNGAN ---
-  const subtotal = useMemo(() => {
-    return cart.reduce(
-      (acc, item) => acc + toNum(item.final_price) * toNum(item.qty),
-      0,
-    );
-  }, [cart]);
+  // ── Computation (TIDAK DIUBAH) ───────────────────────────────────────────────
+  const subtotal = useMemo(
+    () =>
+      cart.reduce(
+        (acc, item) => acc + toNum(item.final_price) * toNum(item.qty),
+        0,
+      ),
+    [cart],
+  );
 
-  const filteredPackages = useMemo(() => {
-    return packages.filter((pkg) =>
-      pkg.name.toLowerCase().includes(search.toLowerCase()),
-    );
-  }, [packages, search]);
+  const filteredPackages = useMemo(
+    () =>
+      packages.filter((pkg) =>
+        pkg.name.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [packages, search],
+  );
 
   const dpAmountNum = toNum(dpAmount);
   const payAmountNum = toNum(payAmount);
   const totalDiterima = dpAmountNum + payAmountNum;
   const sisaTagihan = subtotal - dpAmountNum;
-
-  // Kembalian hanya logis untuk Cash
   const change = is_cash ? payAmountNum - sisaTagihan : 0;
 
-  // --- 3. VALIDASI TOMBOL (Sesuai Permintaan Mas A_so) ---
-  // Tombol valid jika:
-  // 1. Tidak sedang loading & Keranjang tidak kosong
-  // 2. Jika Bayar Nanti (allow_zero_pay) -> Bebas
-  // 3. Jika BUKAN Bayar Nanti -> Total Uang (DP + Bayar) TIDAK BOLEH kurang dari Subtotal
   const isUnderpaid = !allow_zero_pay && totalDiterima < subtotal;
   const isPaymentEntered = allow_zero_pay || totalDiterima > 0;
-
   const isDisabled =
-    loading || cart.length === 0 || !isPaymentEntered || isUnderpaid; // Kunci tombol jika bayar kurang (Cash/QRIS/Transfer)
+    loading || cart.length === 0 || !isPaymentEntered || isUnderpaid;
 
+  // ── Effects (TIDAK DIUBAH) ───────────────────────────────────────────────────
   useEffect(() => {
     if (hasFetched.current) return;
     fetchData();
@@ -92,6 +94,14 @@ const Transactions = () => {
     return () => abortControllerRef.current?.abort();
   }, []);
 
+  useEffect(() => {
+    if (cart.length === 0) {
+      setDpAmount(0);
+      setPayAmount(0);
+    }
+  }, [cart.length]);
+
+  // ── Handlers (TIDAK DIUBAH) ──────────────────────────────────────────────────
   const fetchData = async () => {
     try {
       const res = await TransactionService.getInitData();
@@ -117,6 +127,7 @@ const Transactions = () => {
         customer_id: null,
         is_new: true,
       }));
+
     const controller = new AbortController();
     abortControllerRef.current = controller;
     try {
@@ -140,28 +151,17 @@ const Transactions = () => {
     setCart([...cart, { ...pkg, qty: 1 }]);
   };
 
-  useEffect(() => {
-    if (cart.length === 0) {
-      setDpAmount(0);
-      setPayAmount(0);
-    }
-  }, [cart.length]);
-
   const handleSubmit = async () => {
     if (issubmitting.current || !validate()) return;
     if (cart.length === 0) return triggerToast("Keranjang kosong!", "warning");
-
-    // Validasi Final sebelum hit API
-    if (!allow_zero_pay && totalDiterima < subtotal) {
+    if (!allow_zero_pay && totalDiterima < subtotal)
       return triggerToast(
         `Pembayaran kurang! Total wajib: ${formatRupiah(subtotal)}`,
         "error",
       );
-    }
 
     issubmitting.current = true;
     setLoading(true);
-
     try {
       const payload = {
         outlet_id: values.outlet_id,
@@ -177,17 +177,12 @@ const Transactions = () => {
           qty: toNum(item.qty),
         })),
         dp_amount: dpAmountNum,
-        // Logic Payment Amount:
-        // - Jika Bayar Nanti -> 0
-        // - Jika Cash -> Kirim payAmount (biar server hitung kembalian)
-        // - Jika Non-Cash (QRIS/Transfer) -> Kirim sisaTagihan (biar lunas pas)
         payment_amount: allow_zero_pay
           ? 0
           : is_cash
             ? payAmountNum
             : sisaTagihan,
       };
-
       const response = await TransactionService.createTransaction(payload);
       setCart([]);
       setPayAmount(0);
@@ -215,51 +210,88 @@ const Transactions = () => {
     );
   };
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col lg:flex-row gap-4 p-3 md:p-5 bg-gradient-to-b from-gray-50 to-gray-100 min-h-screen font-sans">
-      <div className="w-full lg:w-3/5 flex flex-col gap-4">
-        <AppHead title="Transaksi" />
-        <TransactionCustomerForm
-          values={values}
-          errors={errors}
-          outlets={outlets}
-          handleChange={handleChange}
-          handlePhoneChange={handlePhoneChange}
-          inputClasses={inputClasses}
-        />
-        <TransactionServiceForm
-          packages={packages}
-          filteredPackages={filteredPackages}
-          search={search}
-          setSearch={setSearch}
-          addToCart={addToCart}
-          formatRupiah={formatRupiah}
-          toNum={toNum}
-        />
+    <div className="min-h-screen bg-gray-50">
+      <AppHead title="Transaksi" />
+
+      {/* ── Page Header ── */}
+      <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-4">
+        <div className="max-w-screen-xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center shadow-sm shadow-emerald-200 flex-shrink-0">
+              <ReceiptText size={16} strokeWidth={2.5} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-base md:text-lg font-bold text-gray-900 leading-tight">
+                Transaksi Baru
+              </h1>
+              <p className="text-[10px] text-gray-400">
+                Buat &amp; proses order pelanggan
+              </p>
+            </div>
+          </div>
+
+          {/* Cart count badge — visible on mobile */}
+          {cart.length > 0 && (
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full lg:hidden">
+              <span className="text-xs font-bold text-emerald-700">
+                {cart.length} layanan
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
-      <TransactionCartForm
-        cart={cart}
-        setCart={setCart}
-        paymentMethods={paymentMethods}
-        selectedPaymentMethod={selectedPaymentMethod}
-        setSelectedPaymentMethod={setSelectedPaymentMethod}
-        subtotal={subtotal}
-        formatRupiah={formatRupiah}
-        toNum={toNum}
-        parseNumber={parseNumber}
-        isDpEnabled_dp={is_dp_enabled}
-        isCash={is_cash}
-        allowZeroPay={allow_zero_pay}
-        dpAmount={dpAmount}
-        setDpAmount={setDpAmount}
-        payAmount={payAmount}
-        setPayAmount={setPayAmount}
-        change={change}
-        handleSubmit={handleSubmit}
-        isDisabled={isDisabled}
-        loading={loading}
-      />
+      {/* ── Content ── */}
+      <div className="max-w-screen-xl mx-auto px-4 md:px-6 py-5">
+        <div className="flex flex-col lg:flex-row gap-5">
+          {/* ── LEFT COLUMN: Customer + Services ── */}
+          <div className="w-full lg:w-3/5 flex flex-col gap-4">
+            <TransactionCustomerForm
+              values={values}
+              errors={errors}
+              outlets={outlets}
+              handleChange={handleChange}
+              handlePhoneChange={handlePhoneChange}
+              inputClasses={inputClasses}
+            />
+            <TransactionServiceForm
+              packages={packages}
+              filteredPackages={filteredPackages}
+              search={search}
+              setSearch={setSearch}
+              addToCart={addToCart}
+              formatRupiah={formatRupiah}
+              toNum={toNum}
+            />
+          </div>
+
+          {/* ── RIGHT COLUMN: Cart ── */}
+          <TransactionCartForm
+            cart={cart}
+            setCart={setCart}
+            paymentMethods={paymentMethods}
+            selectedPaymentMethod={selectedPaymentMethod}
+            setSelectedPaymentMethod={setSelectedPaymentMethod}
+            subtotal={subtotal}
+            formatRupiah={formatRupiah}
+            toNum={toNum}
+            parseNumber={parseNumber}
+            isDpEnabled_dp={is_dp_enabled}
+            isCash={is_cash}
+            allowZeroPay={allow_zero_pay}
+            dpAmount={dpAmount}
+            setDpAmount={setDpAmount}
+            payAmount={payAmount}
+            setPayAmount={setPayAmount}
+            change={change}
+            handleSubmit={handleSubmit}
+            isDisabled={isDisabled}
+            loading={loading}
+          />
+        </div>
+      </div>
 
       <TransactionSuccessModal
         isOpen={showModal}
