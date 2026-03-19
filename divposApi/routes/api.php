@@ -17,7 +17,8 @@ use App\Http\Controllers\{
     EmployeeController,
     CustomerController,
     TransactionController,
-    PaymentMethodController
+    PaymentMethodController,
+    DashboardController
 };
 
 /*
@@ -45,10 +46,10 @@ Route::prefix('auth')->middleware('api')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
 
-    Route::post('/logout', [AuthController::class, 'logout']);
-       Route::get('/me', function (Request $request) {
-        return $request->user()->load(['employee.tenant', 'employee.outlet']);
-    });
+        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::get('/me', function (Request $request) {
+            return $request->user()->load(['employee.tenant', 'employee.outlet']);
+        });
 
         Route::get('/menus', [MenuController::class, 'menus']);
     });
@@ -61,6 +62,7 @@ Route::prefix('auth')->middleware('api')->group(function () {
 */
 Route::middleware(['api', 'auth:sanctum'])->group(function () {
 
+    Route::get('dashboard', [DashboardController::class, 'index']);
     /*
     |--------------------------------------------------------------------------
     | TRANSACTIONS
@@ -75,6 +77,7 @@ Route::middleware(['api', 'auth:sanctum'])->group(function () {
         Route::get('/payment-methods', [TransactionController::class, 'getPaymentMethods']);
         Route::post('/', [TransactionController::class, 'store']);
         Route::post('/paymentUpdate', [TransactionController::class, 'paymentUpdate']);
+        Route::patch('cancel', [TransactionController::class, 'cancel']);
     });
 
     /*

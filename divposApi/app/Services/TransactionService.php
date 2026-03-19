@@ -26,72 +26,72 @@ class TransactionService
         $this->logDbErrorRepo = $logDbErrorRepo;
     }
 
-   public function getTransactionHistory(array $params)
+    public function getTransactionHistory(array $params)
     {
         try {
 
-        $user = Auth::user();
-        $perPage = $params['per_page'] ?? 10;
+            $user = Auth::user();
+            $perPage = $params['per_page'] ?? 10;
 
-        $tenantId = $user->tenant_id;
-        $outletId = null;
+            $tenantId = $user->tenant_id;
+            $outletId = null;
 
-        if (is_null($tenantId)) {
-            $outletId = $user->employee->outlet_id ?? null;
-            $tenantId = $user->employee->tenant_id ?? null;
-        }
+            if (is_null($tenantId)) {
+                $outletId = $user->employee->outlet_id ?? null;
+                $tenantId = $user->employee->tenant_id ?? null;
+            }
 
-        $query = $this->transactionRepo->getBaseQuery($tenantId, $outletId);
+            $query = $this->transactionRepo->getBaseQuery($tenantId, $outletId);
 
-        /**
-         * 2. EAGER LOADING (Hanya tarik kolom yang perlu saja)
-         */
-        $query->with([
-            // Hanya tarik kolom yang akan tampil di struk/tabel
-            'outlet:id,name,phone,city,address', 
-            
-            'creator' => function($q) {
-                // WAJIB: select 'id' agar relasi ke employee nyambung
-                $q->select('id')->with(['employee:id,user_id,full_name']); 
-            },
-            'initialPaymentMethod:id,name'
-        ]);
+            /**
+             * 2. EAGER LOADING (Hanya tarik kolom yang perlu saja)
+             */
+            $query->with([
+                // Hanya tarik kolom yang akan tampil di struk/tabel
+                'outlet:id,name,phone,city,address',
 
-        /**
-         * 3. OPTIMASI KOLOM UTAMA
-         */
-        $query->select([
-            'id', 
-            'outlet_id', // WAJIB ada agar relasi 'outlet' bisa jalan
-            'invoice_no', 
-            'queue_number',
-            'customer_name', 
-            'customer_phone', 
-            'order_date', 
-            'grand_total', 
-            'total_paid', 
-            'status', 
-            'payment_status', 
-            'created_by', 
-            'payment_method_id'
-            // 'tenant_id' dihilangkan dari select jika tidak butuh di frontend
-        ]);
+                'creator' => function ($q) {
+                    // WAJIB: select 'id' agar relasi ke employee nyambung
+                    $q->select('id')->with(['employee:id,user_id,full_name']);
+                },
+                'initialPaymentMethod:id,name'
+            ]);
 
-        // 4, 5, 6: Logic Search & Filter tetap sama (sudah efisien)
-        if (!empty($params['keyword'])) {
-            $keyword = $params['keyword'];
-            $query->where(function ($q) use ($keyword) {
-                $q->where('invoice_no', 'like', $keyword . '%')
-                  ->orWhere('customer_phone', 'like', $keyword . '%')
-                  ->orWhere('customer_name', 'like', '%' . $keyword . '%');
-            });
-        }
+            /**
+             * 3. OPTIMASI KOLOM UTAMA
+             */
+            $query->select([
+                'id',
+                'outlet_id', // WAJIB ada agar relasi 'outlet' bisa jalan
+                'invoice_no',
+                'queue_number',
+                'customer_name',
+                'customer_phone',
+                'order_date',
+                'grand_total',
+                'total_paid',
+                'status',
+                'payment_status',
+                'created_by',
+                'payment_method_id'
+                // 'tenant_id' dihilangkan dari select jika tidak butuh di frontend
+            ]);
+
+            // 4, 5, 6: Logic Search & Filter tetap sama (sudah efisien)
+            if (!empty($params['keyword'])) {
+                $keyword = $params['keyword'];
+                $query->where(function ($q) use ($keyword) {
+                    $q->where('invoice_no', 'like', $keyword . '%')
+                      ->orWhere('customer_phone', 'like', $keyword . '%')
+                      ->orWhere('customer_name', 'like', '%' . $keyword . '%');
+                });
+            }
 
             // 5. Filter Payment Status
             if (!empty($params['payment_status']) && $params['payment_status'] !== 'ALL') {
                 if ($params['payment_status'] === 'UNPAID') {
                     $query->whereIn('payment_status', [
-                        Tr_Transaction::PAY_UNPAID, 
+                        Tr_Transaction::PAY_UNPAID,
                         Tr_Transaction::PAY_PARTIAL
                     ]);
                 } else {
@@ -103,7 +103,7 @@ class TransactionService
             if (!empty($params['status']) && $params['status'] !== 'ALL') {
                 if ($params['status'] === 'ACTIVE') {
                     $query->whereNotIn('status', [
-                        Tr_Transaction::STATUS_TAKEN, 
+                        Tr_Transaction::STATUS_TAKEN,
                         Tr_Transaction::STATUS_CANCELED
                     ]);
                 } else {
@@ -167,10 +167,12 @@ class TransactionService
                 // --- 2. PERBAIKAN KALKULASI FINANSIAL (STRICT & DINAMIS) ---
                 $grandTotal = (float) $totalBasePrice;
                 $method = Ms_PaymentMethod::find($data['payment_method_id']);
-                if (!$method) throw new \Exception("Metode pembayaran tidak valid.");
+                if (!$method) {
+                    throw new \Exception("Metode pembayaran tidak valid.");
+                }
 
-                $inputDP      = (float) ($data['dp_amount'] ?? 0); 
-                $inputPayment = (float) ($data['payment_amount'] ?? 0); 
+                $inputDP      = (float) ($data['dp_amount'] ?? 0);
+                $inputPayment = (float) ($data['payment_amount'] ?? 0);
 
                 // A. Handle DP: Cek apakah metode membolehkan DP
                 if ($inputDP > 0 && !$method->is_dp_enabled) {
@@ -197,22 +199,22 @@ class TransactionService
                             throw new \Exception("Pembayaran {$method->name} harus pas Rp " . number_format($tagihanSetelahDP));
                         }
                         $netPaymentToday = $inputPayment;
-                        $changeAmount = 0; 
+                        $changeAmount = 0;
                     }
                 }
 
                 // C. Akumulasi Bayar & Status
                 $totalPaidAccumulated = $dpAmount + $netPaymentToday;
                 $paymentStatus = $this->determinePaymentStatus($totalPaidAccumulated, $grandTotal);
-                
-                $transactionStatus = ($paymentStatus === Tr_Transaction::PAY_PAID) 
-                    ? Tr_Transaction::STATUS_COMPLETED 
+
+                $transactionStatus = ($paymentStatus === Tr_Transaction::PAY_PAID)
+                    ? Tr_Transaction::STATUS_COMPLETED
                     : Tr_Transaction::STATUS_PENDING;
 
 
-               $numbers = $this->generateTransactionNumbers($tenantId);
+                $numbers = $this->generateTransactionNumbers($tenantId);
                 // --- 3. PROSES SIMPAN DATA ---
-                $customerInfo = $this->handleCustomerLogic($data);     
+                $customerInfo = $this->handleCustomerLogic($data);
 
                 $transaction = $this->transactionRepo->create([
                     'tenant_id'         => $tenantId,
@@ -268,13 +270,15 @@ class TransactionService
         }
     }
 
-    private function determinePaymentStatus($paid, $total) 
+    private function determinePaymentStatus($paid, $total)
     {
-        if ($paid >= $total) return Tr_Transaction::PAY_PAID;
+        if ($paid >= $total) {
+            return Tr_Transaction::PAY_PAID;
+        }
         return $paid > 0 ? Tr_Transaction::PAY_PARTIAL : Tr_Transaction::PAY_UNPAID;
     }
 
-    private function handleCustomerLogic($data) 
+    private function handleCustomerLogic($data)
     {
         $name  = $data['customer']['name'] ?? 'Pelanggan Umum';
         $phone = $data['customer']['phone'] ?? null;
@@ -284,29 +288,29 @@ class TransactionService
         }
 
         // 1. Cari atau buat customer
-    $customer = Ms_Customer::firstOrCreate(
-        ['tenant_id' => $data['tenant_id'], 'phone' => $phone],
-        ['name' => $name, 'point' => 0] // Set point 0 kalau baru dibuat
-    );
+        $customer = Ms_Customer::firstOrCreate(
+            ['tenant_id' => $data['tenant_id'], 'phone' => $phone],
+            ['name' => $name, 'point' => 0] // Set point 0 kalau baru dibuat
+        );
 
-    
-    $customer->increment('point', 1);
+
+        $customer->increment('point', 1);
 
         return ['id' => $customer->id, 'name' => $customer->name, 'phone' => $customer->phone];
     }
 
-   
 
 
-    private function generateTransactionNumbers($tenantId) 
+
+    private function generateTransactionNumbers($tenantId)
     {
         $yearNow = date('Y');
         $monthNow = date('m');
         $today = date('Y-m-d');
-        
+
         // 1. Ambil record terakhir yang sudah di-LOCK
         $last = $this->transactionRepo->getLastInvoice($tenantId, $yearNow, $monthNow);
-        
+
         // --- LOGIKA INVOICE (Urut per bulan/tahun) ---
         $prefix = "INV/" . date('Ymd') . "/";
         $count = $last ? ((int) substr($last->invoice_no, -4)) + 1 : 1;
@@ -317,7 +321,7 @@ class TransactionService
         if ($last) {
             // Cek apakah tanggal di record terakhir sama dengan hari ini
             $lastDate = $last->order_date ? $last->order_date->format('Y-m-d') : null;
-            
+
             if ($lastDate === $today) {
                 $newQueue = (int)$last->queue_number + 1;
             }
@@ -331,7 +335,8 @@ class TransactionService
 
     private function handleLogError(\Exception $e, array $data)
     {
-        $sql = null; $bindings = [];
+        $sql = null;
+        $bindings = [];
         if ($e instanceof QueryException) {
             $sql = $e->getSql();
             $bindings = $e->getBindings();
@@ -370,7 +375,9 @@ class TransactionService
             // 2. Tentukan Metode Pembayaran
             $methodId = $data['payment_method_id'] ?? $transaction->payment_method_id;
             $method = Ms_PaymentMethod::find($methodId);
-            if (!$method) throw new \Exception("Metode pembayaran tidak valid.");
+            if (!$method) {
+                throw new \Exception("Metode pembayaran tidak valid.");
+            }
 
             $changeAmount = 0;
             $amountToPay = 0;
@@ -395,19 +402,19 @@ class TransactionService
 
             // 3. Update Header Transaksi
             $newTotalPaid = $transaction->total_paid + $amountToPay;
-            
+
             // Penentuan Status Final
-            $newPaymentStatus = ($newTotalPaid >= $transaction->grand_total) 
-                ? Tr_Transaction::PAY_PAID 
+            $newPaymentStatus = ($newTotalPaid >= $transaction->grand_total)
+                ? Tr_Transaction::PAY_PAID
                 : Tr_Transaction::PAY_PARTIAL;
 
-            $newOrderStatus = ($newPaymentStatus === Tr_Transaction::PAY_PAID) 
-                ? Tr_Transaction::STATUS_COMPLETED 
+            $newOrderStatus = ($newPaymentStatus === Tr_Transaction::PAY_PAID)
+                ? Tr_Transaction::STATUS_COMPLETED
                 : $transaction->status;
 
 
-        
-                
+
+
             $transaction->update([
                 'payment_method_id' => $method->id,
                 'payment_amount'    => $inputAmount,  // Audit: Nominal asli yang diketik kasir
@@ -438,11 +445,42 @@ class TransactionService
             $transaction->latest_payment = $inputAmount;
             $transaction->latest_change = $changeAmount;
 
-            
+
             return $transaction;
         }, 5);
     }
 
 
+    public function cancelTransaction(int $transactionId, string $reason = ''): Tr_Transaction
+    {
+        return DB::transaction(function () use ($transactionId, $reason) {
 
+            $user     = Auth::user();
+            $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
+
+            // Lock untuk cegah race condition
+            $transaction = Tr_Transaction::where('tenant_id', $tenantId)
+                ->lockForUpdate()
+                ->findOrFail($transactionId);
+
+            // Update status → CANCELED + simpan alasan di kolom notes
+            $transaction->update([
+                'status' => Tr_Transaction::STATUS_CANCELED,
+                'notes'  => $reason,
+            ]);
+
+            // Log aktivitas — konsisten dengan createTransaction & processPayment
+            $changedBy = $user->employee->full_name ?? $user->name ?? 'System';
+
+            $transaction->logs()->create([
+                'tenant_id'   => $tenantId,
+                'status'      => Tr_Transaction::STATUS_CANCELED,
+                'changed_by'  => $changedBy,
+                'description' => 'Transaksi dibatalkan. Alasan: ' . $reason,
+            ]);
+
+            return $transaction;
+
+        }, 5);
+    }
 }
