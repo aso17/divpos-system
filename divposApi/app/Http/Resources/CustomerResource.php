@@ -2,32 +2,32 @@
 
 namespace App\Http\Resources;
 
-use App\Helpers\CryptoHelper;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Helpers\CryptoHelper;
 
+/**
+ * CustomerResource
+ * Dipakai untuk list maupun detail — kolom disesuaikan kebutuhan frontend.
+ */
 class CustomerResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
-    public function toArray($request)
+    public function toArray($request): array
     {
-       return [
-        // Enkripsi ID agar aman di sisi Client (React)
-        'id'         => CryptoHelper::encrypt($this->id),
-        'tenant_id'  => CryptoHelper::encrypt($this->tenant_id),
-        
-        // Data Utama
-        'name'       => $this->name,
-        'phone'      => $this->phone,
-        'address'    => $this->address ?? '',
-        
-        // Meta Data - PERBAIKAN DI SINI
-        'created_at' => $this->created_at ? $this->created_at->format('Y-m-d H:i:s') : null,
-        'updated_at' => $this->updated_at ? $this->updated_at->format('Y-m-d H:i:s') : null,
-    ];
+        return [
+             'id'             => CryptoHelper::encrypt($this->id),
+            'name'       => $this->name,
+            'phone'      => $this->phone,
+            'email'      => $this->email,
+            'address'    => $this->address,
+            'gender'     => $this->gender,
+            'gender_label' => match($this->gender) {
+                'L'     => 'Laki-laki',
+                'P'     => 'Perempuan',
+                default => '-',
+            },
+            'point'      => (float) $this->point,
+            'is_active'  => (bool) $this->is_active,
+            'created_at' => $this->created_at?->format('d M Y'),
+        ];
     }
 }

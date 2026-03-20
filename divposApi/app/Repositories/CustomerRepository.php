@@ -2,88 +2,146 @@
 
 namespace App\Repositories;
 
-use App\Models\Ms_customer; 
+use App\Models\Ms_customer;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class CustomerRepository
 {
-    /**
-     * Mengambil base query customer berdasarkan tenant_id
-     */
-    public function getBaseQuery(int $tenantId)
-    {
-        return Ms_customer::select(
-            'id', 
-            'tenant_id', 
-            'name', 
-            'phone', 
-            'address', 
-            'created_at'
-        )
-        ->where('tenant_id', $tenantId);
-    }
-
-
-   public function getCustomerByPhone(int $tenantId, string $phone)
+    public function getCustomerByPhone(int $tenantId, string $phone)
     {
         // Membersihkan karakter non-angka agar pencarian akurat
         $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
 
         return Ms_customer::where('tenant_id', $tenantId)
             ->where('phone', $cleanPhone)
-            ->first(); 
-    }
-    /**
-     * Mencari customer berdasarkan ID (umum)
-     */
-    public function find(int $id)
-    {
-        return Ms_customer::find($id);
-    }
-
-    /**
-     * Mencari customer berdasarkan ID dan Tenant (Security Check)
-     */
-    public function findByIdAndTenant(int $id, int $tenantId)
-    {
-        return Ms_customer::where('id', $id)
-            ->where('tenant_id', $tenantId)
             ->first();
     }
 
-    /**
-     * Simpan customer baru
-     */
-    public function create(array $data)
+    private function baseQuery(int $tenantId)
     {
-        return Ms_customer::create($data);
+        return Ms_Customer::where('tenant_id', $tenantId)
+            ->whereNull('deleted_at');
     }
 
-    /**
-     * Update data customer
-     */
-    public function update(Ms_customer $customer, array $data)
+    // ── List dengan search + pagination ──────────────────────────────────────
+
+    public function paginate(int $tenantId, array $params): LengthAwarePaginator
+    {
+        $query = $this->baseQuery($tenantId)
+            ->select([
+                'id', 'name', 'phone', 'email',
+                'gender', 'point', 'is_active',
+                'created_at',
+            ]);
+
+        // Search: nama, phone, email
+        if (!empty($params['keyword'])) {
+            $keyword = $params['keyword'];
+            $query->where(function ($q) use ($keyword) {
+                $q->where('name', 'like', '%' . $keyword . '%')
+                  ->orWhere('phone', 'like', $keyword . '%')
+                  ->orWhere('email', 'like', $keyword . '%');
+            });
+        }
+
+        // Filter status
+        if (isset($params['is_active']) && $params['is_active'] !== '') {
+            $query->where('is_active', filter_var($params['is_active'], FILTER_VALIDATE_BOOLEAN));
+        }
+
+        // Filter gender
+        if (!empty($params['gender'])) {
+            $query->where('gender', $params['gender']);
+        }
+
+        return $query
+            ->orderBy('name', 'asc')
+            ->paginate($params['per_page'] ?? 10);
+    }
+
+    // ── Find by ID ────────────────────────────────────────────────────────────
+
+    public function findByTenant(int $id, int $tenantId): ?Ms_Customer
+    {
+        return Ms_Customer::where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
+            ->select([
+                'id', 'tenant_id', 'name', 'phone', 'email',
+                'address', 'gender', 'point', 'is_active',
+                'created_by', 'updated_by', 'created_at', 'updated_at',
+            ])
+            ->first();
+    }
+
+    // ── Find by phone (untuk POS lookup) ─────────────────────────────────────
+
+    public function findByPhone(int $tenantId, string $phone): ?Ms_Customer
+    {
+        return Ms_Customer::where('tenant_id', $tenantId)
+            ->where('phone', $phone)
+            ->whereNull('deleted_at')
+            ->select(['id', 'name', 'phone', 'email', 'address', 'gender', 'point', 'is_active'])
+            ->first();
+    }
+
+    // ── Create ────────────────────────────────────────────────────────────────
+
+    public function create(array $data): Ms_Customer
+    {
+        return Ms_Customer::create($data);
+    }
+
+    // ── Update ────────────────────────────────────────────────────────────────
+
+    public function update(Ms_Customer $customer, array $data): Ms_Customer
     {
         $customer->update($data);
         return $customer->fresh();
     }
 
-    /**
-     * Hapus customer
-     */
-    public function delete(Ms_customer $customer)
+    // ── Soft delete ───────────────────────────────────────────────────────────
+
+    public function delete(Ms_Customer $customer): void
     {
-        return $customer->delete();
+        $customer->delete();
     }
 
-    /**
-     * Cek apakah nomor HP sudah terdaftar di tenant yang sama
-     * (Berguna untuk validasi tambahan sebelum create)
-     */
-    public function findByPhone(int $tenantId, string $phone)
+    // ── Cek duplikasi phone dalam tenant ──────────────────────────────────────
+
+    public function phoneExistsInTenant(int $tenantId, string $phone, ?int $excludeId = null): bool
     {
-        return Ms_customer::where('tenant_id', $tenantId)
+        $query = Ms_Customer::where('tenant_id', $tenantId)
             ->where('phone', $phone)
-            ->first();
+            ->whereNull('deleted_at');
+
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->exists();
+    }
+
+    // ── Summary stats (untuk header CustomerList) ─────────────────────────────
+
+    public function summaryStats(int $tenantId): array
+    {
+        $row = DB::selectOne(
+            'SELECT
+                COUNT(*)                                    AS total,
+                SUM(CASE WHEN is_active = true  THEN 1 ELSE 0 END) AS active,
+                SUM(CASE WHEN is_active = false THEN 1 ELSE 0 END) AS inactive
+               FROM "Ms_customers"
+              WHERE tenant_id  = ?
+                AND deleted_at IS NULL',
+            [$tenantId]
+        );
+
+        return [
+            'total'    => (int) $row->total,
+            'active'   => (int) $row->active,
+            'inactive' => (int) $row->inactive,
+        ];
     }
 }

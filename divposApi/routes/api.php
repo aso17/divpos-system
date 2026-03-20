@@ -86,6 +86,7 @@ Route::middleware(['api', 'auth:sanctum'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::apiResource('users', UserController::class);
+    Route::apiResource('customers', CustomerController::class);
     Route::get('get-available-employees', [UserController::class, 'getavailableemployees']);
     Route::apiResource('employees', EmployeeController::class);
 
@@ -93,13 +94,10 @@ Route::middleware(['api', 'auth:sanctum'])->group(function () {
 
     Route::apiResource('master-services', MasterServiceController::class);
 
-    // Route::get('/packages/generate-code', [PackageController::class, 'generateCode']);
     Route::apiResource('packages', PackageController::class);
 
     Route::apiResource('categories', CategoryController::class);
-    Route::apiResource('categories', CategoryController::class);
     Route::apiResource('units', UnitController::class);
-    Route::apiResource('customers', CustomerController::class);
     Route::apiResource('payment-methods', PaymentMethodController::class);
 
     /*

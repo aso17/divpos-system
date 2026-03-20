@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Repositories\CustomerRepository;
-use App\Helpers\CryptoHelper;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Pagination\LengthAwarePaginator;
 use App\Models\Ms_Customer;
+use App\Helpers\CryptoHelper;
 use Illuminate\Support\Str;
 
 class CustomerService
@@ -17,7 +19,7 @@ class CustomerService
     }
 
 
-   public function getCustomerTransaction($tenantId, $phone)
+    public function getCustomerTransaction($tenantId, $phone)
     {
         // 1. Validasi awal: Tenant harus ada dan Phone tidak boleh kosong
         if (!$tenantId || !is_numeric($tenantId) || empty($phone)) {
@@ -31,83 +33,106 @@ class CustomerService
 
 
 
-
-    
-    /**
-     * Simpan Customer Baru
-     */
-    public function createCustomer(array $data)
+    private function tenantId(): int
     {
-        try {
-            // 1. Dekripsi Identity
-            $tenantId = CryptoHelper::decrypt($data['tenant_id']);
-            if (!$tenantId) throw new \Exception("Tenant ID tidak valid.");
+        $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
 
-            $data['tenant_id'] = (int) $tenantId;
-            
-            // Dekripsi audit trail user
-            $decryptedUser = CryptoHelper::decrypt($data['created_by']) ?? $data['created_by'];
-            $data['created_by'] = substr(strip_tags($decryptedUser), 0, 50);
-
-            // 2. Sanitasi Input
-            $data['name'] = htmlspecialchars(strip_tags(trim(substr($data['name'], 0, 100))), ENT_QUOTES, 'UTF-8');
-            
-            // Bersihkan nomor HP dari karakter non-numerik (kecuali + jika ada)
-            $data['phone'] = preg_replace('/[^0-9\+]/', '', $data['phone']);
-            
-            if (!empty($data['address'])) {
-                $data['address'] = htmlspecialchars(strip_tags(trim(substr($data['address'], 0, 255))), ENT_QUOTES, 'UTF-8');
-            }
-
-            // 3. Eksekusi melalui Repository
-            return $this->customerRepo->create($data);
-
-        } catch (\Exception $e) {
-            // \Log::error("Gagal create customer: " . $e->getMessage());
-            return null;
+        if (!$tenantId) {
+            abort(403, 'Tenant tidak teridentifikasi.');
         }
+
+        return (int) $tenantId;
     }
 
-    /**
-     * Update Data Customer
-     */
-    public function updateCustomer($id, array $data)
+    // ── List ──────────────────────────────────────────────────────────────────
+
+    public function list(array $params): LengthAwarePaginator
     {
-        try {
-            // 1. Cari Model melalui Repo
-            $customer = $this->customerRepo->find($id);
-            if (!$customer) return null;
-
-            // 2. Dekripsi & Sanitasi
-            $tenantId = CryptoHelper::decrypt($data['tenant_id']);
-            $data['tenant_id'] = (int) $tenantId;
-
-            $decryptedUser = CryptoHelper::decrypt($data['updated_by'] ?? '') ?? $data['updated_by'];
-            $data['updated_by'] = substr(strip_tags($decryptedUser), 0, 50);
-
-            $data['name'] = htmlspecialchars(strip_tags(trim(substr($data['name'], 0, 100))), ENT_QUOTES, 'UTF-8');
-            $data['phone'] = preg_replace('/[^0-9\+]/', '', $data['phone']);
-
-            // 3. Eksekusi Update
-            return $this->customerRepo->update($customer, $data);
-
-        } catch (\Exception $e) {
-            return null;
-        }
+        return $this->customerRepo->paginate($this->tenantId(), $params);
     }
 
-    /**
-     * Hapus Customer
-     */
-    public function deleteCustomer($id, $encryptedTenantId)
+    // ── Summary stats ─────────────────────────────────────────────────────────
+
+    public function stats(): array
     {
-        $tenantId = CryptoHelper::decrypt($encryptedTenantId);
-        
-        // Cari pastikan milik tenant yang benar (Security Check)
-        $customer = $this->customerRepo->findByIdAndTenant((int)$id, (int)$tenantId);
+        return $this->customerRepo->summaryStats($this->tenantId());
+    }
 
-        if (!$customer) return null;
+    // ── Detail ────────────────────────────────────────────────────────────────
 
-        return $this->customerRepo->delete($customer);
+    public function findOrFail(int $id): Ms_Customer
+    {
+        $customer = $this->customerRepo->findByTenant($id, $this->tenantId());
+
+        if (!$customer) {
+            abort(404, 'Pelanggan tidak ditemukan.');
+        }
+
+        return $customer;
+    }
+
+    // ── Lookup by phone (POS) ─────────────────────────────────────────────────
+
+    public function findByPhone(string $phone): ?Ms_Customer
+    {
+        return $this->customerRepo->findByPhone($this->tenantId(), $phone);
+    }
+
+    // ── Create ────────────────────────────────────────────────────────────────
+
+    public function create(array $data): Ms_Customer
+    {
+        $tenantId = $this->tenantId();
+
+        // Cek duplikasi phone dalam tenant
+        if ($this->customerRepo->phoneExistsInTenant($tenantId, $data['phone'])) {
+            abort(422, "Nomor telepon {$data['phone']} sudah terdaftar.");
+        }
+
+        return $this->customerRepo->create([
+            'tenant_id' => $tenantId,
+            'name'      => $data['name'],
+            'phone'     => $data['phone'],
+            'email'     => $data['email']   ?? null,
+            'address'   => $data['address'] ?? null,
+            'gender'    => $data['gender']  ?? null,
+            'is_active' => $data['is_active'] ?? true,
+            'point'     => 0,
+        ]);
+    }
+
+    // ── Update ────────────────────────────────────────────────────────────────
+
+    public function update(int $id, array $data): Ms_Customer
+    {
+        $tenantId = $this->tenantId();
+        $customer = $this->findOrFail($id);
+
+        // Cek duplikasi phone (kecuali milik sendiri)
+        if (isset($data['phone']) &&
+            $this->customerRepo->phoneExistsInTenant($tenantId, $data['phone'], $id)) {
+            abort(422, "Nomor telepon {$data['phone']} sudah digunakan pelanggan lain.");
+        }
+
+        $updateData = array_filter([
+            'name'      => $data['name']      ?? null,
+            'phone'     => $data['phone']     ?? null,
+            'email'     => $data['email']     ?? null,
+            'address'   => $data['address']   ?? null,
+            'gender'    => $data['gender']    ?? null,
+            'is_active' => $data['is_active'] ?? null,
+        ], fn ($v) => !is_null($v));
+
+        return $this->customerRepo->update($customer, $updateData);
+    }
+
+    // ── Delete ────────────────────────────────────────────────────────────────
+
+    public function delete($id): void
+    {
+        $idCus = (int) CryptoHelper::decrypt($id);
+        $customer = $this->findOrFail($idCus);
+        $this->customerRepo->delete($customer);
     }
 }
