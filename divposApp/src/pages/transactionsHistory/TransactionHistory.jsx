@@ -1,5 +1,4 @@
-// TransactionHistory.jsx — Final (dengan pagination di semua breakpoint)
-// Logic: TIDAK DIUBAH — hanya styling + tambah paginationNode ke ResponsiveDataView
+// TransactionHistory.jsx — dengan CancelTransactionModal (form reason wajib)
 
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import {
@@ -19,6 +18,7 @@ import CheckCircle2 from "lucide-react/dist/esm/icons/check-circle-2";
 import User from "lucide-react/dist/esm/icons/user";
 import Receipt from "lucide-react/dist/esm/icons/receipt";
 import LayoutList from "lucide-react/dist/esm/icons/layout-list";
+import XCircle from "lucide-react/dist/esm/icons/x-circle";
 
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import TablePagination from "../../components/TablePagination";
@@ -26,17 +26,35 @@ import AppHead from "../../components/common/AppHead";
 import TransactionService from "../../services/TransactionService";
 import { formatRupiah } from "../../utils/formatter";
 import ProcessPaymentHistory from "./ProcessPaymentHistory";
+import CancelTransactionModal from "./CancelTransactionModal"; // ← baru
 import DetailPaymentModal from "./DetailPaymentModal";
 import TransactionSuccessModal from "../../components/TransactionSuccessModal";
 import ReceiptPrint from "../../components/ReceiptPrint";
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
+// ─── Status konstanta ─────────────────────────────────────────────────────────
+const STATUS_PENDING = "PENDING";
+const STATUS_PROCESS = "PROCESS";
+const STATUS_READY = "READY";
+const STATUS_TAKEN = "TAKEN";
+const STATUS_CANCELED = "CANCELED";
+const STATUS_COMPLETED = "COMPLETED";
 
+/**
+ * Boleh dibatalkan hanya jika:
+ * 1. Belum lunas
+ * 2. Status masih PENDING atau PROCESS
+ */
+const canCancel = (trx) =>
+  trx.payment_status !== "PAID" &&
+  [STATUS_PENDING, STATUS_PROCESS].includes(trx.status);
+
+// ─── Payment badge ────────────────────────────────────────────────────────────
 function PayBadge({ status }) {
   const paid = status === "PAID";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border flex-shrink-0
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+      text-[10px] font-bold border flex-shrink-0
       ${
         paid
           ? "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -44,48 +62,93 @@ function PayBadge({ status }) {
       }`}
     >
       <span
-        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${paid ? "bg-emerald-500" : "bg-red-400"}`}
+        className={`w-1.5 h-1.5 rounded-full flex-shrink-0
+        ${paid ? "bg-emerald-500" : "bg-red-400"}`}
       />
       {paid ? "Lunas" : "Belum Lunas"}
     </span>
   );
 }
 
-// ─── Action Button ────────────────────────────────────────────────────────────
+// ─── Transaction status badge ─────────────────────────────────────────────────
+const TX_STATUS_MAP = {
+  [STATUS_PENDING]: {
+    label: "Pending",
+    cls: "bg-amber-50  text-amber-600  border-amber-200",
+  },
+  [STATUS_PROCESS]: {
+    label: "Proses",
+    cls: "bg-blue-50   text-blue-600   border-blue-200",
+  },
+  [STATUS_READY]: {
+    label: "Siap",
+    cls: "bg-purple-50 text-purple-600 border-purple-200",
+  },
+  [STATUS_TAKEN]: {
+    label: "Diambil",
+    cls: "bg-gray-50   text-gray-600   border-gray-200",
+  },
+  [STATUS_CANCELED]: {
+    label: "Batal",
+    cls: "bg-red-50    text-red-600    border-red-200",
+  },
+  [STATUS_COMPLETED]: {
+    label: "Selesai",
+    cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+};
 
+function TxStatusBadge({ status }) {
+  const s = TX_STATUS_MAP[status] ?? TX_STATUS_MAP[STATUS_PENDING];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+      text-[9px] font-bold border flex-shrink-0 ${s.cls}`}
+    >
+      {s.label}
+    </span>
+  );
+}
+
+// ─── Action Button ────────────────────────────────────────────────────────────
 function ActionBtn({ onClick, title, variant = "gray", children }) {
   const cls = {
     amber:
-      "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-500 hover:text-white hover:border-amber-500",
-    gray: "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-800 hover:text-white hover:border-gray-800",
+      "bg-amber-50  text-amber-600  border-amber-200  hover:bg-amber-500  hover:text-white hover:border-amber-500",
+    gray: "bg-gray-50   text-gray-500   border-gray-200   hover:bg-gray-800   hover:text-white hover:border-gray-800",
     green:
       "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600",
+    red: "bg-red-50    text-red-500    border-red-200    hover:bg-red-500    hover:text-white hover:border-red-500",
   };
   return (
     <button
       onClick={onClick}
       title={title}
-      className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all duration-150 flex-shrink-0 ${cls[variant]}`}
+      className={`w-8 h-8 rounded-xl flex items-center justify-center border
+        transition-all duration-150 flex-shrink-0 ${cls[variant]}`}
     >
       {children}
     </button>
   );
 }
 
-// ─── TxCard — shared by mobile & tablet ──────────────────────────────────────
-
-function TxCard({ trx, onPay, onDetail, onPrint }) {
+// ─── TxCard mobile & tablet ───────────────────────────────────────────────────
+function TxCard({ trx, onPay, onDetail, onPrint, onCancel }) {
   const sisa = trx.grand_total - trx.total_paid;
   const isPaid = trx.payment_status === "PAID";
+  const isCanceled = trx.status === STATUS_CANCELED;
+  const showCancel = canCancel(trx);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
       <div
-        className={`h-[3px] flex-shrink-0 ${isPaid ? "bg-emerald-500" : "bg-red-400"}`}
+        className={`h-[3px] flex-shrink-0 ${
+          isCanceled ? "bg-red-400" : isPaid ? "bg-emerald-500" : "bg-amber-400"
+        }`}
       />
 
       <div className="p-4 flex flex-col gap-3 flex-1">
-        {/* Invoice + badge */}
+        {/* Invoice + badges */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-7 h-7 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -100,11 +163,17 @@ function TxCard({ trx, onPay, onDetail, onPrint }) {
               </p>
             </div>
           </div>
-          <PayBadge status={trx.payment_status} />
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            <PayBadge status={trx.payment_status} />
+            <TxStatusBadge status={trx.status} />
+          </div>
         </div>
 
         {/* Customer + total */}
-        <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 flex items-center justify-between gap-3">
+        <div
+          className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5
+          flex items-center justify-between gap-3"
+        >
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-6 h-6 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
               <User size={10} className="text-emerald-700" />
@@ -121,10 +190,13 @@ function TxCard({ trx, onPay, onDetail, onPrint }) {
             </div>
           </div>
           <div className="text-right flex-shrink-0">
-            <p className="text-sm font-bold text-gray-800 tabular-nums leading-tight">
+            <p
+              className={`text-sm font-bold tabular-nums leading-tight
+              ${isCanceled ? "line-through text-gray-400" : "text-gray-800"}`}
+            >
               {formatRupiah(trx.grand_total)}
             </p>
-            {sisa > 0 && (
+            {sisa > 0 && !isCanceled && (
               <p className="text-[10px] font-semibold text-red-500 tabular-nums mt-0.5">
                 Sisa {formatRupiah(sisa)}
               </p>
@@ -134,7 +206,7 @@ function TxCard({ trx, onPay, onDetail, onPrint }) {
 
         {/* Actions */}
         <div className="flex gap-2 mt-auto">
-          {!isPaid && (
+          {!isPaid && !isCanceled && (
             <button
               onClick={onPay}
               className="flex-1 h-9 flex items-center justify-center gap-1.5
@@ -146,11 +218,12 @@ function TxCard({ trx, onPay, onDetail, onPrint }) {
           )}
           <button
             onClick={onDetail}
-            className={`${isPaid ? "flex-[2]" : "flex-1"} h-9 flex items-center justify-center gap-1.5
-              bg-gray-900 hover:bg-gray-700 active:bg-gray-800 text-white
-              rounded-xl text-xs font-bold transition-colors`}
+            className="w-9 h-9 flex items-center justify-center flex-shrink-0
+              bg-white border border-emerald-200 text-emerald-600
+              hover:bg-emerald-600 hover:text-white hover:border-emerald-600
+              rounded-xl transition-all duration-150"
           >
-            <Eye size={12} strokeWidth={2} /> Detail
+            <Eye size={12} strokeWidth={2} />
           </button>
           <button
             onClick={onPrint}
@@ -162,6 +235,18 @@ function TxCard({ trx, onPay, onDetail, onPrint }) {
           >
             <Printer size={12} strokeWidth={2} />
           </button>
+          {showCancel && (
+            <button
+              onClick={onCancel}
+              title="Batalkan transaksi"
+              className="w-9 h-9 flex items-center justify-center flex-shrink-0
+                bg-white border border-red-200 text-red-500
+                hover:bg-red-500 hover:text-white hover:border-red-500
+                rounded-xl transition-all duration-150"
+            >
+              <XCircle size={12} strokeWidth={2} />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -169,9 +254,7 @@ function TxCard({ trx, onPay, onDetail, onPrint }) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-
 export default function TransactionHistory() {
-  // ── State (TIDAK DIUBAH) ──────────────────────────────────────────────────
   const [data, setData] = useState([]);
   const [dataToPrint, setDataToPrint] = useState(null);
   const printRef = useRef(null);
@@ -190,7 +273,10 @@ export default function TransactionHistory() {
   });
   const [paymentFilter, setPaymentFilter] = useState("ALL");
 
-  // ── Fetch (TIDAK DIUBAH) ──────────────────────────────────────────────────
+  // ── state khusus cancel modal ─────────────────────────────────────────────
+  const [cancelModal, setCancelModal] = useState({ isOpen: false, data: null });
+
+  // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchHistory = useCallback(
     async (isMounted = true) => {
       setLoading(true);
@@ -207,12 +293,12 @@ export default function TransactionHistory() {
           setTotalCount(Number(result?.meta?.total || 0));
         }
       } catch (err) {
-        // console.error("Gagal mengambil history:", err);
+        console.error("Gagal mengambil history:", err);
       } finally {
         if (isMounted) setLoading(false);
       }
     },
-    [pagination.pageIndex, pagination.pageSize, activeSearch, paymentFilter],
+    [pagination.pageIndex, pagination.pageSize, activeSearch, paymentFilter]
   );
 
   useEffect(() => {
@@ -223,7 +309,7 @@ export default function TransactionHistory() {
     };
   }, [fetchHistory]);
 
-  // ── Handlers (TIDAK DIUBAH) ───────────────────────────────────────────────
+  // ── Print ─────────────────────────────────────────────────────────────────
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `Nota_${dataToPrint?.invoice_no || "Transaksi"}`,
@@ -245,13 +331,17 @@ export default function TransactionHistory() {
     setTimeout(() => handlePrint(), 500);
   };
 
+  // ── Modal handlers ────────────────────────────────────────────────────────
   const handleOpenDetailPayment = (trx) => {
     setSelectedTrx(trx);
     setIsDetailOpen(true);
   };
   const handleOpenPaymentModal = (trx) =>
     setPaymentModal({ isOpen: true, data: trx });
+  const handleOpenCancelModal = (trx) =>
+    setCancelModal({ isOpen: true, data: trx });
 
+  // ── Search ────────────────────────────────────────────────────────────────
   const handleSearch = (e) => {
     e.preventDefault();
     setActiveSearch(searchTerm);
@@ -265,7 +355,7 @@ export default function TransactionHistory() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
-  // ── Columns (TIDAK DIUBAH logic) ──────────────────────────────────────────
+  // ── Columns ───────────────────────────────────────────────────────────────
   const columns = useMemo(
     () => [
       {
@@ -287,7 +377,10 @@ export default function TransactionHistory() {
           const trx = row.original;
           return (
             <div className="flex flex-col gap-1">
-              <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg inline-block w-fit">
+              <span
+                className="font-mono text-[11px] font-bold text-emerald-700
+              bg-emerald-50 px-2 py-0.5 rounded-lg inline-block w-fit"
+              >
                 {trx.invoice_no}
               </span>
               <span className="text-[10px] text-gray-400">
@@ -322,22 +415,35 @@ export default function TransactionHistory() {
           const sisa = trx.grand_total - trx.total_paid;
           return (
             <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-bold text-gray-800 tabular-nums">
+              <span
+                className={`text-sm font-bold tabular-nums
+              ${
+                trx.status === STATUS_CANCELED
+                  ? "line-through text-gray-400"
+                  : "text-gray-800"
+              }`}
+              >
                 {formatRupiah(trx.grand_total)}
               </span>
-              {trx.payment_status !== "PAID" && (
-                <span className="text-[10px] font-semibold text-red-500 tabular-nums">
-                  Sisa {formatRupiah(sisa)}
-                </span>
-              )}
+              {trx.payment_status !== "PAID" &&
+                trx.status !== STATUS_CANCELED && (
+                  <span className="text-[10px] font-semibold text-red-500 tabular-nums">
+                    Sisa {formatRupiah(sisa)}
+                  </span>
+                )}
             </div>
           );
         },
       },
       {
-        accessorKey: "payment_status",
+        id: "status",
         header: "Status",
-        cell: ({ getValue }) => <PayBadge status={getValue()} />,
+        cell: ({ row }) => (
+          <div className="flex flex-col gap-1">
+            <PayBadge status={row.original.payment_status} />
+            <TxStatusBadge status={row.original.status} />
+          </div>
+        ),
       },
       {
         id: "actions",
@@ -348,9 +454,12 @@ export default function TransactionHistory() {
         ),
         cell: ({ row }) => {
           const trx = row.original;
+          const isCanceled = trx.status === STATUS_CANCELED;
+          const showPay = trx.payment_status !== "PAID" && !isCanceled;
+          const showBatal = canCancel(trx);
           return (
             <div className="flex items-center gap-1.5 justify-end">
-              {trx.payment_status !== "PAID" && (
+              {showPay && (
                 <ActionBtn
                   onClick={() => handleOpenPaymentModal(trx)}
                   title="Pelunasan"
@@ -373,12 +482,21 @@ export default function TransactionHistory() {
               >
                 <Printer size={13} />
               </ActionBtn>
+              {showBatal && (
+                <ActionBtn
+                  onClick={() => handleOpenCancelModal(trx)}
+                  title="Batalkan transaksi"
+                  variant="red"
+                >
+                  <XCircle size={13} />
+                </ActionBtn>
+              )}
             </div>
           );
         },
       },
     ],
-    [],
+    []
   );
 
   const table = useReactTable({
@@ -391,7 +509,6 @@ export default function TransactionHistory() {
     getCoreRowModel: getCoreRowModel(),
   });
 
-  // ── Derived ───────────────────────────────────────────────────────────────
   const paidCount = data.filter((t) => t.payment_status === "PAID").length;
   const unpaidCount = data.filter((t) => t.payment_status !== "PAID").length;
 
@@ -401,8 +518,6 @@ export default function TransactionHistory() {
     { id: "PAID", label: "Lunas", icon: <CheckCircle2 size={13} /> },
   ];
 
-  // ── Shared pagination node ────────────────────────────────────────────────
-  // Satu instance dipakai oleh mobile, tablet, dan desktop
   const paginationEl = (
     <TablePagination table={table} totalEntries={totalCount} />
   );
@@ -412,7 +527,7 @@ export default function TransactionHistory() {
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-6">
       <AppHead title="Riwayat Transaksi" />
 
-      {/* ── Sticky header ─────────────────────────────────────────────────── */}
+      {/* Sticky header */}
       <div className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-20">
         <div
           className="max-w-screen-xl mx-auto px-4 md:px-6 py-3.5
@@ -454,11 +569,9 @@ export default function TransactionHistory() {
         </div>
       </div>
 
-      {/* ── Content ───────────────────────────────────────────────────────── */}
       <div className="max-w-screen-xl mx-auto px-4 md:px-6 py-4 space-y-4">
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-center">
-          {/* Filter tabs */}
           <div className="flex bg-white border border-gray-200 rounded-xl p-1 gap-1 shadow-sm flex-shrink-0">
             {TABS.map((tab) => (
               <button
@@ -481,7 +594,6 @@ export default function TransactionHistory() {
             ))}
           </div>
 
-          {/* Search */}
           <form
             onSubmit={handleSearch}
             className="flex items-center gap-2 bg-white border border-gray-200
@@ -505,8 +617,7 @@ export default function TransactionHistory() {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2
-                    text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   <X size={13} />
                 </button>
@@ -522,10 +633,9 @@ export default function TransactionHistory() {
           </form>
         </div>
 
-        {/* Data view — paginationNode dikirim untuk ditampilkan di mobile & tablet */}
+        {/* Data view */}
         <ResponsiveDataView
           data={data}
-          // loading={loading}
           emptyMessage="Tidak ada riwayat transaksi ditemukan"
           paginationNode={paginationEl}
           renderMobileCard={(trx) => (
@@ -535,6 +645,7 @@ export default function TransactionHistory() {
               onPay={() => handleOpenPaymentModal(trx)}
               onDetail={() => handleOpenDetailPayment(trx)}
               onPrint={() => handleOpenPrintPayment(trx)}
+              onCancel={() => handleOpenCancelModal(trx)}
             />
           )}
           renderDesktopTable={() => (
@@ -554,7 +665,7 @@ export default function TransactionHistory() {
                           >
                             {flexRender(
                               header.column.columnDef.header,
-                              header.getContext(),
+                              header.getContext()
                             )}
                           </th>
                         ))}
@@ -569,7 +680,13 @@ export default function TransactionHistory() {
                               <td key={j} className="px-5 py-4">
                                 <div
                                   className={`h-4 bg-gray-100 animate-pulse rounded-lg
-                                  ${j === 0 ? "w-6" : j === 4 ? "w-20" : "w-full"}`}
+                                  ${
+                                    j === 0
+                                      ? "w-6"
+                                      : j === 4
+                                      ? "w-24"
+                                      : "w-full"
+                                  }`}
                                 />
                               </td>
                             ))}
@@ -578,7 +695,12 @@ export default function TransactionHistory() {
                       : table.getRowModel().rows.map((row) => (
                           <tr
                             key={row.id}
-                            className="hover:bg-emerald-50/40 transition-colors duration-100"
+                            className={`transition-colors duration-100
+                              ${
+                                row.original.status === STATUS_CANCELED
+                                  ? "bg-red-50/30 hover:bg-red-50/60"
+                                  : "hover:bg-emerald-50/40"
+                              }`}
                           >
                             {row.getVisibleCells().map((cell) => (
                               <td
@@ -587,7 +709,7 @@ export default function TransactionHistory() {
                               >
                                 {flexRender(
                                   cell.column.columnDef.cell,
-                                  cell.getContext(),
+                                  cell.getContext()
                                 )}
                               </td>
                             ))}
@@ -596,7 +718,6 @@ export default function TransactionHistory() {
                   </tbody>
                 </table>
               </div>
-              {/* Desktop pagination */}
               <div className="border-t border-gray-100 bg-gray-50/50">
                 {paginationEl}
               </div>
@@ -605,7 +726,7 @@ export default function TransactionHistory() {
         />
       </div>
 
-      {/* ── Modals (TIDAK DIUBAH) ─────────────────────────────────────────── */}
+      {/* ── Modals ── */}
       <ProcessPaymentHistory
         isOpen={paymentModal.isOpen}
         transaction={paymentModal.data}
@@ -613,12 +734,28 @@ export default function TransactionHistory() {
         onSuccess={(updatedTransaction) => {
           setData((prev) =>
             prev.map((t) =>
-              t.id === updatedTransaction.id ? updatedTransaction : t,
-            ),
+              t.id === updatedTransaction.id ? updatedTransaction : t
+            )
           );
           setLastTransactionData(updatedTransaction);
           setPaymentModal({ isOpen: false, data: null });
           setShowSuccessModal(true);
+        }}
+      />
+
+      {/* ── Cancel Modal — form reason wajib ── */}
+      <CancelTransactionModal
+        isOpen={cancelModal.isOpen}
+        transaction={cancelModal.data}
+        onClose={() => setCancelModal({ isOpen: false, data: null })}
+        onSuccess={(updatedTransaction) => {
+          // Update state lokal: ubah status → CANCELED tanpa reload
+          setData((prev) =>
+            prev.map((t) =>
+              t.id === updatedTransaction.id ? updatedTransaction : t
+            )
+          );
+          setCancelModal({ isOpen: false, data: null });
         }}
       />
 
@@ -634,7 +771,6 @@ export default function TransactionHistory() {
         transaction={selectedTrx}
       />
 
-      {/* ── Hidden Print Area ─────────────────────────────────────────────────── */}
       {dataToPrint && (
         <div className="hidden">
           <ReceiptPrint ref={printRef} data={dataToPrint} />

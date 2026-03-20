@@ -17,7 +17,7 @@ const TransactionService = {
 
   // Simpan transaksi baru
   createTransaction: async (payload) => {
-    console.log("Payload sebelum enkripsi:", payload);
+    // console.log("Payload sebelum enkripsi:", payload);
 
     const finalPayload = {
       ...payload,
@@ -48,12 +48,19 @@ const TransactionService = {
     try {
       const response = await api.post(
         "/transactions/paymentUpdate",
-        finalPayload,
+        finalPayload
       );
       return response;
     } catch (error) {
       throw error;
     }
+  },
+
+  cancelTransaction: (id, reason) => {
+    return api.patch("/transactions/cancel", {
+      transaction_id: id,
+      reason,
+    });
   },
 };
 

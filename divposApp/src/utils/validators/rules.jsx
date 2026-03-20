@@ -32,7 +32,7 @@ export const rules = {
    */
   safeString: (
     value,
-    message = "Input mengandung karakter yang dilarang (; ' \" --)",
+    message = "Input mengandung karakter yang dilarang (; ' \" --)"
   ) => {
     if (!value) return null;
     // Melarang karakter ; ' " dan double dash -- yang sering dipakai SQLi
@@ -69,6 +69,12 @@ export const rules = {
     return null;
   },
 
+  maxLength: (value, length, message) => {
+    if (value && value.length > length) {
+      return message || `Maksimal ${length} karakter`;
+    }
+    return null;
+  },
   /**
    * ❌ No Letters: Hanya angka dan simbol (Cocok untuk input numerik murni)
    */
@@ -87,11 +93,11 @@ export const rules = {
   strongPassword: (
     value,
     minLength = 8,
-    message = "Password harus mengandung huruf besar, kecil, angka, dan karakter spesial",
+    message = "Password harus mengandung huruf besar, kecil, angka, dan karakter spesial"
   ) => {
     if (!value) return null;
     const regex = new RegExp(
-      `^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&]).{${minLength},}$`,
+      `^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&]).{${minLength},}$`
     );
     if (!regex.test(value)) {
       return message;
@@ -105,13 +111,15 @@ export const rules = {
   fileType: (
     file,
     allowedTypes = ["image/jpeg", "image/png", "image/webp"],
-    message,
+    message
   ) => {
     if (!file) return null;
     if (!allowedTypes.includes(file.type)) {
       return (
         message ||
-        `Format file harus: ${allowedTypes.map((t) => t.split("/")[1]).join(", ")}`
+        `Format file harus: ${allowedTypes
+          .map((t) => t.split("/")[1])
+          .join(", ")}`
       );
     }
     return null;
@@ -135,7 +143,7 @@ export const rules = {
    */
   username: (
     value,
-    message = "Username hanya boleh huruf, angka, titik, dan underscore",
+    message = "Username hanya boleh huruf, angka, titik, dan underscore"
   ) => {
     if (!value) return null;
     const regex = /^[a-zA-Z0-9._]+$/;
@@ -150,7 +158,7 @@ export const rules = {
    */
   phoneID: (
     value,
-    message = "Nomor harus diawali 08 atau 628 (10-14 digit)",
+    message = "Nomor harus diawali 08 atau 628 (10-14 digit)"
   ) => {
     if (!value) return null;
     // Bersihkan karakter non-angka dulu (seperti spasi atau -) sebelum dicek regex
