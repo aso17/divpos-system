@@ -1,5 +1,4 @@
 import React, { useMemo, useEffect, useState, useCallback } from "react";
-// import { useNavigate } from "react-router-dom"; // useNavigate tidak diperlukan jika pakai modal
 
 // --- IMPORT ICON SPESIFIK ---
 import Pencil from "lucide-react/dist/esm/icons/pencil";
@@ -57,7 +56,7 @@ export default function EmployeesList() {
         if (isMounted) setLoading(false);
       }
     },
-    [pagination.pageIndex, pagination.pageSize, activeSearch],
+    [pagination.pageIndex, pagination.pageSize, activeSearch]
   );
 
   useEffect(() => {
@@ -102,7 +101,7 @@ export default function EmployeesList() {
       `Apakah anda yakin ingin menghapus karyawan ${employee.full_name}?`,
       "Konfirmasi Hapus",
       "warning",
-      { confirmText: "Ya, Hapus", cancelText: "Batal" },
+      { confirmText: "Ya, Hapus", cancelText: "Batal" }
     );
 
     if (!setuju) return;
@@ -110,7 +109,7 @@ export default function EmployeesList() {
     try {
       const res = await EmployeeService.deleteEmployee(employee.id);
       setData((prevEmployees) =>
-        prevEmployees.filter((item) => item.id !== employee.id),
+        prevEmployees.filter((item) => item.id !== employee.id)
       );
       // -------------------------
 
@@ -185,7 +184,9 @@ export default function EmployeesList() {
               }`}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                }`}
               />
               {isActive ? "Aktif" : "Nonaktif"}
             </span>
@@ -226,7 +227,7 @@ export default function EmployeesList() {
         ),
       },
     ],
-    [handleDelete], // Hapus navigate dari dependency
+    [handleDelete] // Hapus navigate dari dependency
   );
 
   return (
@@ -415,8 +416,8 @@ export default function EmployeesList() {
               prev.map((item) =>
                 String(item.id) === String(dataEmployee.id)
                   ? dataEmployee
-                  : item,
-              ),
+                  : item
+              )
             );
           } else {
             setData((prev) => [dataEmployee, ...prev]);

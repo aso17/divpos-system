@@ -5,7 +5,6 @@ const TransactionService = {
     return api.get("/transactions/init-data");
   },
 
-  // Tambahkan parameter 'config' setelah 'params'
   searchCustomer: (params = {}, config = {}) => {
     return api.get("/transactions/customers", {
       params: {
