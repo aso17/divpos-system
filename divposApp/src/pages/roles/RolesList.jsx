@@ -53,7 +53,7 @@ export default function RolesList() {
         if (isMounted) setLoading(false);
       }
     },
-    [pagination.pageIndex, pagination.pageSize, activeSearch],
+    [pagination.pageIndex, pagination.pageSize, activeSearch]
   );
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function RolesList() {
       `Apakah anda yakin ingin menghapus role ${role.role_name}?`,
       "Konfirmasi Hapus",
       "warning",
-      { confirmText: "Ya, Hapus", cancelText: "Batal" },
+      { confirmText: "Ya, Hapus", cancelText: "Batal" }
     );
 
     if (!setuju) return;
@@ -103,7 +103,7 @@ export default function RolesList() {
       await showConfirm(
         res.data?.message || "Data role telah berhasil dihapus.",
         "Hapus Berhasil",
-        "success",
+        "success"
       );
     } catch (err) {
       const errorMsg =
@@ -163,7 +163,9 @@ export default function RolesList() {
               }`}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                }`}
               />
               {isActive ? "Aktif" : "Nonaktif"}
             </span>
@@ -213,7 +215,7 @@ export default function RolesList() {
         ),
       },
     ],
-    [navigate],
+    [navigate]
   );
 
   return (
@@ -274,7 +276,8 @@ export default function RolesList() {
             </div>
             <button
               type="submit"
-              className="bg-slate-900 text-white h-[32px] px-3 md:px-4 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-sm"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
+                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
               <Search size={14} className="md:hidden" />
               <span className="hidden md:block">CARI</span>
@@ -410,7 +413,7 @@ export default function RolesList() {
         onSuccess={(newRole) => {
           if (selectedRole) {
             setData((prev) =>
-              prev.map((r) => (r.id === newRole.id ? newRole : r)),
+              prev.map((r) => (r.id === newRole.id ? newRole : r))
             );
           } else {
             setData((prev) => {

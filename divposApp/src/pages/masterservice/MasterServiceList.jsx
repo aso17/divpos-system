@@ -57,7 +57,7 @@ export default function MasterServiceList() {
         if (isMounted) setLoading(false);
       }
     },
-    [pagination.pageIndex, pagination.pageSize, activeSearch],
+    [pagination.pageIndex, pagination.pageSize, activeSearch]
   );
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export default function MasterServiceList() {
     const setuju = await showConfirm(
       `Hapus layanan ${service.name}?`,
       "Konfirmasi Hapus",
-      "warning",
+      "warning"
     );
 
     if (!setuju) return;
@@ -166,7 +166,9 @@ export default function MasterServiceList() {
               }`}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                }`}
               />
               {isActive ? "Aktif" : "Nonaktif"}
             </span>
@@ -201,7 +203,7 @@ export default function MasterServiceList() {
         ),
       },
     ],
-    [pagination.pageIndex, pagination.pageSize],
+    [pagination.pageIndex, pagination.pageSize]
   );
 
   const table = useReactTable({
@@ -273,7 +275,8 @@ export default function MasterServiceList() {
 
             <button
               type="submit"
-              className="bg-slate-900 text-white h-[32px] px-3 md:px-4 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-sm"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
+                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
               <Search size={14} className="md:hidden" />
               <span className="hidden md:block">CARI</span>
@@ -363,7 +366,7 @@ export default function MasterServiceList() {
                         >
                           {flexRender(
                             header.column.columnDef.header,
-                            header.getContext(),
+                            header.getContext()
                           )}
                         </th>
                       ))}
@@ -383,7 +386,7 @@ export default function MasterServiceList() {
                         >
                           {flexRender(
                             cell.column.columnDef.cell,
-                            cell.getContext(),
+                            cell.getContext()
                           )}
                         </td>
                       ))}
@@ -417,7 +420,7 @@ export default function MasterServiceList() {
         onSuccess={(newService) => {
           if (selectedService) {
             setData((prev) =>
-              prev.map((s) => (s.id === newService.id ? newService : s)),
+              prev.map((s) => (s.id === newService.id ? newService : s))
             );
           } else {
             setData((prev) => [newService, ...prev]);

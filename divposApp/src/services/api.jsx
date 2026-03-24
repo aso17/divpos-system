@@ -59,7 +59,7 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error),
+  (error) => Promise.reject(error)
 );
 
 /**
@@ -129,7 +129,7 @@ api.interceptors.response.use(
     handleApiError(error);
 
     return Promise.reject(error);
-  },
+  }
 );
 
 /**
@@ -145,7 +145,7 @@ function handleApiError(error) {
     if (error.code === "ECONNABORTED") {
       showToast("Koneksi lambat (Timeout). Coba lagi.", "error");
     } else {
-      showToast("Koneksi terputus. Cek internet Mas A_so.", "error");
+      showToast("Koneksi terputus. Cek internet", "error");
     }
     return;
   }

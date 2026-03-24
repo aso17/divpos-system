@@ -54,7 +54,7 @@ export default function CategoryList() {
         if (isMounted) setLoading(false);
       }
     },
-    [pagination.pageIndex, pagination.pageSize, activeSearch],
+    [pagination.pageIndex, pagination.pageSize, activeSearch]
   );
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export default function CategoryList() {
       `Apakah anda yakin ingin menghapus kategori "${category.name}"?`,
       "Konfirmasi Hapus",
       "warning",
-      { confirmText: "Ya, Hapus", cancelText: "Batal" },
+      { confirmText: "Ya, Hapus", cancelText: "Batal" }
     );
 
     if (!setuju) return;
@@ -167,7 +167,9 @@ export default function CategoryList() {
               }`}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                }`}
               />
               {isActive ? "Aktif" : "Nonaktif"}
             </span>
@@ -202,7 +204,7 @@ export default function CategoryList() {
         ),
       },
     ],
-    [],
+    []
   );
 
   const table = useReactTable({
@@ -274,7 +276,8 @@ export default function CategoryList() {
             </div>
             <button
               type="submit"
-              className="bg-slate-900 text-white h-[32px] px-4 rounded-lg text-[9px] font-black uppercase"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
+                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
               CARI
             </button>
@@ -370,7 +373,7 @@ export default function CategoryList() {
                         >
                           {flexRender(
                             header.column.columnDef.header,
-                            header.getContext(),
+                            header.getContext()
                           )}
                         </th>
                       ))}
@@ -390,7 +393,7 @@ export default function CategoryList() {
                         >
                           {flexRender(
                             cell.column.columnDef.cell,
-                            cell.getContext(),
+                            cell.getContext()
                           )}
                         </td>
                       ))}
@@ -424,7 +427,7 @@ export default function CategoryList() {
         onSuccess={(newCategory) => {
           if (selectedCategory) {
             setData((prev) =>
-              prev.map((c) => (c.id === newCategory.id ? newCategory : c)),
+              prev.map((c) => (c.id === newCategory.id ? newCategory : c))
             );
           } else {
             setData((prev) => [newCategory, ...prev]);

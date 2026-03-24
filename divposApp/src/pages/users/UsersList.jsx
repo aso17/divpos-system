@@ -51,7 +51,7 @@ export default function UsersList() {
         if (isMounted) setLoading(false);
       }
     },
-    [pagination.pageIndex, pagination.pageSize, activeSearch],
+    [pagination.pageIndex, pagination.pageSize, activeSearch]
   );
 
   useEffect(() => {
@@ -89,7 +89,7 @@ export default function UsersList() {
       `Apakah anda yakin ingin menghapus ${user.full_name}?`,
       "Konfirmasi Hapus",
       "warning",
-      { confirmText: "Ya, Hapus", cancelText: "Batal" },
+      { confirmText: "Ya, Hapus", cancelText: "Batal" }
     );
 
     if (!setuju) return;
@@ -219,7 +219,7 @@ export default function UsersList() {
         ),
       },
     ],
-    [handleViewDetail, handleEdit, handleDelete],
+    [handleViewDetail, handleEdit, handleDelete]
   );
 
   return (
@@ -280,7 +280,8 @@ export default function UsersList() {
             </div>
             <button
               type="submit"
-              className="bg-slate-900 text-white h-[32px] px-3 md:px-4 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-sm"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
+                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
               <SearchIcon size={14} className="md:hidden" />
               <span className="hidden md:block">CARI</span>
@@ -410,7 +411,7 @@ export default function UsersList() {
         onSuccess={(datauser) => {
           if (selectedUser) {
             setData((prevUsers) =>
-              prevUsers.map((u) => (u.id === datauser.id ? datauser : u)),
+              prevUsers.map((u) => (u.id === datauser.id ? datauser : u))
             );
           } else {
             setData((prevUsers) => {

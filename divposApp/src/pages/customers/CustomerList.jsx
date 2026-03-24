@@ -440,9 +440,8 @@ export default function CustomerList() {
             </div>
             <button
               type="submit"
-              className="bg-slate-900 text-white h-[30px] px-3 md:px-4 rounded-lg
-                text-[9px] font-black uppercase flex items-center justify-center shrink-0
-                active:scale-95 transition-all shadow-sm"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
+                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
               <Search size={13} className="md:hidden" />
               <span className="hidden md:block">CARI</span>

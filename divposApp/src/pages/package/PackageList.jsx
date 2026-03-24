@@ -55,7 +55,7 @@ export default function PackageList() {
         if (isMounted) setLoading(false);
       }
     },
-    [pagination.pageIndex, pagination.pageSize, activeSearch],
+    [pagination.pageIndex, pagination.pageSize, activeSearch]
   );
 
   useEffect(() => {
@@ -88,7 +88,7 @@ export default function PackageList() {
       {
         confirmText: "Ya, Hapus",
         cancelText: "Batal",
-      },
+      }
     );
 
     if (!setuju) return;
@@ -223,7 +223,7 @@ export default function PackageList() {
         ),
       },
     ],
-    [],
+    []
   );
 
   const table = useReactTable({
@@ -300,7 +300,8 @@ export default function PackageList() {
 
             <button
               type="submit"
-              className="bg-slate-900 text-white h-[32px] px-3 md:px-4 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-sm"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
+                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
               <Search size={14} className="md:hidden" />
 
@@ -339,7 +340,11 @@ export default function PackageList() {
               </div>
 
               <div
-                className={`px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase border shrink-0 ${pkg.is_active ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"}`}
+                className={`px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase border shrink-0 ${
+                  pkg.is_active
+                    ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                    : "bg-rose-50 text-rose-600 border-rose-100"
+                }`}
               >
                 {pkg.is_active ? "Aktif" : "Off"}
               </div>
@@ -423,7 +428,7 @@ export default function PackageList() {
                           {flexRender(
                             header.column.columnDef.header,
 
-                            header.getContext(),
+                            header.getContext()
                           )}
                         </th>
                       ))}
@@ -442,7 +447,7 @@ export default function PackageList() {
                           {flexRender(
                             cell.column.columnDef.cell,
 
-                            cell.getContext(),
+                            cell.getContext()
                           )}
                         </td>
                       ))}
@@ -483,7 +488,7 @@ export default function PackageList() {
         onSuccess={(dataPackage) => {
           if (selectedPackage) {
             setData((prev) =>
-              prev.map((p) => (p.id === dataPackage.id ? dataPackage : p)),
+              prev.map((p) => (p.id === dataPackage.id ? dataPackage : p))
             );
           } else {
             setData((prev) => [dataPackage, ...prev]);

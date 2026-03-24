@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import AppHead from "../../components/common/AppHead";
 import LoadingDots from "../../components/common/LoadingDots";
 import RegisterForm from "../register/RegisterForm";
+import { RegistrationService } from "../../services/RegistrationService";
 import LoginForm from "./LoginForm";
 
 export default function Login() {
@@ -13,14 +14,34 @@ export default function Login() {
   const [isRegister, setIsRegister] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // --- PERBAIKAN 1 DI SINI: Tambahkan State businessTypes ---
+  const [businessTypes, setBusinessTypes] = useState([]);
+
   const { login: loginFromContext } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    SystemService.getAppConfig()
-      .then((res) => setConfig(res.data))
-      .catch(() => setConfig({}))
-      .finally(() => setLoadingConfig(false));
+    // --- PERBAIKAN 2 DI SINI: Ambil Config DAN Business Types ---
+    const fetchData = async () => {
+      setLoadingConfig(true);
+      try {
+        const [configRes, bizRes] = await Promise.all([
+          SystemService.getAppConfig().catch(() => ({ data: {} })),
+          RegistrationService.getBisnisType().catch(() => ({ data: [] })),
+        ]);
+
+        setConfig(configRes.data);
+
+        // Sesuaikan dengan struktur response BE Mas (apakah res.data atau res.data.data)
+        setBusinessTypes(bizRes.data.data || bizRes.data || []);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoadingConfig(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
   const handleLogin = async (values) => {
@@ -31,29 +52,36 @@ export default function Login() {
     } catch (error) {
       const message =
         error.response?.data?.message || error.message || "Login gagal";
-
       window.dispatchEvent(
-        new CustomEvent("global-toast", {
-          detail: { message, type: "error" },
-        }),
+        new CustomEvent("global-toast", { detail: { message, type: "error" } })
       );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleRegister = async (values) => {
+  const handleRegister = async (payload) => {
     setIsSubmitting(true);
     try {
-      console.log(values);
+      const response = await RegistrationService.register(payload);
+      if (response.data.success) {
+        window.dispatchEvent(
+          new CustomEvent("global-toast", {
+            detail: {
+              message: "Registrasi Berhasil! Silakan Login.",
+              type: "success",
+            },
+          })
+        );
+        setIsRegister(false);
+      }
     } catch (error) {
       const message =
-        error.response?.data?.message || error.message || "Register gagal";
-
+        error.response?.data?.message || "Gagal mendaftarkan bisnis";
       window.dispatchEvent(
         new CustomEvent("global-toast", {
-          detail: { message, type: "error" },
-        }),
+          detail: { message: message, type: "error" },
+        })
       );
     } finally {
       setIsSubmitting(false);
@@ -65,117 +93,72 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4 py-6">
       {loadingConfig && <LoadingDots overlay />}
-
       <AppHead title="Auth" icon={config?.favicon_path} />
 
-      <div className="relative w-full max-w-5xl bg-white rounded-3xl shadow-xl overflow-hidden md:h-[500px] flex flex-col md:flex-row">
-        {/* LEFT PANEL */}
+      <div className="relative w-full max-w-5xl bg-white rounded-3xl shadow-xl overflow-hidden md:h-[600px] flex flex-col md:flex-row">
+        {/* PANEL OVERLAY (GREEN) */}
         <div
           className={`
-    md:absolute md:top-0 md:left-0 md:h-full md:w-1/2
-    text-white flex items-center justify-center
-    text-center p-8 md:p-10
-    transition-all duration-500
-    z-20
-    ${
-      isRegister
-        ? "md:rounded-l-[120px] md:rounded-r-[16px]"
-        : "md:rounded-r-[120px] md:rounded-l-[16px]"
-    }
-    ${isRegister ? "md:translate-x-full" : "md:translate-x-0"}
-  `}
+            md:absolute md:top-0 md:left-0 md:h-full md:w-1/2
+            text-white flex items-center justify-center
+            text-center p-8 md:p-10 transition-all duration-700 z-20
+            ${
+              isRegister
+                ? "md:translate-x-full md:rounded-l-[100px]"
+                : "md:translate-x-0 md:rounded-r-[100px]"
+            }
+          `}
           style={{ backgroundColor: primaryColor }}
         >
           <div className="max-w-xs flex flex-col items-center">
-            {/* LOGO */}
+            {/* Logo Logic */}
             <div className="mb-6 flex justify-center">
               {config?.logo_path ? (
                 <img
                   src={config.logo_path}
-                  alt={config?.appName}
-                  className="h-18 md:h-20 object-contain rounded-2xl shadow-xl"
+                  className="h-16 object-contain rounded-xl shadow-lg"
+                  alt="logo"
                 />
               ) : (
-                <div
-                  className=" h-16 w-16 md:h-20 md:w-20
-            rounded-2xl 
-            flex items-center justify-center 
-            text-white font-bold text-2xl
-            backdrop-blur-sm bg-white/20
-            shadow-lg
-          "
-                >
-                  {config?.appName?.charAt(0) || "A"}
+                <div className="h-16 w-16 rounded-xl flex items-center justify-center text-white font-bold text-2xl backdrop-blur-sm bg-white/20 shadow-lg">
+                  {config?.appName?.charAt(0) || "D"}
                 </div>
               )}
             </div>
 
-            {!isRegister ? (
-              <>
-                <h2 className="text-xl md:text-2xl font-bold mb-3">
-                  Hello, Friend!
-                </h2>
-
-                <p className="text-xs md:text-sm opacity-90 mb-5">
-                  Register to use all features of{" "}
-                  <span className="font-semibold">
-                    {config?.appName || "Application"}
-                  </span>
-                </p>
-
-                <button
-                  onClick={() => setIsRegister(true)}
-                  className="border border-white px-5 py-2 rounded-full text-sm hover:bg-white hover:text-slate-800 transition"
-                >
-                  SIGN UP
-                </button>
-              </>
-            ) : (
-              <>
-                <h2 className="text-xl md:text-2xl font-bold mb-3">
-                  Welcome Back!
-                </h2>
-
-                <p className="text-xs md:text-sm opacity-90 mb-5">
-                  Login to continue using{" "}
-                  <span className="font-semibold">
-                    {config?.appName || "Application"}
-                  </span>
-                </p>
-
-                <button
-                  onClick={() => setIsRegister(false)}
-                  className="border border-white px-5 py-2 rounded-full text-sm hover:bg-white hover:text-slate-800 transition"
-                >
-                  SIGN IN
-                </button>
-              </>
-            )}
+            <h2 className="text-2xl font-black uppercase mb-3">
+              {isRegister ? "Welcome Back!" : "Hello, Friend!"}
+            </h2>
+            <p className="text-xs opacity-90 mb-8 uppercase tracking-widest font-medium">
+              {isRegister
+                ? "Login to continue managing your business"
+                : "Start your business journey with us today"}
+            </p>
+            <button
+              onClick={() => setIsRegister(!isRegister)}
+              className="border-2 border-white px-10 py-2 rounded-full text-[10px] font-black tracking-widest uppercase hover:bg-white hover:text-slate-800 transition-all"
+            >
+              {isRegister ? "Sign In" : "Sign Up"}
+            </button>
           </div>
         </div>
 
         {/* FORM SIDE */}
         <div
-          className={`
-            w-full md:w-1/2
-            flex items-center justify-center
-            p-6 md:p-10
-            transition-all duration-500
-            ${isRegister ? "md:ml-0" : "md:ml-auto"}
-          `}
+          className={`w-full md:w-1/2 flex items-center justify-center p-6 md:p-10 transition-all duration-700 ${
+            isRegister ? "md:order-1" : "md:ml-auto md:order-2"
+          }`}
         >
           <div className="w-full max-w-sm">
-            {/* APP NAME */}
-            <h2 className="text-xl md:text-2xl font-semibold text-center mb-6">
-              {isRegister
-                ? `Create ${config?.appName || "Account"}`
-                : `Sign In to ${config?.appName || "App"}`}
+            <h2 className="text-2xl font-black text-slate-800 text-center mb-8 uppercase tracking-tighter">
+              {isRegister ? "Create Account" : "Sign In"}
             </h2>
 
             {isRegister ? (
               <RegisterForm
                 isSubmitting={isSubmitting}
                 onSubmit={handleRegister}
+                businessTypes={businessTypes} // SEKARANG SUDAH DEFINED
               />
             ) : (
               <LoginForm

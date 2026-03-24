@@ -55,7 +55,7 @@ export default function OutletList() {
         if (isMounted) setLoading(false);
       }
     },
-    [pagination.pageIndex, pagination.pageSize, activeSearch, filterStatus],
+    [pagination.pageIndex, pagination.pageSize, activeSearch, filterStatus]
   );
 
   useEffect(() => {
@@ -85,7 +85,7 @@ export default function OutletList() {
       `Apakah anda yakin ingin menghapus outlet ${outlet.name}?`,
       "Konfirmasi Hapus",
       "warning",
-      { confirmText: "Ya, Hapus", cancelText: "Batal" },
+      { confirmText: "Ya, Hapus", cancelText: "Batal" }
     );
 
     if (!setuju) return;
@@ -174,7 +174,9 @@ export default function OutletList() {
               }`}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                }`}
               />
               {isActive ? "Operasional" : "Tutup"}
             </span>
@@ -209,7 +211,7 @@ export default function OutletList() {
         ),
       },
     ],
-    [],
+    []
   );
 
   const table = useReactTable({
@@ -315,7 +317,8 @@ export default function OutletList() {
             {/* 3. Tombol CARI */}
             <button
               type="submit"
-              className="bg-slate-900 text-white h-[40px] md:h-[34px] px-5 md:px-6 rounded-xl md:rounded-lg text-[10px] md:text-[9px] font-black uppercase tracking-wider shadow-md hover:bg-black active:scale-95 transition-all flex items-center justify-center shrink-0"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
+                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
               CARI
             </button>
@@ -348,7 +351,11 @@ export default function OutletList() {
                 </span>
               </div>
               <div
-                className={`px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase border shrink-0 ${outlet.is_active ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"}`}
+                className={`px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase border shrink-0 ${
+                  outlet.is_active
+                    ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                    : "bg-rose-50 text-rose-600 border-rose-100"
+                }`}
               >
                 {outlet.is_active ? "Operasional" : "Tutup"}
               </div>
@@ -403,7 +410,7 @@ export default function OutletList() {
                         >
                           {flexRender(
                             header.column.columnDef.header,
-                            header.getContext(),
+                            header.getContext()
                           )}
                         </th>
                       ))}
@@ -420,7 +427,7 @@ export default function OutletList() {
                         <td key={cell.id} className="px-6 py-4 align-middle">
                           {flexRender(
                             cell.column.columnDef.cell,
-                            cell.getContext(),
+                            cell.getContext()
                           )}
                         </td>
                       ))}
@@ -454,7 +461,7 @@ export default function OutletList() {
         onSuccess={(newOutlet) => {
           if (selectedOutlet) {
             setData((prev) =>
-              prev.map((o) => (o.id === newOutlet.id ? newOutlet : o)),
+              prev.map((o) => (o.id === newOutlet.id ? newOutlet : o))
             );
           } else {
             setData((prev) => [newOutlet, ...prev]);

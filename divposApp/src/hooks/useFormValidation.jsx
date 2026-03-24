@@ -8,7 +8,6 @@ export function useFormValidation(initialValues, schema) {
   const handleChange = useCallback((field, value) => {
     setValues((prev) => ({ ...prev, [field]: value }));
 
-    // Hapus error secara real-time saat user mulai mengetik/memperbaiki
     setErrors((prev) => {
       if (prev[field]) {
         const newErrors = { ...prev };
@@ -19,14 +18,34 @@ export function useFormValidation(initialValues, schema) {
     });
   }, []);
 
-  const validate = (manualValues = null) => {
-    // Jika ada data yang dikirim manual (e.g. values terbaru), gunakan itu.
-    // Jika tidak, gunakan state values saat ini.
-    const dataToValidate = manualValues || values;
-    const validationErrors = validateForm(dataToValidate, schema);
+  // MODIFIKASI DI SINI: Tambahkan parameter targetFields
+  const validate = (targetFields = null) => {
+    // 1. Ambil semua error dari seluruh schema dulu
+    const allValidationErrors = validateForm(values, schema);
 
-    setErrors(validationErrors);
-    return Object.keys(validationErrors).length === 0;
+    // 2. Jika user memberikan targetFields (e.g. ['name', 'address'])
+    if (targetFields && Array.isArray(targetFields)) {
+      const filteredErrors = {};
+
+      targetFields.forEach((field) => {
+        if (allValidationErrors[field]) {
+          filteredErrors[field] = allValidationErrors[field];
+        }
+      });
+
+      // Update errors hanya untuk field yang ditarget (tanpa menghapus error field lain yang mungkin sudah ada)
+      setErrors((prev) => ({
+        ...prev,
+        ...filteredErrors,
+      }));
+
+      // Return true jika tidak ada error di field yang ditarget
+      return Object.keys(filteredErrors).length === 0;
+    }
+
+    // 3. Jika tidak ada targetFields, validasi normal (semua)
+    setErrors(allValidationErrors);
+    return Object.keys(allValidationErrors).length === 0;
   };
 
   return {
