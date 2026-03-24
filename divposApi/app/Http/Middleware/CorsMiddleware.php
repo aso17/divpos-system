@@ -28,6 +28,7 @@ class CorsMiddleware
         return $this->handleAllowed($request, $next, $origin);
     }
 
+
     /**
      * Daftar origin yang diizinkan
      */

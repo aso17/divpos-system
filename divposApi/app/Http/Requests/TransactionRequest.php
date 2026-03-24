@@ -12,19 +12,29 @@ class TransactionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Pastikan user punya profil employee/tenant
         return Auth::check() && !is_null(Auth::user()->employee);
     }
 
     protected function prepareForValidation()
     {
+        // 1. Ambil data customer asli dari input
+        $customer = $this->input('customer');
+
+        // 2. Dekripsi ID customer jika ada (agar lolos validasi 'integer')
+        if (!empty($customer['id'])) {
+            $customer['id'] = CryptoHelper::decrypt($customer['id']);
+        }
+
+        // 3. Merge semua data yang didekripsi
         $this->merge([
+            'tenant_id'         => Auth::user()->employee->tenant_id,
             'outlet_id'         => CryptoHelper::decrypt($this->outlet_id),
             'payment_method_id' => CryptoHelper::decrypt($this->payment_method_id),
-            'tenant_id'         => Auth::user()->employee->tenant_id,
-            'customer_id'       => $this->input('customer.id') ? CryptoHelper::decrypt($this->input('customer.id')) : null,
+            'customer'          => $customer, // Data customer yang sudah didekripsi ID-nya
+            'customer_id'       => $customer['id'] ?? null // Shortcut untuk mempermudah di Controller
         ]);
 
+        // 4. Dekripsi Item Packages
         if (is_array($this->items)) {
             $decryptedItems = array_map(function ($item) {
                 if (isset($item['package_id'])) {
@@ -51,11 +61,13 @@ class TransactionRequest extends FormRequest
                 'required', 'integer',
                 Rule::exists('Ms_payment_methods', 'id')
             ],
+            // Validasi customer.id sekarang aman karena sudah di-decrypt di prepareForValidation
             'customer.id'     => 'nullable|integer',
             'customer.is_new' => 'required|boolean',
             'customer.name'   => ['nullable', 'string', 'max:100', 'regex:/^[a-zA-Z0-9\s.]+$/'],
             'customer.phone'  => 'nullable|string|min:10|max:15|regex:/^[0-9]+$/',
-            'items'           => 'required|array|min:1',
+
+            'items'              => 'required|array|min:1',
             'items.*.package_id' => [
                 'required', 'integer',
                 Rule::exists('Ms_packages', 'id')->where('tenant_id', $tenantId)
@@ -66,17 +78,13 @@ class TransactionRequest extends FormRequest
         ];
     }
 
-    /**
-   /**
-     * Logic tambahan setelah aturan dasar terpenuhi
-     */
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
-            // Jika validasi dasar (required, numeric, dll) sudah gagal, stop.
-            if ($validator->errors()->any()) return;
+            if ($validator->errors()->any()) {
+                return;
+            }
 
-            // Ambil data payment method dari DB
             $method = Ms_PaymentMethod::find($this->payment_method_id);
 
             if ($method) {
@@ -84,21 +92,18 @@ class TransactionRequest extends FormRequest
                 $pay = (float)$this->payment_amount;
                 $totalInput = $dp + $pay;
 
-                // 1. VALIDASI ZERO PAY: Jika metode mewajibkan uang masuk (CASH/QRIS)
-                // Tapi kasir tidak isi DP maupun nominal Bayar
+                // Validasi kewajiban bayar
                 if (!$method->allow_zero_pay && $totalInput <= 0) {
                     $validator->errors()->add(
-                        'payment_amount', 
+                        'payment_amount',
                         "Metode {$method->name} mewajibkan pembayaran. Masukkan nominal bayar atau DP."
                     );
                 }
 
-                // 2. VALIDASI DP DINAMIS: Mas A_so bilang Salon sering ada bayar awal (DP)
-                // Tapi kita cek dulu, apakah metodenya diizinkan untuk DP?
-                // Jika kasir input DP > 0 tapi settingan 'is_dp_enabled' FALSE
+                // Validasi izin DP
                 if ($dp > 0 && !$method->is_dp_enabled) {
                     $validator->errors()->add(
-                        'dp_amount', 
+                        'dp_amount',
                         "Metode {$method->name} tidak mendukung pembayaran DP (Uang Muka)."
                     );
                 }
@@ -106,14 +111,13 @@ class TransactionRequest extends FormRequest
         });
     }
 
-    
-
     public function messages(): array
     {
         return [
             'outlet_id.exists'          => 'Outlet tidak valid atau bukan milik Anda.',
             'items.*.package_id.exists' => 'Salah satu layanan tidak ditemukan di bisnis Anda.',
             'items.*.qty.min'           => 'Jumlah/berat tidak boleh nol.',
+            'customer.id.integer'       => 'ID Pelanggan tidak valid.',
             'customer.name.regex'       => 'Nama pelanggan mengandung karakter ilegal.',
             'customer.phone.regex'      => 'Nomor telepon hanya boleh angka.',
         ];

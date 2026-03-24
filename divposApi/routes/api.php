@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\{
     AppconfigController,
+    RegistrationController,
     AuthController,
     MenuController,
     UserController,
@@ -26,9 +27,13 @@ use App\Http\Controllers\{
 | 1️⃣ PUBLIC AREA
 |--------------------------------------------------------------------------
 */
+
+
 Route::middleware('api-public')->group(function () {
     // Route::get('/project-info', [ProjectInfoController::class, 'show']);
     Route::get('/app-config', [AppconfigController::class, 'show']);
+    Route::get('/busines-type', [RegistrationController::class, 'getBusinessTypes']);
+    Route::post('/register', [RegistrationController::class, 'store']);
 });
 
 /*

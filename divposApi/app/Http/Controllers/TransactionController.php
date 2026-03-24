@@ -147,6 +147,7 @@ class TransactionController extends Controller
             $transaction = $this->transactionService->createTransaction($payload);
             return response()->json([
                 'status' => 'success',
+                // 'datapay' => $payload,
                 'message' => 'Transaksi Berhasil',
                 'data' => new TransactionResource(
                     $transaction->load(['details', 'customer', 'outlet', 'initialPaymentMethod'])
