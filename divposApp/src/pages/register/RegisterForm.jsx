@@ -10,23 +10,30 @@ export default function RegisterForm({
 }) {
   const [step, setStep] = useState(1);
 
-  // --- INTEGRASI useFormValidation ---
   const { values, errors, handleChange, validate, setErrors } =
     useFormValidation(
       {
-        // INITIAL VALUES
+        // Step 1 — Business Info
         name: "",
         business_type_id: "",
         address: "",
+        // Step 2 — Owner / Account
+        full_name: "", // → Ms_employees.full_name (NOT NULL)
         email: "",
         phone: "",
         password: "",
+        confirm_password: "",
+        // username TIDAK ada di form — auto-generate di backend dari email
       },
       {
-        // VALIDATION SCHEMA (Sesuai kolom Ms_tenants)
         name: [(v) => rules.required(v, "Nama bisnis wajib diisi")],
         business_type_id: [(v) => rules.required(v, "Pilih jenis bisnis")],
         address: [(v) => rules.required(v, "Alamat wajib diisi")],
+
+        full_name: [
+          (v) => rules.required(v, "Nama lengkap wajib diisi"),
+          (v) => rules.minLength(v, 3, "Min. 3 karakter"),
+        ],
         email: [
           (v) => rules.required(v, "Email wajib diisi"),
           (v) => rules.email(v, "Format email salah"),
@@ -39,16 +46,24 @@ export default function RegisterForm({
           (v) => rules.required(v, "Password wajib diisi"),
           (v) => rules.strongPassword(v, 8, "Min 8 Karakter, Huruf & Simbol"),
         ],
+        confirm_password: [
+          (v) => rules.required(v, "Konfirmasi password wajib diisi"),
+          (v, allValues) => v === allValues.password || "Password tidak cocok",
+        ],
       }
     );
 
   const handleNext = () => {
-    // Validasi field Step 1 saja
     const step1Fields = ["name", "business_type_id", "address"];
     const isValid = validate(step1Fields);
+    if (isValid) setStep(2);
+  };
 
-    if (isValid) {
-      setStep(2);
+  // Re-validate confirm_password saat password berubah
+  const handlePasswordChange = (val) => {
+    handleChange("password", val);
+    if (values.confirm_password) {
+      handleChange("confirm_password", values.confirm_password);
     }
   };
 
@@ -57,8 +72,10 @@ export default function RegisterForm({
     if (step === 1) {
       handleNext();
     } else {
-      // Validasi semua field sebelum submit final
       if (validate()) {
+        // Backend RegistrationRequest.prepareForValidation() handle:
+        // - confirm_password → password_confirmation
+        // - username         → auto-generate dari email
         onSubmit(values);
       }
     }
@@ -66,27 +83,27 @@ export default function RegisterForm({
 
   const prevStep = () => {
     setStep(1);
-    setErrors({}); // Bersihkan error saat balik agar tidak mengganggu visual
+    setErrors({});
   };
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 min-h-[350px] flex flex-col justify-between"
+      className="space-y-4 flex flex-col justify-between"
     >
       <div>
-        {/* STEP INDICATOR */}
+        {/* STEP INDICATOR — >= agar step selesai tetap hijau */}
         <div className="flex justify-center mb-6 space-x-2">
           <div
             className={`h-1.5 w-10 rounded-full transition-all ${
-              step === 1 ? "bg-emerald-500" : "bg-slate-200"
+              step >= 1 ? "bg-emerald-500" : "bg-slate-200"
             }`}
-          ></div>
+          />
           <div
             className={`h-1.5 w-10 rounded-full transition-all ${
-              step === 2 ? "bg-emerald-500" : "bg-slate-200"
+              step >= 2 ? "bg-emerald-500" : "bg-slate-200"
             }`}
-          ></div>
+          />
         </div>
 
         <p className="text-center text-[10px] text-slate-400 uppercase tracking-[0.2em] mb-6 font-bold italic">
@@ -97,14 +114,18 @@ export default function RegisterForm({
         {step === 1 && (
           <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-500">
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-500 uppercase ml-1">
+              <label
+                htmlFor="name"
+                className="text-[9px] font-black text-slate-500 uppercase ml-1"
+              >
                 Nama Bisnis
               </label>
               <input
+                id="name"
                 type="text"
                 value={values.name}
                 onChange={(e) => handleChange("name", e.target.value)}
-                placeholder="Contoh:Toko atau perusahaan"
+                placeholder="Nama Bisnis"
                 className={
                   inputClasses({ error: !!errors.name }) +
                   " rounded-xl px-4 py-2.5 text-sm"
@@ -116,10 +137,14 @@ export default function RegisterForm({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-500 uppercase ml-1">
+              <label
+                htmlFor="business_type_id"
+                className="text-[9px] font-black text-slate-500 uppercase ml-1"
+              >
                 Jenis Bisnis
               </label>
               <select
+                id="business_type_id"
                 value={values.business_type_id}
                 onChange={(e) =>
                   handleChange("business_type_id", e.target.value)
@@ -144,10 +169,14 @@ export default function RegisterForm({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-500 uppercase ml-1">
+              <label
+                htmlFor="address"
+                className="text-[9px] font-black text-slate-500 uppercase ml-1"
+              >
                 Alamat Utama
               </label>
               <textarea
+                id="address"
                 value={values.address}
                 onChange={(e) => handleChange("address", e.target.value)}
                 placeholder="Alamat lengkap outlet..."
@@ -166,14 +195,44 @@ export default function RegisterForm({
           </div>
         )}
 
-        {/* STEP 2: KONTAK & PASSWORD */}
+        {/* STEP 2: DATA OWNER & KEAMANAN AKUN */}
         {step === 2 && (
           <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-500">
+            {/* full_name → Ms_employees.full_name (NOT NULL) */}
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-500 uppercase ml-1">
+              <label
+                htmlFor="full_name"
+                className="text-[9px] font-black text-slate-500 uppercase ml-1"
+              >
+                Nama Lengkap Owner
+              </label>
+              <input
+                id="full_name"
+                type="text"
+                value={values.full_name}
+                onChange={(e) => handleChange("full_name", e.target.value)}
+                placeholder="Nama sesuai identitas"
+                className={
+                  inputClasses({ error: !!errors.full_name }) +
+                  " rounded-xl px-4 py-2.5 text-sm"
+                }
+              />
+              {errors.full_name && (
+                <p className="text-[8px] text-rose-500 ml-1">
+                  {errors.full_name}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <label
+                htmlFor="email"
+                className="text-[9px] font-black text-slate-500 uppercase ml-1"
+              >
                 Email Owner
               </label>
               <input
+                id="email"
                 type="email"
                 value={values.email}
                 onChange={(e) => handleChange("email", e.target.value)}
@@ -189,10 +248,14 @@ export default function RegisterForm({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-500 uppercase ml-1">
+              <label
+                htmlFor="phone"
+                className="text-[9px] font-black text-slate-500 uppercase ml-1"
+              >
                 WhatsApp / No. HP
               </label>
               <input
+                id="phone"
                 type="tel"
                 value={values.phone}
                 onChange={(e) => handleChange("phone", e.target.value)}
@@ -207,31 +270,65 @@ export default function RegisterForm({
               )}
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-500 uppercase ml-1">
-                Password Akses
-              </label>
-              <input
-                type="password"
-                value={values.password}
-                onChange={(e) => handleChange("password", e.target.value)}
-                placeholder="Min. 8 Karakter"
-                className={
-                  inputClasses({ error: !!errors.password }) +
-                  " rounded-xl px-4 py-2.5 text-sm"
-                }
-              />
-              {errors.password && (
-                <p className="text-[8px] text-rose-500 ml-1">
-                  {errors.password}
-                </p>
-              )}
+            {/* PASSWORD GRID */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label
+                  htmlFor="password"
+                  className="text-[9px] font-black text-slate-500 uppercase ml-1"
+                >
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={values.password}
+                  onChange={(e) => handlePasswordChange(e.target.value)}
+                  placeholder="Min. 8 Karakter"
+                  className={
+                    inputClasses({ error: !!errors.password }) +
+                    " rounded-xl px-4 py-2.5 text-sm"
+                  }
+                />
+                {errors.password && (
+                  <p className="text-[8px] text-rose-500 ml-1">
+                    {errors.password}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="confirm_password"
+                  className="text-[9px] font-black text-slate-500 uppercase ml-1"
+                >
+                  Konfirmasi
+                </label>
+                <input
+                  id="confirm_password"
+                  type="password"
+                  value={values.confirm_password}
+                  onChange={(e) =>
+                    handleChange("confirm_password", e.target.value)
+                  }
+                  placeholder="Ulangi Password"
+                  className={
+                    inputClasses({ error: !!errors.confirm_password }) +
+                    " rounded-xl px-4 py-2.5 text-sm"
+                  }
+                />
+                {errors.confirm_password && (
+                  <p className="text-[8px] text-rose-500 ml-1">
+                    {errors.confirm_password}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* FOOTER ACTIONS */}
+      {/* FOOTER */}
       <div className="flex space-x-3 pt-6 border-t border-slate-50">
         {step === 2 && (
           <button

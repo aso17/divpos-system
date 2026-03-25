@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState, useCallback } from "react";
-// Import icon secara spesifik (Tree-shaking)
+
 import Eye from "lucide-react/dist/esm/icons/eye";
 import Pencil from "lucide-react/dist/esm/icons/pencil";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
@@ -10,9 +10,8 @@ import XIcon from "lucide-react/dist/esm/icons/x";
 import Mail from "lucide-react/dist/esm/icons/mail";
 import ShieldCheck from "lucide-react/dist/esm/icons/shield-check";
 
-// Import Komponen Generic dan lainnya
 import TableGeneric from "../../components/TableGeneric";
-import TablePagination from "../../components/TablePagination"; // <--- PASTIKAN IMPORT INI ADA
+import TablePagination from "../../components/TablePagination";
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import AppHead from "../../components/common/AppHead";
 import UsersService from "../../services/UsersService";
@@ -26,7 +25,6 @@ export default function UsersList() {
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-
   const [openModal, setOpenModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [openDetail, setOpenDetail] = useState(false);
@@ -40,10 +38,9 @@ export default function UsersList() {
           per_page: pagination.pageSize,
           keyword: activeSearch,
         });
-
         if (isMounted) {
           setData(res.data?.data || res.data || []);
-          setTotalCount(Number(res.data.meta?.total || 0));
+          setTotalCount(Number(res.data?.meta?.total || 0));
         }
       } catch (error) {
         console.error("Error fetching users:", error);
@@ -68,57 +65,66 @@ export default function UsersList() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
-  const handleResetSearch = () => {
+  const handleResetSearch = useCallback(() => {
     setSearchTerm("");
     setActiveSearch("");
     setPagination((p) => ({ ...p, pageIndex: 0 }));
-  };
+  }, []);
 
-  const handleEdit = (user) => {
+  // FIX: Semua handler di-wrap useCallback
+  const handleEdit = useCallback((user) => {
     setSelectedUser(user);
     setOpenModal(true);
-  };
+  }, []);
 
-  const handleViewDetail = (user) => {
+  const handleViewDetail = useCallback((user) => {
     setSelectedUser(user);
     setOpenDetail(true);
-  };
+  }, []);
 
-  const handleDelete = async (user) => {
-    const setuju = await showConfirm(
-      `Apakah anda yakin ingin menghapus ${user.full_name}?`,
-      "Konfirmasi Hapus",
-      "warning",
-      { confirmText: "Ya, Hapus", cancelText: "Batal" }
-    );
+  // FIX: useCallback + rollback
+  const handleDelete = useCallback(
+    async (user) => {
+      const setuju = await showConfirm(
+        `Apakah anda yakin ingin menghapus ${user.full_name}?`,
+        "Konfirmasi Hapus",
+        "warning",
+        { confirmText: "Ya, Hapus", cancelText: "Batal" }
+      );
+      if (!setuju) return;
 
-    if (!setuju) return;
+      const snapshot = data;
+      const isLastOnPage = data.length === 1 && pagination.pageIndex > 0;
 
-    try {
-      const res = await UsersService.deleteUser(user.id);
-
-      setData((prev) => prev.filter((r) => r.id !== user.id));
-
-      if (data.length === 1 && pagination.pageIndex > 0) {
-        setPagination((prev) => ({
-          ...prev,
-          pageIndex: prev.pageIndex - 1,
-        }));
+      if (!isLastOnPage) {
+        setData((prev) => prev.filter((r) => r.id !== user.id));
+        setTotalCount((prev) => Math.max(0, prev - 1));
       }
 
-      setTotalCount((prev) => Math.max(0, prev - 1));
+      try {
+        const res = await UsersService.deleteUser(user.id);
+        await showConfirm(
+          res.data?.message || "Data user berhasil dihapus.",
+          "Hapus Berhasil",
+          "success"
+        );
+        if (isLastOnPage) {
+          setPagination((prev) => ({ ...prev, pageIndex: prev.pageIndex - 1 }));
+        }
+      } catch (err) {
+        setData(snapshot);
+        setTotalCount(snapshot.length);
+        showConfirm(
+          err.response?.data?.message || "Terjadi kesalahan server",
+          "Gagal Hapus",
+          "error"
+        );
+      }
+    },
+    [data, pagination.pageIndex]
+  );
 
-      const successMsg =
-        res.data?.message || "Data user telah berhasil dihapus.";
-
-      await showConfirm(successMsg, "Hapus Berhasil", "success");
-    } catch (err) {
-      const errorMsg =
-        err.response?.data?.message || "Terjadi kesalahan server";
-      showConfirm(errorMsg, "Gagal Hapus", "error");
-    }
-  };
-
+  // FIX: deps columns lengkap — semua handler sudah useCallback
   const columns = useMemo(
     () => [
       {
@@ -225,8 +231,6 @@ export default function UsersList() {
   return (
     <div className="px-2 py-4 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-28 md:pb-6">
       <AppHead title="User Management" />
-
-      {/* Header Page */}
       <div className="flex items-center justify-between gap-4 px-1">
         <div className="flex items-center gap-2.5">
           <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
@@ -241,7 +245,6 @@ export default function UsersList() {
             </p>
           </div>
         </div>
-
         <button
           onClick={() => {
             setSelectedUser(null);
@@ -253,7 +256,6 @@ export default function UsersList() {
         </button>
       </div>
 
-      {/* Filter & Search */}
       <div className="flex justify-start px-1">
         <div className="bg-white p-2 rounded-2xl border border-slate-100 shadow-sm w-full md:w-auto md:min-w-[320px]">
           <form onSubmit={handleSearch} className="flex items-center gap-1.5">
@@ -280,8 +282,7 @@ export default function UsersList() {
             </div>
             <button
               type="submit"
-              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
-                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
               <SearchIcon size={14} className="md:hidden" />
               <span className="hidden md:block">CARI</span>
@@ -318,7 +319,6 @@ export default function UsersList() {
                 {user.is_active ? "Active" : "Inactive"}
               </div>
             </div>
-
             <div className="space-y-2 py-2 border-y border-slate-50">
               <div className="flex items-center gap-2">
                 <Mail size={10} className="text-slate-300 shrink-0" />
@@ -333,7 +333,6 @@ export default function UsersList() {
                 </p>
               </div>
             </div>
-
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => handleViewDetail(user)}
@@ -367,22 +366,13 @@ export default function UsersList() {
         )}
       />
 
-      {/* --- PAGINASI KHUSUS MOBILE --- */}
       <div className="md:hidden mt-4">
         <TablePagination
           table={{
-            // PERBAIKAN: Struktur disesuaikan dengan
-            // table.options.state.pagination
-            options: {
-              state: {
-                pagination: pagination, // state pagination utama
-              },
-            },
-            // Fungsi-fungsi yang dipanggil di komponen harus didefinisikan
-            setPageSize: (newSize) =>
-              setPagination((p) => ({ ...p, pageSize: newSize, pageIndex: 0 })),
-            setPageIndex: (newIndex) =>
-              setPagination((p) => ({ ...p, pageIndex: newIndex })),
+            options: { state: { pagination } },
+            setPageSize: (s) =>
+              setPagination((p) => ({ ...p, pageSize: s, pageIndex: 0 })),
+            setPageIndex: (i) => setPagination((p) => ({ ...p, pageIndex: i })),
             previousPage: () =>
               setPagination((p) => ({ ...p, pageIndex: p.pageIndex - 1 })),
             nextPage: () =>
@@ -391,9 +381,7 @@ export default function UsersList() {
           totalEntries={totalCount}
         />
       </div>
-      {/* ----------------------------- */}
 
-      {/* Floating Action Button Mobile */}
       <button
         onClick={() => {
           setSelectedUser(null);
@@ -410,15 +398,13 @@ export default function UsersList() {
         onClose={() => setOpenModal(false)}
         onSuccess={(datauser) => {
           if (selectedUser) {
-            setData((prevUsers) =>
-              prevUsers.map((u) => (u.id === datauser.id ? datauser : u))
+            setData((prev) =>
+              prev.map((u) => (u.id === datauser.id ? datauser : u))
             );
           } else {
-            setData((prevUsers) => {
-              const newData = [datauser, ...prevUsers];
-              return newData.slice(0, pagination.pageSize);
-            });
-
+            setData((prev) =>
+              [datauser, ...prev].slice(0, pagination.pageSize)
+            );
             setTotalCount((prev) => prev + 1);
             setPagination((prev) => ({ ...prev, pageIndex: 0 }));
           }

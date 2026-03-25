@@ -1,6 +1,5 @@
 import React, { useMemo, useEffect, useState, useCallback } from "react";
 
-// --- IMPORT ICON SPESIFIK ---
 import Pencil from "lucide-react/dist/esm/icons/pencil";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import PlusSquare from "lucide-react/dist/esm/icons/plus-square";
@@ -13,14 +12,13 @@ import Building from "lucide-react/dist/esm/icons/building";
 import Phone from "lucide-react/dist/esm/icons/phone";
 import Eye from "lucide-react/dist/esm/icons/eye";
 
-// --- IMPORT COMPONENTS & SERVICES ---
 import TableGeneric from "../../components/TableGeneric";
 import TablePagination from "../../components/TablePagination";
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import AppHead from "../../components/common/AppHead";
 import EmployeeService from "../../services/EmployeeService";
-import EmployeeForm from "./EmployeeForm"; // Modal Form Diimport
-import EmployeeDetail from "./EmployeeDetail"; // Modal Form Diimport
+import EmployeeForm from "./EmployeeForm";
+import EmployeeDetail from "./EmployeeDetail";
 
 export default function EmployeesList() {
   const [data, setData] = useState([]);
@@ -28,7 +26,6 @@ export default function EmployeesList() {
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
-  // --- STATE UNTUK MODAL ---
   const [detailOpen, setDetailOpen] = useState(false);
   const [openModal, setOpenModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -45,7 +42,6 @@ export default function EmployeesList() {
           per_page: pagination.pageSize,
           keyword: activeSearch,
         });
-        // console.log("Fetched employees:", res.data);
         if (isMounted) {
           setData(res.data?.data || []);
           setTotalCount(Number(res.data?.meta?.total || 0));
@@ -67,22 +63,21 @@ export default function EmployeesList() {
     };
   }, [fetchEmployees]);
 
-  const handleOpenDetail = (employee) => {
+  // FIX: Semua handler di-wrap useCallback agar columns tidak recreate tiap render
+  const handleOpenDetail = useCallback((employee) => {
     setSelectedEmployee(employee);
     setDetailOpen(true);
-  };
-  // --- HANDLER MODAL ---
-  const handleOpenForm = (employee = null) => {
-    setSelectedEmployee(employee); // Set data kalau edit, null kalau tambah
-    setOpenModal(true);
-  };
+  }, []);
 
-  const handleCloseForm = () => {
+  const handleOpenForm = useCallback((employee = null) => {
+    setSelectedEmployee(employee);
+    setOpenModal(true);
+  }, []);
+
+  const handleCloseForm = useCallback(() => {
     setOpenModal(false);
     setSelectedEmployee(null);
-  };
-
-  // -------------------------
+  }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -90,39 +85,46 @@ export default function EmployeesList() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setSearchTerm("");
     setActiveSearch("");
     setPagination((p) => ({ ...p, pageIndex: 0 }));
-  };
+  }, []);
 
-  const handleDelete = async (employee) => {
-    const setuju = await showConfirm(
-      `Apakah anda yakin ingin menghapus karyawan ${employee.full_name}?`,
-      "Konfirmasi Hapus",
-      "warning",
-      { confirmText: "Ya, Hapus", cancelText: "Batal" }
-    );
-
-    if (!setuju) return;
-
-    try {
-      const res = await EmployeeService.deleteEmployee(employee.id);
-      setData((prevEmployees) =>
-        prevEmployees.filter((item) => item.id !== employee.id)
+  // FIX: useCallback + rollback jika API gagal
+  const handleDelete = useCallback(
+    async (employee) => {
+      const setuju = await showConfirm(
+        `Apakah anda yakin ingin menghapus karyawan ${employee.full_name}?`,
+        "Konfirmasi Hapus",
+        "warning",
+        { confirmText: "Ya, Hapus", cancelText: "Batal" }
       );
-      // -------------------------
+      if (!setuju) return;
 
-      const successMsg =
-        res.data?.message || "Data karyawan telah berhasil dihapus.";
-      await showConfirm(successMsg, "Hapus Berhasil", "success");
-    } catch (err) {
-      const errorMsg =
-        err.response?.data?.message || "Gagal menghapus karyawan";
-      showConfirm(errorMsg, "Gagal Hapus", "error");
-    }
-  };
+      // Simpan snapshot untuk rollback
+      const snapshot = data;
+      setData((prev) => prev.filter((item) => item.id !== employee.id));
+      setTotalCount((prev) => Math.max(0, prev - 1));
 
+      try {
+        const res = await EmployeeService.deleteEmployee(employee.id);
+        const successMsg =
+          res.data?.message || "Data karyawan telah berhasil dihapus.";
+        await showConfirm(successMsg, "Hapus Berhasil", "success");
+      } catch (err) {
+        // FIX: Rollback UI jika API gagal
+        setData(snapshot);
+        setTotalCount(snapshot.length);
+        const errorMsg =
+          err.response?.data?.message || "Gagal menghapus karyawan";
+        showConfirm(errorMsg, "Gagal Hapus", "error");
+      }
+    },
+    [data]
+  );
+
+  // FIX: deps columns lengkap — handleDelete, handleOpenDetail, handleOpenForm semua useCallback
   const columns = useMemo(
     () => [
       {
@@ -204,14 +206,14 @@ export default function EmployeesList() {
           <div className="flex gap-2 justify-center">
             <button
               title="Lihat Detail"
-              onClick={() => handleOpenDetail(row.original)} // Kita buat fungsi ini nanti
+              onClick={() => handleOpenDetail(row.original)}
               className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
             >
               <Eye size={14} />
             </button>
             <button
               title="Edit Karyawan"
-              onClick={() => handleOpenForm(row.original)} // Buka modal mode edit
+              onClick={() => handleOpenForm(row.original)}
               className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
             >
               <Pencil size={14} />
@@ -227,14 +229,13 @@ export default function EmployeesList() {
         ),
       },
     ],
-    [handleDelete] // Hapus navigate dari dependency
+    [handleDelete, handleOpenDetail, handleOpenForm]
   );
 
   return (
     <div className="px-2 py-4 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-28 md:pb-6">
       <AppHead title="Manajemen Karyawan" />
 
-      {/* Header Page */}
       <div className="flex items-center justify-between gap-4 px-1">
         <div className="flex items-center gap-2.5">
           <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
@@ -249,9 +250,8 @@ export default function EmployeesList() {
             </p>
           </div>
         </div>
-
         <button
-          onClick={() => handleOpenForm(null)} // Buka modal mode tambah
+          onClick={() => handleOpenForm(null)}
           className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
         >
           <UserPlus size={18} /> Tambah Karyawan
@@ -294,7 +294,6 @@ export default function EmployeesList() {
         </div>
       </div>
 
-      {/* --- RESPONSIVE DATA VIEW --- */}
       <ResponsiveDataView
         data={data}
         loading={loading}
@@ -349,7 +348,7 @@ export default function EmployeesList() {
                 <Eye size={12} /> Detail
               </button>
               <button
-                onClick={() => handleOpenForm(employee)} // Buka modal edit di mobile
+                onClick={() => handleOpenForm(employee)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
               >
                 <Pencil size={10} /> Edit
@@ -376,19 +375,13 @@ export default function EmployeesList() {
         )}
       />
 
-      {/* --- PAGINASI KHUSUS MOBILE --- */}
       <div className="md:hidden mt-4">
         <TablePagination
           table={{
-            options: {
-              state: {
-                pagination: pagination,
-              },
-            },
-            setPageSize: (newSize) =>
-              setPagination((p) => ({ ...p, pageSize: newSize, pageIndex: 0 })),
-            setPageIndex: (newIndex) =>
-              setPagination((p) => ({ ...p, pageIndex: newIndex })),
+            options: { state: { pagination } },
+            setPageSize: (s) =>
+              setPagination((p) => ({ ...p, pageSize: s, pageIndex: 0 })),
+            setPageIndex: (i) => setPagination((p) => ({ ...p, pageIndex: i })),
             previousPage: () =>
               setPagination((p) => ({ ...p, pageIndex: p.pageIndex - 1 })),
             nextPage: () =>
@@ -398,9 +391,8 @@ export default function EmployeesList() {
         />
       </div>
 
-      {/* Floating Action Button Mobile */}
       <button
-        onClick={() => handleOpenForm(null)} // Buka modal tambah di mobile
+        onClick={() => handleOpenForm(null)}
         className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 border-4 border-white transition-all"
       >
         <PlusSquare size={20} />

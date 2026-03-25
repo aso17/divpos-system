@@ -2,11 +2,9 @@ import React, { useRef } from "react";
 import { CheckCircle, Printer, X } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import ReceiptPrint from "./ReceiptPrint";
-// Gunakan formatter milik Mas A_so
 import { formatRupiah } from "../utils/formatter";
 
 const TransactionSuccessModal = ({ isOpen, onClose, data }) => {
-  // console.log(data);
   const componentRef = useRef();
 
   const handlePrint = useReactToPrint({
@@ -14,6 +12,9 @@ const TransactionSuccessModal = ({ isOpen, onClose, data }) => {
   });
 
   if (!isOpen) return null;
+
+  // Logic Label Dinamis: Jika ada DP, ganti label "Bayar" jadi "DP / Uang Muka"
+  const paymentLabel = data?.dp_amount > 0 ? "DP / Uang Muka" : "Bayar";
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[999] p-2 md:p-4">
@@ -50,7 +51,7 @@ const TransactionSuccessModal = ({ isOpen, onClose, data }) => {
               </span>
             </div>
 
-            {/* Total */}
+            {/* Total Tagihan */}
             <div className="flex justify-between items-center border-t border-gray-200 pt-2">
               <span className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase">
                 Total
@@ -60,25 +61,40 @@ const TransactionSuccessModal = ({ isOpen, onClose, data }) => {
               </span>
             </div>
 
-            {/* Bayar */}
+            {/* Bayar / DP */}
             <div className="flex justify-between items-center border-t border-gray-100 pt-2">
               <span className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase">
-                Bayar
+                {paymentLabel}
               </span>
               <span className="text-sm font-bold text-gray-600">
+                {/* payment_amount sekarang sudah di-handle Backend agar tidak 0 jika ada DP */}
                 {formatRupiah(data?.payment_amount)}
               </span>
             </div>
 
-            {/* Kembalian */}
-            <div className="flex justify-between items-center border-t border-gray-200 pt-2">
-              <span className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase">
-                Kembalian
-              </span>
-              <span className="text-sm md:text-base font-black text-orange-600">
-                {formatRupiah(data?.change_amount)}
-              </span>
-            </div>
+            {/* Sisa Tagihan (Hanya muncul jika belum lunas) */}
+            {data?.remaining_bill > 0 && (
+              <div className="flex justify-between items-center border-t border-gray-100 pt-2">
+                <span className="text-[9px] md:text-[10px] font-bold text-rose-400 uppercase">
+                  Sisa Tagihan
+                </span>
+                <span className="text-sm font-black text-rose-600">
+                  {formatRupiah(data?.remaining_bill)}
+                </span>
+              </div>
+            )}
+
+            {/* Kembalian (Hanya muncul jika ada kembalian) */}
+            {data?.change_amount > 0 && (
+              <div className="flex justify-between items-center border-t border-gray-200 pt-2">
+                <span className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase">
+                  Kembalian
+                </span>
+                <span className="text-sm md:text-base font-black text-orange-600">
+                  {formatRupiah(data?.change_amount)}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* ACTION BUTTONS */}

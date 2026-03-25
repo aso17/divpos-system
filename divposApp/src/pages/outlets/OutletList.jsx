@@ -14,6 +14,7 @@ import Search from "lucide-react/dist/esm/icons/search";
 import MapPin from "lucide-react/dist/esm/icons/map-pin";
 import Phone from "lucide-react/dist/esm/icons/phone";
 import Filter from "lucide-react/dist/esm/icons/filter";
+
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
@@ -25,9 +26,14 @@ export default function OutletList() {
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState(""); // State baru untuk filter
+
+  // FIX: filterStatus tidak langsung trigger fetch — dikontrol via handleSearch & handleReset
+  const [filterStatus, setFilterStatus] = useState("");
+  const [activeFilterStatus, setActiveFilterStatus] = useState("");
+
   const [openModal, setOpenModal] = useState(false);
   const [selectedOutlet, setSelectedOutlet] = useState(null);
 
@@ -39,23 +45,26 @@ export default function OutletList() {
           page: pagination.pageIndex + 1,
           per_page: pagination.pageSize,
           keyword: activeSearch,
-          is_active: filterStatus, // Kirim filter ke backend
+          is_active: activeFilterStatus,
         });
-        // console.log("Fetched Outlets:", res.data);
         if (isMounted) {
           setData(res.data?.data || []);
           setTotalCount(Number(res.data?.meta?.total || 0));
         }
       } catch (error) {
-        const errorMsg =
-          error.response?.data?.message ||
-          "Terjadi kesalahan saat mengambil data outlet";
-        console.error(errorMsg); // Pastikan fungsi showConfirm tersedia di scope global/context
+        console.error(
+          error.response?.data?.message || "Gagal mengambil data outlet"
+        );
       } finally {
         if (isMounted) setLoading(false);
       }
     },
-    [pagination.pageIndex, pagination.pageSize, activeSearch, filterStatus]
+    [
+      pagination.pageIndex,
+      pagination.pageSize,
+      activeSearch,
+      activeFilterStatus,
+    ]
   );
 
   useEffect(() => {
@@ -66,49 +75,67 @@ export default function OutletList() {
     };
   }, [fetchOutlets]);
 
+  // FIX: Search juga apply filterStatus sekaligus
   const handleSearch = (e) => {
     e.preventDefault();
     setActiveSearch(searchTerm);
+    setActiveFilterStatus(filterStatus);
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setSearchTerm("");
     setActiveSearch("");
     setFilterStatus("");
+    setActiveFilterStatus("");
     setPagination((p) => ({ ...p, pageIndex: 0 }));
-  };
+  }, []);
 
-  const handleDelete = async (outlet) => {
-    // Logic: Gunakan showConfirm yang konsisten dengan modul User
-    const setuju = await showConfirm(
-      `Apakah anda yakin ingin menghapus outlet ${outlet.name}?`,
-      "Konfirmasi Hapus",
-      "warning",
-      { confirmText: "Ya, Hapus", cancelText: "Batal" }
-    );
+  // FIX: useCallback + rollback
+  const handleDelete = useCallback(
+    async (outlet) => {
+      const setuju = await showConfirm(
+        `Apakah anda yakin ingin menghapus outlet ${outlet.name}?`,
+        "Konfirmasi Hapus",
+        "warning",
+        { confirmText: "Ya, Hapus", cancelText: "Batal" }
+      );
+      if (!setuju) return;
 
-    if (!setuju) return;
+      const snapshot = data;
+      const isLastOnPage = data.length === 1 && pagination.pageIndex > 0;
 
-    try {
-      const res = await OutletService.deleteOutlet(outlet.id);
-      const successMsg = res.data?.message || "Outlet telah berhasil dihapus.";
-      await showConfirm(successMsg, "Hapus Berhasil", "success");
-
-      if (data.length === 1 && pagination.pageIndex > 0) {
-        setPagination((prev) => ({ ...prev, pageIndex: prev.pageIndex - 1 }));
-      } else {
-        // Filter state lokal agar UI langsung update tanpa loading spinner (Performa)
-        setData((prevData) => prevData.filter((item) => item.id !== outlet.id));
+      if (!isLastOnPage) {
+        setData((prev) => prev.filter((item) => item.id !== outlet.id));
+        setTotalCount((prev) => Math.max(0, prev - 1));
       }
 
-      setTotalCount((prev) => Math.max(0, prev - 1));
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || "Gagal menghapus data";
-      showConfirm(errorMsg, "Gagal Hapus", "error");
-    }
-  };
+      try {
+        const res = await OutletService.deleteOutlet(outlet.id);
+        const successMsg =
+          res.data?.message || "Outlet telah berhasil dihapus.";
+        await showConfirm(successMsg, "Hapus Berhasil", "success");
 
+        if (isLastOnPage) {
+          setPagination((prev) => ({ ...prev, pageIndex: prev.pageIndex - 1 }));
+        }
+      } catch (err) {
+        // Rollback
+        setData(snapshot);
+        setTotalCount(snapshot.length);
+        const errorMsg = err.response?.data?.message || "Gagal menghapus data";
+        showConfirm(errorMsg, "Gagal Hapus", "error");
+      }
+    },
+    [data, pagination.pageIndex]
+  );
+
+  const handleOpenForm = useCallback((outlet = null) => {
+    setSelectedOutlet(outlet);
+    setOpenModal(true);
+  }, []);
+
+  // FIX: deps columns lengkap
   const columns = useMemo(
     () => [
       {
@@ -150,11 +177,11 @@ export default function OutletList() {
         cell: ({ row }) => (
           <div className="flex flex-col gap-1 py-1">
             <span className="text-slate-500 italic truncate max-w-[200px] flex items-center gap-1.5 text-[10px]">
-              <MapPin size={12} className="text-slate-300" />{" "}
+              <MapPin size={12} className="text-slate-300" />
               {row.original.city || row.original.address || "-"}
             </span>
             <span className="text-slate-400 flex items-center gap-1.5 font-medium text-[10px]">
-              <Phone size={12} className="text-slate-300" />{" "}
+              <Phone size={12} className="text-slate-300" />
               {row.original.phone || "-"}
             </span>
           </div>
@@ -193,10 +220,7 @@ export default function OutletList() {
         cell: ({ row }) => (
           <div className="flex gap-2 justify-center">
             <button
-              onClick={() => {
-                setSelectedOutlet(row.original);
-                setOpenModal(true);
-              }}
+              onClick={() => handleOpenForm(row.original)}
               className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
             >
               <Pencil size={14} />
@@ -211,7 +235,7 @@ export default function OutletList() {
         ),
       },
     ],
-    []
+    [handleDelete, handleOpenForm]
   );
 
   const table = useReactTable({
@@ -230,7 +254,6 @@ export default function OutletList() {
     <div className="px-2 py-4 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-28 md:pb-6">
       <AppHead title="Outlet Management" />
 
-      {/* --- Header Section --- */}
       <div className="flex items-center justify-between gap-4 px-1">
         <div className="flex items-center gap-2.5">
           <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
@@ -245,53 +268,43 @@ export default function OutletList() {
             </p>
           </div>
         </div>
-
         <button
-          onClick={() => {
-            setSelectedOutlet(null);
-            setOpenModal(true);
-          }}
+          onClick={() => handleOpenForm(null)}
           className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
         >
           <PlusSquare size={18} /> Tambah Cabang
         </button>
       </div>
-      {/* --- Search & Filter Section --- */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 p-2 md:p-3">
-        {/* 1. Filter Dropdown (Limit Status) */}
+
+      {/* FIX: Filter + Search dalam satu form agar filterStatus apply saat submit */}
+      <form
+        onSubmit={handleSearch}
+        className="flex flex-col md:flex-row items-stretch md:items-center gap-3 p-2 md:p-3"
+      >
+        {/* Filter Status */}
         <div className="bg-white px-3 rounded-2xl border border-slate-100 shadow-sm flex items-center group focus-within:border-emerald-500/50 transition-all w-fit self-start h-[52px] md:h-[46px]">
-          {/* Bagian Icon */}
           <div className="pr-2 text-slate-400 group-focus-within:text-emerald-600 border-r border-slate-50 mr-2 shrink-0">
             <Filter size={15} className="md:w-3.5 md:h-3.5" />
           </div>
-
-          {/* Bagian Select */}
           <div className="flex flex-col pr-1">
             <label className="text-[9px] md:text-[7px] font-black text-slate-400 uppercase leading-none mb-1">
-              Limit Status
+              Status
             </label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-transparent text-[11px] md:text-[10px] font-black text-slate-700 outline-none cursor-pointer  w-auto min-w-[100px] md:min-w-[90px]"
+              className="bg-transparent text-[11px] md:text-[10px] font-black text-slate-700 outline-none cursor-pointer w-auto min-w-[100px] md:min-w-[90px]"
             >
               <option value="">All</option>
-              <option value="true">Operational</option>
+              <option value="true">Operasional</option>
               <option value="false">Tutup</option>
             </select>
           </div>
         </div>
 
-        {/* 2. Box Search (Input Utama) */}
+        {/* Search Input */}
         <div className="bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm flex-1 md:max-w-[450px] flex items-center h-[52px] md:h-[46px]">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setActiveSearch(searchTerm);
-              setPagination((p) => ({ ...p, pageIndex: 0 }));
-            }}
-            className="flex items-center gap-1.5 w-full"
-          >
+          <div className="flex items-center gap-1.5 w-full">
             <div className="relative flex-1 group">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
@@ -303,7 +316,7 @@ export default function OutletList() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              {searchTerm && (
+              {(searchTerm || filterStatus) && (
                 <button
                   type="button"
                   onClick={handleReset}
@@ -313,18 +326,16 @@ export default function OutletList() {
                 </button>
               )}
             </div>
-
-            {/* 3. Tombol CARI */}
             <button
               type="submit"
-              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
-                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
               CARI
             </button>
-          </form>
+          </div>
         </div>
-      </div>
+      </form>
+
       <ResponsiveDataView
         data={data}
         loading={loading}
@@ -376,10 +387,7 @@ export default function OutletList() {
             </div>
             <div className="flex gap-2 pt-1">
               <button
-                onClick={() => {
-                  setSelectedOutlet(outlet);
-                  setOpenModal(true);
-                }}
+                onClick={() => handleOpenForm(outlet)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 transition-all"
               >
                 <Pencil size={10} /> Edit
@@ -443,12 +451,8 @@ export default function OutletList() {
         )}
       />
 
-      {/* Floating Action Button Mobile */}
       <button
-        onClick={() => {
-          setSelectedOutlet(null);
-          setOpenModal(true);
-        }}
+        onClick={() => handleOpenForm(null)}
         className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 border-4 border-white transition-all active:scale-90"
       >
         <PlusSquare size={20} />

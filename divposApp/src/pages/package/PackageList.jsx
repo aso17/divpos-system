@@ -1,3 +1,6 @@
+// ============================================================
+// PackageList.jsx
+// ============================================================
 import { useMemo, useEffect, useState, useCallback } from "react";
 import {
   useReactTable,
@@ -12,7 +15,6 @@ import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import X from "lucide-react/dist/esm/icons/x";
 import PlusSquare from "lucide-react/dist/esm/icons/plus-square";
 
-// Import Components & Services
 import TablePagination from "../../components/TablePagination";
 import AppHead from "../../components/common/AppHead";
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
@@ -21,12 +23,11 @@ import { formatRupiah } from "../../utils/formatter";
 import PackageForm from "./PackageForm";
 import PackageDetail from "./PackageDetail";
 
-export default function PackageList() {
+export function PackageList() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [detailPackage, setDetailPackage] = useState(null);
@@ -34,7 +35,6 @@ export default function PackageList() {
   const [openModal, setOpenModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState(null);
 
-  // 1. Fetch Data
   const fetchPackages = useCallback(
     async (isMounted = true) => {
       setLoading(true);
@@ -44,7 +44,6 @@ export default function PackageList() {
           per_page: pagination.pageSize,
           keyword: activeSearch,
         });
-
         if (isMounted) {
           setData(res.data?.data || []);
           setTotalCount(Number(res.data?.meta?.total || 0));
@@ -66,57 +65,64 @@ export default function PackageList() {
     };
   }, [fetchPackages]);
 
-  // 2. Handlers
   const handleSearch = (e) => {
     e.preventDefault();
     setActiveSearch(searchTerm);
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setSearchTerm("");
     setActiveSearch("");
     setPagination((p) => ({ ...p, pageIndex: 0 }));
-  };
+  }, []);
 
-  const handleDelete = async (pkg) => {
-    // 1. Alert Konfirmasi dengan style warning
-    const setuju = await showConfirm(
-      `Apakah anda yakin ingin menghapus paket "${pkg.name}"?`,
-      "Konfirmasi Hapus",
-      "warning",
-      {
-        confirmText: "Ya, Hapus",
-        cancelText: "Batal",
-      }
-    );
+  const handleOpenDetail = useCallback((pkg) => {
+    setDetailPackage(pkg);
+    setOpenDetail(true);
+  }, []);
 
-    if (!setuju) return;
+  const handleOpenForm = useCallback((pkg = null) => {
+    setSelectedPackage(pkg);
+    setOpenModal(true);
+  }, []);
 
-    try {
-      // 2. Eksekusi ke PackageService
-      const res = await PackageService.deletePackage(pkg.id);
+  // FIX: useCallback + rollback
+  const handleDelete = useCallback(
+    async (pkg) => {
+      const setuju = await showConfirm(
+        `Apakah anda yakin ingin menghapus paket "${pkg.name}"?`,
+        "Konfirmasi Hapus",
+        "warning",
+        { confirmText: "Ya, Hapus", cancelText: "Batal" }
+      );
+      if (!setuju) return;
 
-      // 3. Ambil pesan dari backend
-      const successMsg =
-        res.data?.message || "Data paket telah berhasil dihapus.";
-
-      // 4. Alert Sukses
-      await showConfirm(successMsg, "Hapus Berhasil", "success");
-
-      // 5. Update State UI
-      setData((prevData) => prevData.filter((item) => item.id !== pkg.id));
+      const snapshot = data;
+      setData((prev) => prev.filter((item) => item.id !== pkg.id));
       setTotalCount((prev) => Math.max(0, prev - 1));
-    } catch (err) {
-      // 6. Alert Error jika gagal (misal: paket sudah digunakan di transaksi)
-      const errorMsg = err.response?.data?.message || "Gagal menghapus paket";
 
-      showConfirm(errorMsg, "Gagal Hapus", "error");
-      console.error("Gagal menghapus paket", err);
-    }
-  };
+      try {
+        const res = await PackageService.deletePackage(pkg.id);
+        await showConfirm(
+          res.data?.message || "Data paket berhasil dihapus.",
+          "Hapus Berhasil",
+          "success"
+        );
+      } catch (err) {
+        setData(snapshot);
+        setTotalCount(snapshot.length);
+        showConfirm(
+          err.response?.data?.message || "Gagal menghapus paket",
+          "Gagal Hapus",
+          "error"
+        );
+      }
+    },
+    [data]
+  );
 
-  // 3. Table Columns (Desktop)
+  // FIX: deps columns lengkap
   const columns = useMemo(
     () => [
       {
@@ -161,7 +167,6 @@ export default function PackageList() {
               Rp {Number(row.original.price).toLocaleString("id-ID")}
             </span>
             <span className="text-[9px] text-slate-400 font-medium italic">
-              {/* UBAH DI SINI: tambahkan .name */}
               Per {row.original.unit?.name || "Unit"}
             </span>
           </div>
@@ -195,24 +200,17 @@ export default function PackageList() {
         cell: ({ row }) => (
           <div className="flex gap-2 justify-center">
             <button
-              onClick={() => {
-                setDetailPackage(row.original);
-                setOpenDetail(true);
-              }}
+              onClick={() => handleOpenDetail(row.original)}
               className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm"
             >
               <Eye size={14} />
             </button>
             <button
-              onClick={() => {
-                setSelectedPackage(row.original);
-                setOpenModal(true);
-              }}
+              onClick={() => handleOpenForm(row.original)}
               className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"
             >
               <Pencil size={14} />
             </button>
-
             <button
               onClick={() => handleDelete(row.original)}
               className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all"
@@ -223,7 +221,7 @@ export default function PackageList() {
         ),
       },
     ],
-    []
+    [handleDelete, handleOpenDetail, handleOpenForm]
   );
 
   const table = useReactTable({
@@ -239,32 +237,22 @@ export default function PackageList() {
   return (
     <div className="px-2 py-4 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-28 md:pb-6">
       <AppHead title="Paket & Harga" />
-
-      {/* --- Header Section --- */}
-
       <div className="flex items-center justify-between gap-4 px-1">
         <div className="flex items-center gap-2.5">
           <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
             <Box size={20} className="text-emerald-600" />
           </div>
-
           <div>
             <h1 className="text-[11px] md:text-sm font-black text-slate-800 uppercase leading-none">
               Paket & Harga
             </h1>
-
             <p className="hidden md:block text-[10px] text-slate-500 mt-1 font-medium">
               Kelola tarif layanan, satuan, dan minimal order
             </p>
           </div>
         </div>
-
         <button
-          onClick={() => {
-            setSelectedPackage(null);
-
-            setOpenModal(true);
-          }}
+          onClick={() => handleOpenForm(null)}
           className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
         >
           <PlusSquare size={18} /> Tambah Paket
@@ -279,14 +267,12 @@ export default function PackageList() {
                 className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
                 size={13}
               />
-
               <input
                 className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] outline-none focus:bg-white focus:border-emerald-500/50 transition-all placeholder:text-slate-400"
                 placeholder="Cari paket..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-
               {searchTerm && (
                 <button
                   type="button"
@@ -297,21 +283,16 @@ export default function PackageList() {
                 </button>
               )}
             </div>
-
             <button
               type="submit"
-              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
-                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
-              <Search size={14} className="md:hidden" />
-
               <span className="hidden md:block">CARI</span>
+              <Search size={14} className="md:hidden" />
             </button>
           </form>
         </div>
       </div>
-
-      {/* --- Responsive Data View --- */}
 
       <ResponsiveDataView
         data={data}
@@ -327,18 +308,15 @@ export default function PackageList() {
                 <h3 className="text-[11px] font-black text-slate-800 uppercase leading-tight">
                   {pkg.name}
                 </h3>
-
                 <div className="flex gap-1 items-center">
                   <span className="text-[7px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100 uppercase">
                     {pkg.code}
                   </span>
-
                   <span className="text-[8px] text-slate-400 font-bold uppercase">
                     {pkg.category?.name}
                   </span>
                 </div>
               </div>
-
               <div
                 className={`px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase border shrink-0 ${
                   pkg.is_active
@@ -349,13 +327,11 @@ export default function PackageList() {
                 {pkg.is_active ? "Aktif" : "Off"}
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-2 py-2 border-y border-slate-50">
               <div className="border-r border-slate-50 pr-1">
                 <p className="text-[7px] text-slate-400 font-black uppercase mb-0.5">
                   Harga / Satuan
                 </p>
-
                 <p className="text-[10px] font-black text-slate-700 whitespace-nowrap">
                   <span className="text-[8px]">Rp</span>{" "}
                   {formatRupiah(pkg.price)}
@@ -365,12 +341,10 @@ export default function PackageList() {
                   </span>
                 </p>
               </div>
-
               <div className="pl-1">
                 <p className="text-[7px] text-slate-400 font-black uppercase mb-0.5">
                   Min. Order
                 </p>
-
                 <p className="text-[10px] font-black text-slate-700 uppercase">
                   {pkg.min_order}{" "}
                   <span className="text-[8px] font-normal text-slate-400">
@@ -379,28 +353,19 @@ export default function PackageList() {
                 </p>
               </div>
             </div>
-
             <div className="flex gap-2 pt-1">
               <button
-                onClick={() => {
-                  setDetailPackage(pkg);
-                  setOpenDetail(true);
-                }}
+                onClick={() => handleOpenDetail(pkg)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
               >
-                <Pencil size={10} /> Detail
+                <Eye size={10} /> Detail
               </button>
-
               <button
-                onClick={() => {
-                  setSelectedPackage(pkg);
-                  setOpenModal(true);
-                }}
+                onClick={() => handleOpenForm(pkg)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
               >
                 <Pencil size={10} /> Edit
               </button>
-
               <button
                 onClick={() => handleDelete(pkg)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
@@ -420,22 +385,20 @@ export default function PackageList() {
                       key={hg.id}
                       className="bg-slate-50/50 border-b border-slate-100"
                     >
-                      {hg.headers.map((header) => (
+                      {hg.headers.map((h) => (
                         <th
-                          key={header.id}
+                          key={h.id}
                           className="px-6 py-4 text-[8px] font-black text-slate-400 uppercase tracking-widest text-left"
                         >
                           {flexRender(
-                            header.column.columnDef.header,
-
-                            header.getContext()
+                            h.column.columnDef.header,
+                            h.getContext()
                           )}
                         </th>
                       ))}
                     </tr>
                   ))}
                 </thead>
-
                 <tbody className="divide-y divide-slate-50">
                   {table.getRowModel().rows.map((row) => (
                     <tr
@@ -446,7 +409,6 @@ export default function PackageList() {
                         <td key={cell.id} className="px-6 py-4 align-middle">
                           {flexRender(
                             cell.column.columnDef.cell,
-
                             cell.getContext()
                           )}
                         </td>
@@ -456,7 +418,6 @@ export default function PackageList() {
                 </tbody>
               </table>
             </div>
-
             <div className="p-4 bg-slate-50/50 border-t border-slate-100">
               <TablePagination table={table} totalEntries={totalCount} />
             </div>
@@ -464,14 +425,8 @@ export default function PackageList() {
         )}
       />
 
-      {/* Floating Action Button */}
-
       <button
-        onClick={() => {
-          setSelectedPackage(null);
-
-          setOpenModal(true);
-        }}
+        onClick={() => handleOpenForm(null)}
         className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 border-4 border-white transition-all"
       >
         <Plus size={24} />
@@ -482,7 +437,6 @@ export default function PackageList() {
         initialData={selectedPackage}
         onClose={() => {
           setOpenModal(false);
-
           setSelectedPackage(null);
         }}
         onSuccess={(dataPackage) => {
@@ -492,16 +446,12 @@ export default function PackageList() {
             );
           } else {
             setData((prev) => [dataPackage, ...prev]);
-
             setTotalCount((prev) => prev + 1);
           }
-
           setOpenModal(false);
-
           setSelectedPackage(null);
         }}
       />
-
       <PackageDetail
         open={openDetail}
         pkg={detailPackage}
@@ -510,3 +460,5 @@ export default function PackageList() {
     </div>
   );
 }
+
+export default PackageList;

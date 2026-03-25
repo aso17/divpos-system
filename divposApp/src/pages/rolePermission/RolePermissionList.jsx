@@ -6,18 +6,31 @@ import {
   flexRender,
 } from "@tanstack/react-table";
 
-// --- ICON IMPORT ---
 import ShieldCheck from "lucide-react/dist/esm/icons/shield-check";
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left";
 import CheckSquare from "lucide-react/dist/esm/icons/check-square";
 import Layers from "lucide-react/dist/esm/icons/layers";
 import Save from "lucide-react/dist/esm/icons/save";
 
-// --- COMPONENTS ---
 import LoadingDots from "../../components/common/LoadingDots";
 import AppHead from "../../components/common/AppHead";
 import RolesService from "../../services/RolespermissionService";
 import SubmitButton from "../../components/SubmitButton";
+
+const PERMISSION_FIELDS = [
+  "can_view",
+  "can_create",
+  "can_update",
+  "can_delete",
+  "can_export",
+];
+const PERMISSION_LABELS = {
+  can_view: "view",
+  can_create: "add",
+  can_update: "edit",
+  can_delete: "del",
+  can_export: "exp",
+};
 
 export default function RolePermissionList() {
   const { roleId } = useParams();
@@ -28,33 +41,25 @@ export default function RolePermissionList() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const triggerToast = (message, type) => {
+  const triggerToast = useCallback((message, type) => {
     window.dispatchEvent(
-      new CustomEvent("global-toast", { detail: { message, type } }),
+      new CustomEvent("global-toast", { detail: { message, type } })
     );
-  };
+  }, []);
 
   const fetchPermissions = useCallback(async () => {
     setLoading(true);
     try {
       const res = await RolesService.getRolePermissions(roleId);
-      const serverResponse = res.data;
-
-      // 2. Set Permissions (ambil dari serverResponse.data)
-      // Karena Laravel Resource biasanya membungkus array dalam key 'data'
-      setData(serverResponse.data || []);
-
-      // 3. Set Role Info (ambil dari serverResponse.role)
-      if (serverResponse.role) {
-        setRoleInfo(serverResponse.role);
-      }
+      setData(res.data?.data || []);
+      if (res.data?.role) setRoleInfo(res.data.role);
     } catch (error) {
       console.error("Error fetching permissions:", error);
       triggerToast("Gagal mengambil data hak akses", "error");
     } finally {
       setLoading(false);
     }
-  }, [roleId]);
+  }, [roleId, triggerToast]);
 
   useEffect(() => {
     fetchPermissions();
@@ -62,59 +67,50 @@ export default function RolePermissionList() {
 
   const handleSave = async () => {
     setIsSubmitting(true);
-    // console.log(roleId);
     try {
       await RolesService.updatePermissions(roleId, { permissions: data });
       triggerToast("Hak akses berhasil diperbarui!", "success");
-    } catch (err) {
+    } catch {
       triggerToast("Gagal menyimpan perubahan", "error");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleToggle = (menuId, field) => {
+  // FIX: useCallback agar tidak jadi deps columns yang berubah tiap render
+  const handleToggle = useCallback((menuId, field) => {
     setData((prev) =>
       prev.map((item) =>
-        item.menu_id === menuId ? { ...item, [field]: !item[field] } : item,
-      ),
+        item.menu_id === menuId ? { ...item, [field]: !item[field] } : item
+      )
     );
-  };
+  }, []);
 
-  const toggleColumn = (field) => {
-    const isAllChecked = data.every((item) => !!item[field]);
-    setData((prev) =>
-      prev.map((item) => ({ ...item, [field]: !isAllChecked })),
-    );
-  };
+  const toggleColumn = useCallback((field) => {
+    setData((prev) => {
+      const isAllChecked = prev.every((item) => !!item[field]);
+      return prev.map((item) => ({ ...item, [field]: !isAllChecked }));
+    });
+  }, []);
 
-  const toggleRow = (menuId) => {
-    const fields = [
-      "can_view",
-      "can_create",
-      "can_update",
-      "can_delete",
-      "can_export",
-    ];
-    const row = data.find((item) => item.menu_id === menuId);
-    if (!row) return;
-    const isAllRowChecked = fields.every((f) => !!row[f]);
-    setData((prev) =>
-      prev.map((item) =>
+  const toggleRow = useCallback((menuId) => {
+    setData((prev) => {
+      const row = prev.find((item) => item.menu_id === menuId);
+      if (!row) return prev;
+      const isAllRowChecked = PERMISSION_FIELDS.every((f) => !!row[f]);
+      return prev.map((item) =>
         item.menu_id === menuId
-          ? {
-              ...item,
-              can_view: !isAllRowChecked,
-              can_create: !isAllRowChecked,
-              can_update: !isAllRowChecked,
-              can_delete: !isAllRowChecked,
-              can_export: !isAllRowChecked,
-            }
-          : item,
-      ),
-    );
-  };
+          ? PERMISSION_FIELDS.reduce(
+              (acc, f) => ({ ...acc, [f]: !isAllRowChecked }),
+              { ...item }
+            )
+          : item
+      );
+    });
+  }, []);
 
+  // FIX: columns deps adalah handler callbacks saja — BUKAN [data]
+  // Sebelumnya [data] menyebabkan columns recreate setiap ada toggle checkbox
   const columns = useMemo(
     () => [
       {
@@ -143,47 +139,32 @@ export default function RolePermissionList() {
           </div>
         ),
       },
-      ...[
-        "can_view",
-        "can_create",
-        "can_update",
-        "can_delete",
-        "can_export",
-      ].map((field) => {
-        const labels = {
-          can_view: "view",
-          can_create: "add",
-          can_update: "edit",
-          can_delete: "del",
-          can_export: "exp",
-        };
-        return {
-          accessorKey: field,
-          header: () => (
-            <div
-              className="flex flex-col items-center gap-1 cursor-pointer group py-2"
-              onClick={() => toggleColumn(field)}
-            >
-              <span className="text-[9px] font-black group-hover:text-emerald-600 transition-colors uppercase tracking-tighter">
-                {labels[field]}
-              </span>
-              <div className="w-1 h-1 rounded-full bg-slate-200 group-hover:bg-emerald-400" />
-            </div>
-          ),
-          cell: ({ row }) => (
-            <div className="flex justify-center items-center">
-              <input
-                type="checkbox"
-                checked={!!row.original[field]}
-                onChange={() => handleToggle(row.original.menu_id, field)}
-                className="w-5 h-5 md:w-4 md:h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer transition-all"
-              />
-            </div>
-          ),
-        };
-      }),
+      ...PERMISSION_FIELDS.map((field) => ({
+        accessorKey: field,
+        header: () => (
+          <div
+            className="flex flex-col items-center gap-1 cursor-pointer group py-2"
+            onClick={() => toggleColumn(field)}
+          >
+            <span className="text-[9px] font-black group-hover:text-emerald-600 transition-colors uppercase tracking-tighter">
+              {PERMISSION_LABELS[field]}
+            </span>
+            <div className="w-1 h-1 rounded-full bg-slate-200 group-hover:bg-emerald-400" />
+          </div>
+        ),
+        cell: ({ row }) => (
+          <div className="flex justify-center items-center">
+            <input
+              type="checkbox"
+              checked={!!row.original[field]}
+              onChange={() => handleToggle(row.original.menu_id, field)}
+              className="w-5 h-5 md:w-4 md:h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer transition-all"
+            />
+          </div>
+        ),
+      })),
     ],
-    [data],
+    [handleToggle, toggleColumn, toggleRow]
   );
 
   const table = useReactTable({
@@ -203,7 +184,6 @@ export default function RolePermissionList() {
     <div className="p-2 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-24 md:pb-6">
       <AppHead title={`Hak Akses - ${roleInfo?.role_name || "Role"}`} />
 
-      {/* HEADER PAGE */}
       <div className="flex items-center justify-between bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-slate-100">
         <div className="flex items-center gap-3">
           <button
@@ -225,18 +205,16 @@ export default function RolePermissionList() {
             </p>
           </div>
         </div>
-
         <div className="hidden md:block">
           <SubmitButton
             onClick={handleSave}
             isSubmitting={isSubmitting}
             label="Simpan Perubahan"
-            className="text-[10px]  uppercase py-2 px-6 rounded-xl bg-emerald-600  hover:bg-emerald-700 shadow-lg transition-all"
+            className="text-[10px] uppercase py-2 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-lg transition-all"
           />
         </div>
       </div>
 
-      {/* TABLE MATRIX CONTAINER */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full border-collapse">
@@ -249,13 +227,15 @@ export default function RolePermissionList() {
                   {hg.headers.map((header, idx) => (
                     <th
                       key={header.id}
-                      className={`px-3 py-4 font-black text-center text-[9px] text-slate-400 uppercase tracking-widest 
-                        ${idx === 1 ? "sticky left-0 z-20 bg-slate-50 shadow-[2px_0_5px_rgba(0,0,0,0.05)]" : ""}
-                      `}
+                      className={`px-3 py-4 font-black text-center text-[9px] text-slate-400 uppercase tracking-widest ${
+                        idx === 1
+                          ? "sticky left-0 z-20 bg-slate-50 shadow-[2px_0_5px_rgba(0,0,0,0.05)]"
+                          : ""
+                      }`}
                     >
                       {flexRender(
                         header.column.columnDef.header,
-                        header.getContext(),
+                        header.getContext()
                       )}
                     </th>
                   ))}
@@ -269,7 +249,6 @@ export default function RolePermissionList() {
                   const { module_id, module_name } = row.original;
                   const showGroupHeader = module_id !== lastModuleId;
                   lastModuleId = module_id;
-
                   return (
                     <React.Fragment key={row.id}>
                       {showGroupHeader && (
@@ -291,13 +270,15 @@ export default function RolePermissionList() {
                         {row.getVisibleCells().map((cell, idx) => (
                           <td
                             key={cell.id}
-                            className={`px-3 py-3 align-middle border-r border-slate-50 last:border-0
-                              ${idx === 1 ? "sticky left-0 z-10 bg-white group-hover:bg-slate-50 shadow-[2px_0_5px_rgba(0,0,0,0.05)]" : ""}
-                            `}
+                            className={`px-3 py-3 align-middle border-r border-slate-50 last:border-0 ${
+                              idx === 1
+                                ? "sticky left-0 z-10 bg-white group-hover:bg-slate-50 shadow-[2px_0_5px_rgba(0,0,0,0.05)]"
+                                : ""
+                            }`}
                           >
                             {flexRender(
                               cell.column.columnDef.cell,
-                              cell.getContext(),
+                              cell.getContext()
                             )}
                           </td>
                         ))}
@@ -311,7 +292,6 @@ export default function RolePermissionList() {
         </div>
       </div>
 
-      {/* Floating Save Button Mobile */}
       <div className="md:hidden fixed bottom-6 left-0 right-0 px-4 z-30">
         <button
           disabled={isSubmitting}

@@ -1,7 +1,9 @@
+// ============================================================
+// RolesList.jsx
+// ============================================================
 import { useMemo, useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
-// --- IMPORT ICON SPESIFIK (Tree-shaking) ---
 import Pencil from "lucide-react/dist/esm/icons/pencil";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import PlusSquare from "lucide-react/dist/esm/icons/plus-square";
@@ -11,24 +13,20 @@ import Search from "lucide-react/dist/esm/icons/search";
 import Lock from "lucide-react/dist/esm/icons/lock";
 import FileText from "lucide-react/dist/esm/icons/file-text";
 
-// --- IMPORT COMPONENTS & SERVICES ---
 import TableGeneric from "../../components/TableGeneric";
 import TablePagination from "../../components/TablePagination";
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import AppHead from "../../components/common/AppHead";
 import RolesService from "../../services/RoleService";
-
 import RoleForm from "./RoleForm";
 
-export default function RolesList() {
+export function RolesList() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-
   const [openModal, setOpenModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState(null);
   const navigate = useNavigate();
@@ -42,7 +40,6 @@ export default function RolesList() {
           per_page: pagination.pageSize,
           keyword: activeSearch,
         });
-
         if (isMounted) {
           setData(res.data?.data || []);
           setTotalCount(Number(res.data?.meta?.total || 0));
@@ -70,48 +67,69 @@ export default function RolesList() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setSearchTerm("");
     setActiveSearch("");
     setPagination((p) => ({ ...p, pageIndex: 0 }));
-  };
+  }, []);
 
-  const handleDelete = async (role) => {
-    const setuju = await showConfirm(
-      `Apakah anda yakin ingin menghapus role ${role.role_name}?`,
-      "Konfirmasi Hapus",
-      "warning",
-      { confirmText: "Ya, Hapus", cancelText: "Batal" }
-    );
+  const handleOpenForm = useCallback((role = null) => {
+    setSelectedRole(role);
+    setOpenModal(true);
+  }, []);
 
-    if (!setuju) return;
+  const handleNavigatePermission = useCallback(
+    (role) => {
+      navigate(`/rolespermission/${role.id}`, {
+        state: { role_name: role.role_name, code: role.code },
+      });
+    },
+    [navigate]
+  );
 
-    try {
-      const res = await RolesService.deleteRole(role.id);
+  // FIX: useCallback + rollback
+  const handleDelete = useCallback(
+    async (role) => {
+      const setuju = await showConfirm(
+        `Apakah anda yakin ingin menghapus role ${role.role_name}?`,
+        "Konfirmasi Hapus",
+        "warning",
+        { confirmText: "Ya, Hapus", cancelText: "Batal" }
+      );
+      if (!setuju) return;
 
-      setData((prev) => prev.filter((r) => r.id !== role.id));
+      const snapshot = data;
+      const isLastOnPage = data.length === 1 && pagination.pageIndex > 0;
 
-      if (data.length === 1 && pagination.pageIndex > 0) {
-        setPagination((prev) => ({
-          ...prev,
-          pageIndex: prev.pageIndex - 1,
-        }));
+      if (!isLastOnPage) {
+        setData((prev) => prev.filter((r) => r.id !== role.id));
+        setTotalCount((prev) => Math.max(0, prev - 1));
       }
 
-      setTotalCount((prev) => Math.max(0, prev - 1));
+      try {
+        const res = await RolesService.deleteRole(role.id);
+        await showConfirm(
+          res.data?.message || "Data role berhasil dihapus.",
+          "Hapus Berhasil",
+          "success"
+        );
+        if (isLastOnPage) {
+          setPagination((prev) => ({ ...prev, pageIndex: prev.pageIndex - 1 }));
+        }
+      } catch (err) {
+        setData(snapshot);
+        setTotalCount(snapshot.length);
+        showConfirm(
+          err.response?.data?.message || "Terjadi kesalahan server",
+          "Gagal Hapus",
+          "error"
+        );
+      }
+    },
+    [data, pagination.pageIndex]
+  );
 
-      await showConfirm(
-        res.data?.message || "Data role telah berhasil dihapus.",
-        "Hapus Berhasil",
-        "success"
-      );
-    } catch (err) {
-      const errorMsg =
-        err.response?.data?.message || "Terjadi kesalahan server";
-      showConfirm(errorMsg, "Gagal Hapus", "error");
-    }
-  };
-
+  // FIX: deps columns lengkap
   const columns = useMemo(
     () => [
       {
@@ -182,25 +200,13 @@ export default function RolesList() {
         cell: ({ row }) => (
           <div className="flex gap-2 justify-center">
             <button
-              title="Setting Permissions"
-              onClick={() => {
-                const hashedId = row.original.id;
-                navigate(`/rolespermission/${hashedId}`, {
-                  state: {
-                    role_name: row.original.role_name,
-                    code: row.original.code,
-                  },
-                });
-              }}
+              onClick={() => handleNavigatePermission(row.original)}
               className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm"
             >
               <Lock size={14} />
             </button>
             <button
-              onClick={() => {
-                setSelectedRole(row.original);
-                setOpenModal(true);
-              }}
+              onClick={() => handleOpenForm(row.original)}
               className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
             >
               <Pencil size={14} />
@@ -215,14 +221,12 @@ export default function RolesList() {
         ),
       },
     ],
-    [navigate]
+    [handleDelete, handleNavigatePermission, handleOpenForm]
   );
 
   return (
     <div className="px-2 py-4 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-28 md:pb-6">
       <AppHead title="Role Management" />
-
-      {/* Header Page */}
       <div className="flex items-center justify-between gap-4 px-1">
         <div className="flex items-center gap-2.5">
           <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
@@ -237,19 +241,14 @@ export default function RolesList() {
             </p>
           </div>
         </div>
-
         <button
-          onClick={() => {
-            setSelectedRole(null);
-            setOpenModal(true);
-          }}
+          onClick={() => handleOpenForm(null)}
           className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
         >
           <PlusSquare size={18} /> Tambah Role
         </button>
       </div>
 
-      {/* Filter & Search */}
       <div className="flex justify-start px-1">
         <div className="bg-white p-2 rounded-2xl border border-slate-100 shadow-sm w-full md:w-auto md:min-w-[320px]">
           <form onSubmit={handleSearch} className="flex items-center gap-1.5">
@@ -276,8 +275,7 @@ export default function RolesList() {
             </div>
             <button
               type="submit"
-              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
-                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
               <Search size={14} className="md:hidden" />
               <span className="hidden md:block">CARI</span>
@@ -286,7 +284,6 @@ export default function RolesList() {
         </div>
       </div>
 
-      {/* --- RESPONSIVE DATA VIEW --- */}
       <ResponsiveDataView
         data={data}
         loading={loading}
@@ -315,7 +312,6 @@ export default function RolesList() {
                 {role.is_active ? "Aktif" : "Nonaktif"}
               </div>
             </div>
-
             <div className="space-y-2 py-2 border-y border-slate-50">
               <div className="flex items-start gap-2">
                 <FileText
@@ -327,27 +323,15 @@ export default function RolesList() {
                 </p>
               </div>
             </div>
-
             <div className="flex gap-2 pt-1">
               <button
-                onClick={() => {
-                  const hashedId = role.id;
-                  navigate(`/rolespermission/${hashedId}`, {
-                    state: {
-                      role_name: role.role_name,
-                      code: role.code,
-                    },
-                  });
-                }}
+                onClick={() => handleNavigatePermission(role)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase active:scale-95 transition-all"
               >
                 <Lock size={10} /> Permission
               </button>
               <button
-                onClick={() => {
-                  setSelectedRole(role);
-                  setOpenModal(true);
-                }}
+                onClick={() => handleOpenForm(role)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
               >
                 <Pencil size={10} /> Edit
@@ -374,19 +358,13 @@ export default function RolesList() {
         )}
       />
 
-      {/* --- PAGINASI KHUSUS MOBILE --- */}
       <div className="md:hidden mt-4">
         <TablePagination
           table={{
-            options: {
-              state: {
-                pagination: pagination,
-              },
-            },
-            setPageSize: (newSize) =>
-              setPagination((p) => ({ ...p, pageSize: newSize, pageIndex: 0 })),
-            setPageIndex: (newIndex) =>
-              setPagination((p) => ({ ...p, pageIndex: newIndex })),
+            options: { state: { pagination } },
+            setPageSize: (s) =>
+              setPagination((p) => ({ ...p, pageSize: s, pageIndex: 0 })),
+            setPageIndex: (i) => setPagination((p) => ({ ...p, pageIndex: i })),
             previousPage: () =>
               setPagination((p) => ({ ...p, pageIndex: p.pageIndex - 1 })),
             nextPage: () =>
@@ -397,10 +375,7 @@ export default function RolesList() {
       </div>
 
       <button
-        onClick={() => {
-          setSelectedRole(null);
-          setOpenModal(true);
-        }}
+        onClick={() => handleOpenForm(null)}
         className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 border-4 border-white transition-all"
       >
         <PlusSquare size={20} />
@@ -416,11 +391,7 @@ export default function RolesList() {
               prev.map((r) => (r.id === newRole.id ? newRole : r))
             );
           } else {
-            setData((prev) => {
-              const newData = [newRole, ...prev];
-              return newData.slice(0, pagination.pageSize);
-            });
-
+            setData((prev) => [newRole, ...prev].slice(0, pagination.pageSize));
             setTotalCount((prev) => prev + 1);
             setPagination((prev) => ({ ...prev, pageIndex: 0 }));
           }
@@ -430,3 +401,5 @@ export default function RolesList() {
     </div>
   );
 }
+
+export default RolesList;
