@@ -11,7 +11,6 @@ use App\Repositories\LogDbErrorRepository;
 use App\Models\Ms_Customer;
 use App\Models\Ms_PaymentMethod;
 use App\Models\Tr_Transaction;
-use App\Helpers\CryptoHelper;
 
 class TransactionService
 {
@@ -299,9 +298,6 @@ class TransactionService
         return ['id' => $customer->id, 'name' => $customer->name, 'phone' => $customer->phone];
     }
 
-
-
-
     private function generateTransactionNumbers($tenantId)
     {
         $yearNow = date('Y');
@@ -454,33 +450,54 @@ class TransactionService
     public function cancelTransaction(int $transactionId, string $reason = ''): Tr_Transaction
     {
         return DB::transaction(function () use ($transactionId, $reason) {
-
             $user     = Auth::user();
             $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
 
-            // Lock untuk cegah race condition
+            // 1. Ambil data dengan Lock untuk keamanan data
             $transaction = Tr_Transaction::where('tenant_id', $tenantId)
                 ->lockForUpdate()
                 ->findOrFail($transactionId);
 
-            // Update status → CANCELED + simpan alasan di kolom notes
-            $transaction->update([
-                'status' => Tr_Transaction::STATUS_CANCELED,
-                'notes'  => $reason,
-            ]);
+            // 2. VALIDASI BISNIS (SINKRON DENGAN FRONTEND)
+            // Jangan izinkan cancel jika sudah Lunas (Paid)
+            if ($transaction->payment_status === Tr_Transaction::PAY_PAID) {
+                throw new \Exception("Transaksi yang sudah LUNAS tidak dapat dibatalkan.");
+            }
 
-            // Log aktivitas — konsisten dengan createTransaction & processPayment
+            // Hanya boleh cancel jika status masih PENDING atau PROCESS
+            $allowedStatus = [Tr_Transaction::STATUS_PENDING, Tr_Transaction::STATUS_PROCESS];
+            if (!in_array($transaction->status, $allowedStatus)) {
+                throw new \Exception("Transaksi tidak bisa dibatalkan karena sudah dalam tahap: " . $transaction->status);
+            }
+
+            // 3. LOGIC REFUND (Jika sudah ada DP/Uang Masuk)
+            $refundNote = "";
+            if ($transaction->total_paid > 0) {
+                $refundAmount = $transaction->total_paid;
+                $refundNote = " | REFUND DP: " . number_format($refundAmount, 0, ',', '.');
+
+                // PENTING: Reset nilai bayar agar tidak terhitung di laporan Omzet
+                $transaction->total_paid     = 0;
+                $transaction->payment_amount = 0;
+            }
+
+            // 4. UPDATE DATA TRANSAKSI
+            $transaction->status = Tr_Transaction::STATUS_CANCELED;
+            // Gabungkan catatan lama dengan alasan pembatalan baru
+            $transaction->notes  = trim(($transaction->notes ?? '') . " | Batal: " . $reason . $refundNote);
+            $transaction->save();
+
+            // 5. LOGGING AKTIVITAS
             $changedBy = $user->employee->full_name ?? $user->name ?? 'System';
 
             $transaction->logs()->create([
                 'tenant_id'   => $tenantId,
                 'status'      => Tr_Transaction::STATUS_CANCELED,
                 'changed_by'  => $changedBy,
-                'description' => 'Transaksi dibatalkan. Alasan: ' . $reason,
+                'description' => "Transaksi dibatalkan. Alasan: " . ($reason ?: '-') . ($refundNote ? " (Dana dikembalikan)" : ""),
             ]);
 
             return $transaction;
-
         }, 5);
     }
 }

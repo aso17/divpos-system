@@ -8,44 +8,51 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class TransactionResource extends JsonResource
 {
-   // TransactionResource.php
     public function toArray($request)
     {
-        // Ambil nama kasir yang sedang login atau dari relasi creator
-        $cashierName = $this->creator->employee->full_name ?? Auth::user()->employee->full_name;
+        // Ambil nama kasir
+        $cashierName = $this->creator->employee->full_name ?? Auth::user()->employee->full_name ?? 'System';
+
+        // LOGIC FALLBACK: Jika payment_amount 0 tapi ada DP, gunakan DP sebagai nominal bayar utama
+        $displayPayment = (float) $this->payment_amount;
+        if ($displayPayment <= 0 && $this->dp_amount > 0) {
+            $displayPayment = (float) $this->dp_amount;
+        }
 
         return [
             'id'                => CryptoHelper::encrypt($this->id),
             'invoice_no'        => $this->invoice_no,
-            'queue_number' => $this->queue_number 
-                            ? str_pad($this->queue_number, 2, '0', STR_PAD_LEFT) 
-                            : '00',
-            
+            'queue_number'      => $this->queue_number
+                                    ? str_pad($this->queue_number, 2, '0', STR_PAD_LEFT)
+                                    : '00',
+
             // Customer Info
             'customer_name'     => $this->customer_name,
             'customer_phone'    => $this->customer_phone,
 
             // Financials
             'grand_total'       => (float) $this->grand_total,
-            'payment_amount'    => (float) $this->payment_amount,
+
+            // Perbaikan: Sekarang payment_amount akan selalu berisi angka (DP atau Bayar Cash)
+            'payment_amount'    => $displayPayment,
+
+            'dp_amount'         => (float) $this->dp_amount, // Tambahkan ini agar FE tahu jika ada DP
             'change_amount'     => (float) $this->change_amount,
             'total_paid'        => (float) $this->total_paid,
+            'remaining_bill'    => (float) ($this->grand_total - $this->total_paid), // Bonus: Sisa tagihan
 
             // Status
             'status'            => $this->status,
             'payment_status'    => $this->payment_status,
-            
-            // SAMAKAN DISINI: Format order_date menjadi string
+
+            // Format order_date
             'order_date'        => $this->order_date ? $this->order_date->format('d M Y H:i') : $this->created_at->format('d M Y H:i'),
 
             // Relations
             'details'           => TransactionDetailResource::collection($this->whenLoaded('details')),
             'outlet'            => new OutletResource($this->whenLoaded('outlet')),
-            
-            // SAMAKAN DISINI: Gunakan key 'payment_method' langsung berupa string nama
+
             'payment_method'    => $this->initialPaymentMethod->name ?? '-',
-            
-            // SAMAKAN DISINI: Gunakan key 'cashier'
             'cashier'           => $cashierName,
         ];
     }
