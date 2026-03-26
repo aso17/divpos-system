@@ -41,29 +41,30 @@ class RegistrationController extends Controller
     public function store(RegistrationRequest $request)
     {
         try {
-            // 1. Ambil data yang sudah lolos sensor dan ter-decrypt di Request
-            $validated = $request->validated();
 
-            // 2. Eksekusi Service (Insert 4-5 tabel di dalam Transaction)
+
+            $validated = $request->validated();
             $result = $this->registrationService->registerNewTenant($validated);
 
-            // 3. Response Berhasil
             return response()->json([
                 'success' => true,
                 'message' => 'Registrasi bisnis berhasil! Selamat datang di sistem.',
-                'data'    => $result
+               'data'    => [
+                        'tenant_name' => $result['tenant_name'],
+                        'owner_email' => $result['owner_email'],
+                        ]
             ], 201);
 
         } catch (\Exception $e) {
-            // 4. Catat error secara detail (SQL Query, Bindings, dll)
-            // Kita teruskan data request untuk context di log
+            // 4. Catat error secara detail melalui LogService
             $this->logService->log($e);
 
-            // 5. Response Gagal untuk Frontend
+            // 5. Response Gagal
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mendaftarkan bisnis. Terjadi kesalahan pada server.',
-                'debug' => $e->getMessage() // Matikan ini jika sudah Production
+                'message' => 'Gagal mendaftarkan bisnis. Silakan coba beberapa saat lagi.',
+                // Tampilkan debug hanya jika environment bukan production
+                'debug'   => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
     }

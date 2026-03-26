@@ -14,7 +14,7 @@ class EmployeeController extends Controller
     protected $employeeService;
     protected $logService;
 
-    public function __construct(EmployeeService $employeeService,LogDbErrorService $logService)
+    public function __construct(EmployeeService $employeeService, LogDbErrorService $logService)
     {
         $this->employeeService = $employeeService;
         $this->logService = $logService;
@@ -24,30 +24,35 @@ class EmployeeController extends Controller
     {
         $user = Auth::user();
         $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
-      if (!$tenantId) {
-        return response()->json([
-            'message' => 'Access denied. You do not have permission to perform this action.'
-        ], 403);
-         }
+
+        if (!$tenantId) {
+            return response()->json([
+                'message' => 'Access denied.'
+            ], 403);
+        }
 
         $params = [
             'tenant_id' => $tenantId,
-            'keyword' => $request->query('keyword'),
+            'keyword'   => $request->query('keyword'),
+            'is_active' => $request->query('is_active'),
+            'outlet_id' => $request->query('outlet_id'),
         ];
 
         $query = $this->employeeService->getAllEmployees($params);
-        $perPage = (int) ($request->per_page ?? 10);
-        $employees = $query->paginate($perPage);
 
-        return EmployeeResource::collection($employees);
+        $perPage = min((int) ($request->per_page ?? 10), 100);
+
+        return EmployeeResource::collection(
+            $query->paginate($perPage)
+        );
     }
 
-   public function store(EmployeeRequest $request)
+    public function store(EmployeeRequest $request)
     {
         try {
-            
+
             $user = Auth::user();
-            $tenantId = $user->employee->tenant_id; 
+            $tenantId = $user->employee->tenant_id;
 
             if (!$tenantId) {
                 return response()->json([
@@ -88,10 +93,10 @@ class EmployeeController extends Controller
             }
 
             $payload = $request->validated();
-            
+
             // Memanggil service tanpa mengirim $userId manual
             $updatedEmployee = $this->employeeService->updateEmployee($payload['id'], $tenantId, $payload);
-            
+
             $updatedEmployee->load(['outlet']);
 
             return response()->json([
@@ -111,29 +116,29 @@ class EmployeeController extends Controller
 
 
     public function destroy($id)
-{
-    try {
-        $user = Auth::user();
-        $tenantId = $user->employee->tenant_id;
+    {
+        try {
+            $user = Auth::user();
+            $tenantId = $user->employee->tenant_id;
 
-        if (!$tenantId) {
-            return response()->json(['message' => 'Akses ditolak.'], 403);
+            if (!$tenantId) {
+                return response()->json(['message' => 'Akses ditolak.'], 403);
+            }
+
+            // Panggil service untuk menghapus
+            $this->employeeService->deleteEmployee($id, $tenantId);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data karyawan dan akses loginnya berhasil dihapus.'
+            ]);
+
+        } catch (\Exception $e) {
+            $this->logService->log($e);
+            return response()->json([
+                'success' => false,
+                'message' => '' . $e->getMessage()
+            ], 500);
         }
-
-        // Panggil service untuk menghapus
-        $this->employeeService->deleteEmployee($id, $tenantId);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Data karyawan dan akses loginnya berhasil dihapus.'
-        ]);
-
-    } catch (\Exception $e) {
-        $this->logService->log($e);
-        return response()->json([
-            'success' => false,
-            'message' => '' . $e->getMessage()
-        ], 500);
     }
-}
 }

@@ -6,28 +6,28 @@ use App\Models\Ms_PaymentMethod;
 
 class MsPaymentMethodRepository
 {
-   public function getForTransaction($tenantId)
-{
-    return Ms_paymentMethod::select([
-            'id', 
-            'name', 
-            'code', 
-            'type', 
-            'is_default',
-           
-            'is_cash',
-            'is_dp_enabled',
-            'allow_zero_pay'
-        ])
-        ->where(function($query) use ($tenantId) {
-            $query->where('tenant_id', $tenantId)
-                  ->orWhereNull('tenant_id'); 
-        })
-        ->where('is_active', true)
-        ->orderBy('is_default', 'desc') 
-        ->orderBy('name', 'asc')
-        ->get();
-}
+    public function getForTransaction($tenantId)
+    {
+        return Ms_paymentMethod::select([
+                'id',
+                'name',
+                'code',
+                'type',
+                'is_default',
+                'is_cash',
+                'is_dp_enabled',
+                'allow_zero_pay'
+            ])
+            // ->where(function ($query) use ($tenantId) {
+            //     $query->where('tenant_id', $tenantId)
+            //       ->orWhereNull('tenant_id');
+            // })
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->orderBy('is_default', 'desc')
+            ->orderBy('name', 'asc')
+            ->get();
+    }
     /**
      * Query dasar untuk mendapatkan list data dengan filter tenant & keyword.
      */
@@ -36,19 +36,19 @@ class MsPaymentMethodRepository
         return Ms_PaymentMethod::withoutGlobalScopes()
             ->from('Ms_payment_methods as pm')
             ->select([
-                'pm.id', 
-                'pm.name', 
-                'pm.type', 
-                'pm.account_number', 
-                'pm.account_name', 
-                'pm.description', 
-                'pm.is_active', 
+                'pm.id',
+                'pm.name',
+                'pm.type',
+                'pm.account_number',
+                'pm.account_name',
+                'pm.description',
+                'pm.is_active',
                 'pm.created_at'
             ])
             ->where('pm.tenant_id', $tenantId)
             ->whereNull('pm.deleted_at')
             ->when($keyword, function ($query) use ($keyword) {
-                $query->where(function($q) use ($keyword) {
+                $query->where(function ($q) use ($keyword) {
                     // Gunakan 'like' atau 'ilike' tergantung database yang Anda pakai
                     $q->where('pm.name', 'like', '%' . $keyword . '%')
                       ->orWhere('pm.type', 'like', '%' . $keyword . '%')
@@ -91,7 +91,7 @@ class MsPaymentMethodRepository
 
         return $record->delete();
     }
-    
+
     /**
      * Temukan satu data spesifik (untuk keperluan detail/edit).
      */

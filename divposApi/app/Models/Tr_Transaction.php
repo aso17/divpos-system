@@ -15,16 +15,16 @@ class Tr_Transaction extends Model
     protected $table = 'Tr_transactions';
 
     // --- Konstanta Status (Source of Truth) ---
-    const STATUS_PENDING   = 'PENDING';
-    const STATUS_PROCESS   = 'PROCESS';
-    const STATUS_READY     = 'READY';
-    const STATUS_TAKEN     = 'TAKEN';
-    const STATUS_CANCELED  = 'CANCELED';
-    const STATUS_COMPLETED = 'COMPLETED'; 
+    public const STATUS_PENDING   = 'PENDING';
+    public const STATUS_PROCESS   = 'PROCESS';
+    public const STATUS_READY     = 'READY';
+    public const STATUS_TAKEN     = 'TAKEN';
+    public const STATUS_CANCELED  = 'CANCELED';
+    public const STATUS_COMPLETED = 'COMPLETED';
 
-    const PAY_UNPAID  = 'UNPAID';
-    const PAY_PARTIAL = 'PARTIAL';
-    const PAY_PAID    = 'PAID';
+    public const PAY_UNPAID  = 'UNPAID';
+    public const PAY_PARTIAL = 'PARTIAL';
+    public const PAY_PAID    = 'PAID';
 
     protected $fillable = [
         'tenant_id',
@@ -49,7 +49,7 @@ class Tr_Transaction extends Model
         'status',
         'payment_status',
         'notes',
-        'order_year',    
+        'order_year',
         'order_month',
         'created_by',
         'updated_by',
@@ -59,19 +59,22 @@ class Tr_Transaction extends Model
         'order_date'         => 'datetime',
         'pickup_date'        => 'datetime',
         'actual_pickup_date' => 'datetime',
-        'order_year'         => 'integer', // Tambahkan cast integer
+        // --- TAMBAHKAN INI ---
+        'created_at'         => 'datetime',
+        'updated_at'         => 'datetime',
+        // ----------------------
+        'order_year'         => 'integer',
         'order_month'        => 'integer',
-        'queue_number'        => 'integer',
+        'queue_number'       => 'integer',
         'total_base_price'   => 'float',
         'discount_amount'    => 'float',
         'tax_amount'         => 'float',
         'grand_total'        => 'float',
-        'dp_amount'          => 'float', // Penambahan: Casting untuk akurasi math
+        'dp_amount'          => 'float',
         'payment_amount'     => 'float',
         'change_amount'      => 'float',
         'total_paid'         => 'float',
     ];
-
     /**
      * Boot logic untuk mengisi audit columns secara otomatis
      */
@@ -113,7 +116,7 @@ class Tr_Transaction extends Model
     {
         return $this->belongsTo(Ms_Customer::class, 'customer_id');
     }
-    
+
     public function outlet(): BelongsTo
     {
         return $this->belongsTo(Ms_Outlet::class, 'outlet_id');
@@ -134,7 +137,7 @@ class Tr_Transaction extends Model
     public function creator(): BelongsTo
     {
         // Sesuaikan nama model User anda, biasanya 'User' atau 'Ms_user'
-        return $this->belongsTo(Ms_user::class, 'created_by'); 
+        return $this->belongsTo(Ms_user::class, 'created_by');
     }
 
     public function updater(): BelongsTo

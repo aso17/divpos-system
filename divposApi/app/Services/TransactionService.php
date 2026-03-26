@@ -28,10 +28,8 @@ class TransactionService
     public function getTransactionHistory(array $params)
     {
         try {
-
             $user = Auth::user();
             $perPage = $params['per_page'] ?? 10;
-
             $tenantId = $user->tenant_id;
             $outletId = null;
 
@@ -43,25 +41,24 @@ class TransactionService
             $query = $this->transactionRepo->getBaseQuery($tenantId, $outletId);
 
             /**
-             * 2. EAGER LOADING (Hanya tarik kolom yang perlu saja)
+             * 2. EAGER LOADING (Dioptimasi)
              */
             $query->with([
-                // Hanya tarik kolom yang akan tampil di struk/tabel
                 'outlet:id,name,phone,city,address',
-
                 'creator' => function ($q) {
-                    // WAJIB: select 'id' agar relasi ke employee nyambung
                     $q->select('id')->with(['employee:id,user_id,full_name']);
                 },
-                'initialPaymentMethod:id,name'
+                'initialPaymentMethod:id,name',
+                // Tambahkan details jika Mas ingin langsung muncul di list/print tanpa hit API lagi
+                'details'
             ]);
 
             /**
-             * 3. OPTIMASI KOLOM UTAMA
+             * 3. OPTIMASI KOLOM UTAMA (TAMBAHKAN NOTES & LAINNYA)
              */
             $query->select([
                 'id',
-                'outlet_id', // WAJIB ada agar relasi 'outlet' bisa jalan
+                'outlet_id',
                 'invoice_no',
                 'queue_number',
                 'customer_name',
@@ -72,14 +69,18 @@ class TransactionService
                 'status',
                 'payment_status',
                 'created_by',
-                'payment_method_id'
-                // 'tenant_id' dihilangkan dari select jika tidak butuh di frontend
+                'payment_method_id',
+                // --- WAJIB TAMBAH ---
+                'notes', // Agar alasan pembatalan/refund muncul di Modal Detail
+                'payment_amount', // Dibutuhkan Resource untuk info pembayaran pertama
+                'change_amount'   // Dibutuhkan Resource untuk info kembalian
             ]);
 
-            // 4, 5, 6: Logic Search & Filter tetap sama (sudah efisien)
+            // 4. Logic Search (Sudah Bagus)
             if (!empty($params['keyword'])) {
                 $keyword = $params['keyword'];
                 $query->where(function ($q) use ($keyword) {
+                    // Gunakan index database jika ada
                     $q->where('invoice_no', 'like', $keyword . '%')
                       ->orWhere('customer_phone', 'like', $keyword . '%')
                       ->orWhere('customer_name', 'like', '%' . $keyword . '%');
@@ -98,26 +99,20 @@ class TransactionService
                 }
             }
 
-            // 6. Filter Order Status
+            // 6. Filter Order Status (Tambahkan Filter CANCELED jika perlu)
             if (!empty($params['status']) && $params['status'] !== 'ALL') {
-                if ($params['status'] === 'ACTIVE') {
-                    $query->whereNotIn('status', [
-                        Tr_Transaction::STATUS_TAKEN,
-                        Tr_Transaction::STATUS_CANCELED
-                    ]);
-                } else {
-                    $query->where('status', $params['status']);
-                }
+                $query->where('status', $params['status']);
             }
 
             // 7. Sortir (Terbaru di atas) & Eksekusi
             return $query->orderBy('order_date', 'desc')->paginate($perPage);
 
         } catch (\Exception $e) {
+            // Log error dengan detail agar Mas A_so mudah debugging
             $this->logDbErrorRepo->store([
                 'user_id' => Auth::id(),
                 'feature' => 'TRANSACTION_HISTORY',
-                'message' => $e->getMessage(),
+                'message' => $e->getMessage() . " in Line " . $e->getLine(),
             ]);
             throw $e;
         }
@@ -352,25 +347,31 @@ class TransactionService
 
     public function processPayment(array $data)
     {
+        // Gunakan retry (angka 5) untuk menangani deadlock jika database sedang sibuk
         return DB::transaction(function () use ($data) {
             $user = Auth::user();
-            $tenantId = $user->employee->tenant_id;
+            $employee = $user->employee;
+            $tenantId = $employee->tenant_id;
 
-            // 1. Cari Transaksi dengan Lock (Keamanan data keuangan)
+            // 1. Cari Transaksi dengan Lock (Penting untuk data finansial)
             $transaction = Tr_Transaction::where('tenant_id', $tenantId)
                 ->lockForUpdate()
                 ->findOrFail($data['transaction_id']);
 
+            // Proteksi: Jika sudah lunas, jangan diproses lagi
             if ($transaction->payment_status === Tr_Transaction::PAY_PAID) {
                 throw new \Exception("Transaksi ini sudah berstatus LUNAS.");
             }
 
             $inputAmount = (float) $data['payment_amount'];
-            $sisaTagihan = (float) ($transaction->grand_total - $transaction->total_paid);
+            $totalPaidSekarang = (float) $transaction->total_paid;
+            $grandTotal = (float) $transaction->grand_total;
+            $sisaTagihan = $grandTotal - $totalPaidSekarang;
 
-            // 2. Tentukan Metode Pembayaran
-            $methodId = $data['payment_method_id'] ?? $transaction->payment_method_id;
-            $method = Ms_PaymentMethod::find($methodId);
+            // 2. Validasi Metode Pembayaran
+            $methodId = $data['payment_method_id'];
+            $method = Ms_PaymentMethod::where('id', $methodId)->first();
+
             if (!$method) {
                 throw new \Exception("Metode pembayaran tidak valid.");
             }
@@ -378,74 +379,67 @@ class TransactionService
             $changeAmount = 0;
             $amountToPay = 0;
 
-            // --- LOGIC STRICT PAYMENT (SAMA DENGAN CREATE) ---
+            // --- LOGIC PEMBAYARAN (Sesuai SOP Mas A_so) ---
             if ($method->is_cash) {
-                // Cash: Tidak boleh kurang dari sisa tagihan
+                // Cash: Boleh lebih (ada kembalian), tidak boleh kurang
                 if ($inputAmount < $sisaTagihan) {
-                    throw new \Exception("Nominal bayar kurang. Sisa tagihan: Rp " . number_format($sisaTagihan));
+                    throw new \Exception("Nominal bayar kurang. Sisa tagihan: Rp " . number_format($sisaTagihan, 0, ',', '.'));
                 }
                 $changeAmount = $inputAmount - $sisaTagihan;
-                $amountToPay = $sisaTagihan; // Yang masuk ke omzet adalah sisa tagihannya
+                $amountToPay = $sisaTagihan; // Yang dicatat sebagai pembayaran adalah senilai sisanya saja
             } else {
-                // Non-cash (QRIS/Transfer): Harus PAS sesuai sisa tagihan
-                // Pakai abs() untuk handle error floating point minor
+                // Non-cash (QRIS/Transfer): Harus pas (Tolerance 0.01 untuk floating point)
                 if (abs($inputAmount - $sisaTagihan) > 0.01) {
-                    throw new \Exception("Pembayaran {$method->name} harus pas Rp " . number_format($sisaTagihan));
+                    throw new \Exception("Pembayaran via {$method->name} harus nominal pas Rp " . number_format($sisaTagihan, 0, ',', '.'));
                 }
                 $amountToPay = $inputAmount;
                 $changeAmount = 0;
             }
 
-            // 3. Update Header Transaksi
-            $newTotalPaid = $transaction->total_paid + $amountToPay;
+            // 3. Kalkulasi Status Baru
+            $newTotalPaid = $totalPaidSekarang + $amountToPay;
 
-            // Penentuan Status Final
-            $newPaymentStatus = ($newTotalPaid >= $transaction->grand_total)
-                ? Tr_Transaction::PAY_PAID
-                : Tr_Transaction::PAY_PARTIAL;
+            // Cek apakah sudah lunas (menggunakan perbandingan yang aman)
+            $isLunas = ($newTotalPaid >= ($grandTotal - 0.01));
 
-            $newOrderStatus = ($newPaymentStatus === Tr_Transaction::PAY_PAID)
-                ? Tr_Transaction::STATUS_COMPLETED
-                : $transaction->status;
+            $newPaymentStatus = $isLunas ? Tr_Transaction::PAY_PAID : Tr_Transaction::PAY_PARTIAL;
+            $newOrderStatus = $isLunas ? Tr_Transaction::STATUS_COMPLETED : $transaction->status;
 
-
-
-
+            // 4. Update Header Transaksi
             $transaction->update([
                 'payment_method_id' => $method->id,
-                'payment_amount'    => $inputAmount,  // Audit: Nominal asli yang diketik kasir
-                'change_amount'     => $changeAmount, // Audit: Kembaliannya
+                'payment_amount'    => $inputAmount,  // Simpan input asli kasir untuk audit
+                'change_amount'     => $changeAmount, // Simpan kembaliannya
                 'total_paid'        => $newTotalPaid,
                 'payment_status'    => $newPaymentStatus,
                 'status'            => $newOrderStatus,
             ]);
 
-            // 4. Catat ke Tabel History Pembayaran
+            // 5. Catat ke Tabel History (Sangat Penting untuk Laporan Kas)
             $transaction->payments()->create([
                 'tenant_id'           => $tenantId,
                 'payment_method_id'   => $method->id,
                 'payment_method_name' => $method->name,
                 'amount'              => $amountToPay,
                 'payment_date'        => now(),
-                'received_by'         => $user->employee->full_name ?? 'Kasir',
+                'received_by'         => $employee->full_name ?? $user->name,
             ]);
 
-            // 5. Log Aktivitas
+            // 6. Log Aktivitas
             $transaction->logs()->create([
                 'tenant_id'   => $tenantId,
                 'status'      => $newOrderStatus,
-                'changed_by'  => $user->employee->full_name ?? 'System',
-                'description' => "Pelunasan sebesar " . number_format($amountToPay) . " menggunakan " . $method->name,
+                'changed_by'  => $employee->full_name ?? $user->name,
+                'description' => "Pelunasan sebesar Rp " . number_format($amountToPay, 0, ',', '.') . " via " . $method->name,
             ]);
 
+            // Temp variable untuk response ke Frontend (agar modal sukses bisa tampil kembalian)
             $transaction->latest_payment = $inputAmount;
             $transaction->latest_change = $changeAmount;
-
 
             return $transaction;
         }, 5);
     }
-
 
     public function cancelTransaction(int $transactionId, string $reason = ''): Tr_Transaction
     {

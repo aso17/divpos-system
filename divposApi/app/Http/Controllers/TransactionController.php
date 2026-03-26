@@ -47,6 +47,52 @@ class TransactionController extends Controller
     public function getInitData()
     {
         $user = Auth::user();
+        // Ambil tenantId dengan fallback ke employee
+        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
+
+        if (!$tenantId) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 403);
+        }
+
+        $cacheKey = "init_data_tenant_transaction_{$tenantId}";
+
+        // 1. Ambil data dari cache
+        $data = Cache::remember($cacheKey, now()->addHours(24), function () use ($tenantId) {
+            return [
+                'packages'        => $this->packageService->getAllPackagesTransaction($tenantId),
+                'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId),
+                'payment_methods' => $this->paymentMethodService->getAllPaymentMethodsTransaction($tenantId),
+            ];
+        });
+
+        /**
+         * 2. VALIDASI CACHE (Anti Error Undefined Key)
+         * Jika data cache tidak lengkap (korup), hapus cache dan ambil ulang dari DB secara real-time
+         */
+        if (!isset($data['packages']) || !isset($data['outlets']) || !isset($data['payment_methods'])) {
+            Cache::forget($cacheKey);
+
+            // Ambil data fresh tanpa cache untuk request saat ini saja
+            $data = [
+                'packages'        => $this->packageService->getAllPackagesTransaction($tenantId),
+                'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId),
+                'payment_methods' => $this->paymentMethodService->getAllPaymentMethodsTransaction($tenantId),
+            ];
+        }
+
+        // 3. Return response dengan Resource Collection & Fallback Empty Array
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'packages'        => TransactionPackageResource::collection($data['packages'] ?? []),
+                'outlets'         => TransactionOutletResource::collection($data['outlets'] ?? []),
+                'payment_methods' => TransactionPaymentMethodResource::collection($data['payment_methods'] ?? []),
+            ]
+        ]);
+    }
+    public function getPaymentMethods()
+    {
+        $user = Auth::user();
         $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
 
         if (!$tenantId) {
@@ -55,11 +101,8 @@ class TransactionController extends Controller
 
         // Gunakan Cache Remember
         $cacheKey = "init_data_tenant_transaction_{$tenantId}";
-
         $data = Cache::remember($cacheKey, now()->addHours(24), function () use ($tenantId) {
             return [
-                'packages'        => $this->packageService->getAllPackagesTransaction($tenantId),
-                'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId),
                 'payment_methods' => $this->paymentMethodService->getAllPaymentMethodsTransaction($tenantId),
 
             ];
@@ -68,8 +111,6 @@ class TransactionController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'packages'        => TransactionPackageResource::collection($data['packages']),
-                'outlets'         => TransactionOutletResource::collection($data['outlets']),
                 'payment_methods' => TransactionPaymentMethodResource::collection($data['payment_methods']),
 
             ]
@@ -79,25 +120,15 @@ class TransactionController extends Controller
     public function getTransactionHistory(Request $request)
     {
         try {
-            // 1. Ambil data dari Service (Data sudah ter-load with() dan ter-select kolomnya)
+
             $data = $this->transactionService->getTransactionHistory($request->all());
-
-            /**
-             * 2. ANALISIS RE-LOADING:
-             * Karena di Service kita sudah pakai ->with(['outlet', 'creator.employee', 'initialPaymentMethod']),
-             * Kita HANYA perlu meload 'details' di sini jika memang Service belum meloadnya.
-             * Ini jauh lebih hemat performa.
-             */
             $data->getCollection()->loadMissing(['details']);
-
-            // 3. Gunakan Resource secara elegan
-            // Tidak perlu manual pecah meta/links, Resource::collection sudah pintar.
             $resource = TransactionHistoryResource::collection($data)->response()->getData(true);
 
             return response()->json([
                 'success' => true,
                 'message' => "Riwayat transaksi berhasil diambil",
-                'data'    => $resource, // Ini otomatis berisi { data: [], links: {}, meta: {} }
+                'data'    => $resource,
             ], 200);
 
         } catch (\Exception $e) {

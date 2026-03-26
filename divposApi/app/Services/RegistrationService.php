@@ -31,9 +31,6 @@ class RegistrationService
         return $this->businessRepo->getAll();
     }
 
-    /**
-     * Alur Registrasi Utama dengan Proteksi Transaksi & Race Condition
-     */
     public function registerNewTenant(array $data): array
     {
         return DB::transaction(function () use ($data) {
@@ -87,17 +84,15 @@ class RegistrationService
 
                 // 9. INSERT DEFAULT PAYMENT METHODS (Bulk insert)
                 $this->seedDefaultPaymentMethods($tenant->id, $user->id);
+                // 10. INSERT DEFAULT UNITS (Berdasarkan Tipe Bisnis)
+                $this->seedDefaultUnits($tenant->id, $tenant->business_type_id, $user->id);
 
                 return [
-                    'success' => true,
-                    'message' => 'Registrasi Bisnis Berhasil!',
-                    'data'    => [
-                        'tenant_name' => $tenant->name,
-                        'owner_email' => $user->email,
-                        'tenant_id'   => $tenant->id,
-                    ],
+                    'tenant_id'   => $tenant->id,
+                    'tenant_name' => $tenant->name,
+                    'user_id'     => $user->id,
+                    'owner_email' => $user->email,
                 ];
-
             } catch (\Exception $e) {
                 $this->handleLogError($e, $data);
                 throw $e;
@@ -105,10 +100,6 @@ class RegistrationService
         });
     }
 
-    /**
-     * Generate kode karyawan: YY + TenantID(3pad) + Sequence(4pad)
-     * lockForUpdate() mencegah race condition pada concurrent registration
-     */
     private function createOwnerAsEmployee($tenant, $user, array $data): void
     {
         $tenantId        = $tenant->id;
@@ -152,9 +143,6 @@ class RegistrationService
         ]);
     }
 
-    /**
-     * FIX: Ganti foreach+query (N+1) dengan single upsert bulk
-     */
     private function mapModulesToBusiness(int $businessTypeId, int $userId): void
     {
         $allModules = DB::table('Ms_modules')
@@ -182,9 +170,6 @@ class RegistrationService
         );
     }
 
-    /**
-     * FIX: created_by konsisten integer, bulk insert tetap dipertahankan
-     */
     private function seedOwnerPermissions(int $tenantId, int $roleId, int $userId, int $businessTypeId): void
     {
         $menus = DB::table('Ms_menus as m')
@@ -232,9 +217,9 @@ class RegistrationService
                 'code'           => 'CASH',
                 'name'           => 'Tunai',
                 'type'           => 'CASH',
-                'is_cash'        => true,  // Aktifkan input bayar & kembalian
-                'is_dp_enabled'  => false, // Tunai biasanya lunas, tapi bisa di-true-kan jika mau
-                'allow_zero_pay' => false, // Tunai harus bayar (tidak boleh 0)
+                'is_cash'        => true,  // Aktifkan fitur kembalian di UI
+                'is_dp_enabled'  => false,  // Sebaiknya true agar bisa terima DP cash
+                'allow_zero_pay' => false,
                 'is_active'      => true,
                 'is_default'     => true,
                 'created_by'     => $userId,
@@ -243,12 +228,26 @@ class RegistrationService
             ],
             [
                 'tenant_id'      => $tenantId,
+                'code'           => 'QRIS_MANUAL',
+                'name'           => 'QRIS (Stiker/Scan)',
+                'type'           => 'NON_CASH',
+                'is_cash'        => false, // Uang harus PAS (sesuai mutasi rekening)
+                'is_dp_enabled'  => false,
+                'allow_zero_pay' => false,
+                'is_active'      => true,
+                'is_default'     => false,
+                'created_by'     => $userId,
+                'created_at'     => $now, // Jangan lupa timestamps agar tidak error
+                'updated_at'     => $now,
+            ],
+            [
+                'tenant_id'      => $tenantId,
                 'code'           => 'PAY_LATER',
-                'name'           => 'Bayar Nanti / DP', // Nama lebih informatif buat user
+                'name'           => 'Bayar Nanti / DP',
                 'type'           => 'DEBT',
                 'is_cash'        => false,
-                'is_dp_enabled'  => true,  // INI KUNCINYA: Izinkan input DP (misal bayar 50k dari total 100k)
-                'allow_zero_pay' => true,  // Izinkan simpan meski bayar 0 (Full Hutang)
+                'is_dp_enabled'  => true,  // Bisa input DP di sini
+                'allow_zero_pay' => true,  // Bisa simpan meskipun bayar Rp 0
                 'is_active'      => true,
                 'is_default'     => false,
                 'created_by'     => $userId,
@@ -256,8 +255,7 @@ class RegistrationService
                 'updated_at'     => $now,
             ],
         ]);
-    }
-    /**
+    } /**
      * FIX: generateUsername dengan pengecekan uniqueness — tidak hanya rand()
      * Fallback ke UUID suffix jika setelah 10 percobaan masih collision
      */
@@ -282,6 +280,60 @@ class RegistrationService
         }
 
         return $username;
+    }
+
+    /**
+ * Auto-mapping satuan (Unit) berdasarkan jenis bisnis tenant.
+ */
+    private function seedDefaultUnits($tenantId, $businessTypeId, $userId): void
+    {
+        // 1. Ambil kode bisnis dari tabel master (LDR, SLN, BRB, dll)
+        $businessType = DB::table('Ms_business_types')->where('id', $businessTypeId)->first();
+        $code = $businessType ? $businessType->code : 'GENERAL';
+
+        // 2. Definisi Template Unit yang Tersedia
+        $units = [
+            'kg'    => ['name' => 'Kilogram', 'short_name' => 'kg', 'is_decimal' => true],
+            'pcs'   => ['name' => 'Potong / Pcs', 'short_name' => 'pcs', 'is_decimal' => false],
+            'm2'    => ['name' => 'Meter Persegi', 'short_name' => 'm2', 'is_decimal' => true],
+            'pax'   => ['name' => 'Orang / Sesi', 'short_name' => 'pax', 'is_decimal' => false],
+            'unit'  => ['name' => 'Unit Kendaraan', 'short_name' => 'unit', 'is_decimal' => false],
+            'tail'  => ['name' => 'Ekor', 'short_name' => 'tail', 'is_decimal' => false],
+            'ml'    => ['name' => 'Milliliter', 'short_name' => 'ml', 'is_decimal' => true],
+            'point' => ['name' => 'Titik / Spot', 'short_name' => 'point', 'is_decimal' => false],
+        ];
+
+        // 3. Filter Unit Berdasarkan Jenis Bisnis (Mapping Sempit)
+        // Disini Mas mengatur agar tiap bisnis HANYA mendapatkan yang mereka butuhkan
+        $selectedKeys = match ($code) {
+            'LDR'        => ['kg', 'pcs', 'm2'],          // Laundry: Fokus ke berat dan satuan
+            'SLN', 'BRB' => ['pax', 'point', 'ml'],       // Salon/Barber: Fokus ke sesi dan pemakaian bahan
+            'CRW'        => ['unit'],                     // Carwash: Fokus ke jumlah kendaraan
+            'PET'        => ['tail', 'kg', 'pax'],        // Petgrooming: Fokus ke ekor dan berat hewan
+            default      => ['pcs'],                      // Umum
+        };
+
+        $dataToInsert = [];
+        foreach ($selectedKeys as $key) {
+            // Pastikan key ada di library $units untuk menghindari error undefined index
+            if (isset($units[$key])) {
+                $unit = $units[$key];
+                $dataToInsert[] = [
+                    'tenant_id'  => $tenantId,
+                    'name'       => $unit['name'],
+                    'short_name' => $unit['short_name'],
+                    'is_decimal' => $unit['is_decimal'],
+                    'is_active'  => true,
+                    'created_at' => now(), // Postgres akan otomatis handle timestampsTz
+                    'updated_at' => now(),
+                ];
+            }
+        }
+
+        // 4. Eksekusi Bulk Insert (Hanya jika ada data yang akan dimasukkan)
+        if (!empty($dataToInsert)) {
+            DB::table('Ms_units')->insert($dataToInsert);
+        }
     }
 
     private function handleLogError(\Exception $e, array $data): void
