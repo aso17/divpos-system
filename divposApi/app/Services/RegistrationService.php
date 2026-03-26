@@ -282,16 +282,20 @@ class RegistrationService
         return $username;
     }
 
-    /**
- * Auto-mapping satuan (Unit) berdasarkan jenis bisnis tenant.
- */
     private function seedDefaultUnits($tenantId, $businessTypeId, $userId): void
     {
-        // 1. Ambil kode bisnis dari tabel master (LDR, SLN, BRB, dll)
-        $businessType = DB::table('Ms_business_types')->where('id', $businessTypeId)->first();
-        $code = $businessType ? $businessType->code : 'GENERAL';
+        // PROTEKSI: Jika tenantId null, jangan lanjut insert!
+        if (!$tenantId) {
+            return;
+        }
 
-        // 2. Definisi Template Unit yang Tersedia
+        // 1. Ambil data tipe bisnis (Gunakan find agar lebih cepat)
+        $businessType = DB::table('Ms_business_types')->find($businessTypeId);
+
+        // Pastikan ambil 'code' dan samakan dengan Case di match (UPPERCASE)
+        $code = $businessType ? strtoupper($businessType->code) : 'GENERAL';
+
+        // 2. Library Template Unit
         $units = [
             'kg'    => ['name' => 'Kilogram', 'short_name' => 'kg', 'is_decimal' => true],
             'pcs'   => ['name' => 'Potong / Pcs', 'short_name' => 'pcs', 'is_decimal' => false],
@@ -303,39 +307,37 @@ class RegistrationService
             'point' => ['name' => 'Titik / Spot', 'short_name' => 'point', 'is_decimal' => false],
         ];
 
-        // 3. Filter Unit Berdasarkan Jenis Bisnis (Mapping Sempit)
-        // Disini Mas mengatur agar tiap bisnis HANYA mendapatkan yang mereka butuhkan
+        // 3. Mapping Sempit (Sesuai kode di Seeder Mas)
         $selectedKeys = match ($code) {
-            'LDR'        => ['kg', 'pcs', 'm2'],          // Laundry: Fokus ke berat dan satuan
-            'SLN', 'BRB' => ['pax', 'point', 'ml'],       // Salon/Barber: Fokus ke sesi dan pemakaian bahan
-            'CRW'        => ['unit'],                     // Carwash: Fokus ke jumlah kendaraan
-            'PET'        => ['tail', 'kg', 'pax'],        // Petgrooming: Fokus ke ekor dan berat hewan
-            default      => ['pcs'],                      // Umum
+            'LDR'   => ['kg', 'pcs', 'm2'],
+            'SLN'   => ['pax', 'point', 'ml'],
+            'BRB'   => ['pax', 'point', 'ml'],
+            'CRW'   => ['unit'],
+            'PET'   => ['tail', 'kg', 'pax'],
+            default => ['pcs'], // Jika kode tidak dikenali, hanya beri 'pcs'
         };
 
         $dataToInsert = [];
         foreach ($selectedKeys as $key) {
-            // Pastikan key ada di library $units untuk menghindari error undefined index
             if (isset($units[$key])) {
                 $unit = $units[$key];
                 $dataToInsert[] = [
-                    'tenant_id'  => $tenantId,
+                    'tenant_id'  => $tenantId, // Ini yang akan masuk ke kolom tenant_id
                     'name'       => $unit['name'],
                     'short_name' => $unit['short_name'],
                     'is_decimal' => $unit['is_decimal'],
                     'is_active'  => true,
-                    'created_at' => now(), // Postgres akan otomatis handle timestampsTz
+                    'created_at' => now(),
                     'updated_at' => now(),
                 ];
             }
         }
 
-        // 4. Eksekusi Bulk Insert (Hanya jika ada data yang akan dimasukkan)
+        // 4. Bulk Insert
         if (!empty($dataToInsert)) {
             DB::table('Ms_units')->insert($dataToInsert);
         }
     }
-
     private function handleLogError(\Exception $e, array $data): void
     {
         $sql      = null;
