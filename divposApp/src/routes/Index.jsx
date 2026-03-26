@@ -10,6 +10,7 @@ import Customers from "../pages/customers/CustomerList";
 import CategoryPage from "../pages/category/CategoryList";
 import LayananPage from "../pages/masterservice/MasterServiceList";
 import TransactionPage from "../pages/transactions/Transactions";
+import CatalogPage from "../pages/catalog/CatalogList";
 import TrxHistoryPage from "../pages/transactionsHistory/TransactionHistory";
 import RolePermissionsPage from "../pages/RolePermission/RolePermissionList";
 import LoginPage from "../pages/login/Login";
@@ -90,6 +91,14 @@ export default function AppRoutes() {
               element={
                 <RequirePermission permission="view">
                   <LayananPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/catalog"
+              element={
+                <RequirePermission permission="view">
+                  <CatalogPage />
                 </RequirePermission>
               }
             />

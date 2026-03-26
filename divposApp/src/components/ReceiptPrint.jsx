@@ -3,17 +3,36 @@ import "../assets/css/ReceiptPrint.css";
 import { formatRupiah } from "../utils/formatter";
 
 const ReceiptPrint = React.forwardRef(({ data }, ref) => {
-  // --- NORMALISASI DATA (Ambil dari Resource yang sudah kita buat) ---
+  // --- NORMALISASI DATA ---
   const outlet = data?.outlet || {};
   const customerName = data?.customer_name || "Pelanggan Umum";
-  const queueNumber = data?.queue_number || "00"; // Sudah di-pad di backend
+  const queueNumber = data?.queue_number || "00";
   const cashier = data?.cashier || "Staff";
-  const paymentMethod = data?.payment_method || "TUNAI";
+  const paymentMethod =
+    data?.payment_method_name || data?.payment_method || "TUNAI";
   const displayDate = data?.order_date || "-";
 
-  // Logic Label Pembayaran
-  const paymentLabel =
-    data?.dp_amount > 0 ? "DP / UANG MUKA" : `BAYAR (${paymentMethod})`;
+  // --- LOGIC PEMBAYARAN (SINKRON DENGAN BACKEND) ---
+  // 1. Nominal yang sedang dibayar saat ini (menggunakan latest_payment dari backend)
+  const currentPayment = parseFloat(
+    data?.latest_payment || data?.payment_amount || 0
+  );
+
+  // 2. Nominal DP/Pembayaran sebelumnya (Total Paid di DB dikurangi yang baru masuk)
+  const previousPaid = parseFloat(data?.total_paid || 0) - currentPayment;
+
+  // 3. Kembalian terbaru
+  const currentChange = parseFloat(
+    data?.latest_change || data?.change_amount || 0
+  );
+
+  // Label Dinamis
+  const isPelunasan = data?.payment_status === "PAID" && previousPaid > 0;
+  const paymentLabel = isPelunasan
+    ? "PELUNASAN"
+    : data?.payment_status === "PARTIAL"
+    ? "DP / UANG MUKA"
+    : `BAYAR (${paymentMethod})`;
 
   return (
     <div ref={ref} className="receipt-container">
@@ -63,13 +82,16 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
             <thead>
               <tr>
                 <th align="left" style={{ width: "50%" }}>
-                  Layanan
+                  {" "}
+                  Layanan{" "}
                 </th>
                 <th align="center" style={{ width: "20%" }}>
-                  Qty
+                  {" "}
+                  Qty{" "}
                 </th>
                 <th align="right" style={{ width: "30%" }}>
-                  Total
+                  {" "}
+                  Total{" "}
                 </th>
               </tr>
             </thead>
@@ -79,7 +101,8 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
                   <td className="item-name-cell">
                     <span className="item-name">{item.package_name}</span>
                     <div className="item-price">
-                      @{formatRupiah(item.price_per_unit)}
+                      {" "}
+                      @{formatRupiah(item.price_per_unit)}{" "}
                     </div>
                   </td>
                   <td align="center" className="item-qty">
@@ -104,14 +127,26 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
               </span>
             </div>
 
-            {/* Menampilkan apa yang dibayar saat ini (DP atau Full) */}
+            {/* Jika ada pembayaran DP sebelumnya, tampilkan sebagai pengurang */}
+            {previousPaid > 0 && (
+              <div className="footer-row" style={{ opacity: 0.8 }}>
+                <span className="label text-xs tracking-tight uppercase">
+                  Telah Dibayar (DP)
+                </span>
+                <span className="value">{formatRupiah(previousPaid)}</span>
+              </div>
+            )}
+
+            {/* Nominal yang dibayar SEKARANG */}
             <div className="footer-row">
-              <span className="label uppercase">{paymentLabel}</span>
-              <span className="value">{formatRupiah(data.payment_amount)}</span>
+              <span className="label font-bold uppercase">{paymentLabel}</span>
+              <span className="value font-bold">
+                {formatRupiah(currentPayment)}
+              </span>
             </div>
 
-            {/* SISA TAGIHAN: Hanya muncul jika belum lunas */}
-            {data.remaining_bill > 0 && (
+            {/* SISA TAGIHAN: Muncul jika masih ada sisa (Hutang/DP) */}
+            {parseFloat(data.remaining_bill) > 0 && (
               <div className="footer-row sisa-tagihan">
                 <span className="label font-bold">SISA TAGIHAN</span>
                 <span className="value font-bold">
@@ -120,13 +155,11 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
               </div>
             )}
 
-            {/* KEMBALIAN: Hanya muncul jika ada uang kembali */}
-            {data.change_amount > 0 && (
+            {/* KEMBALIAN: Muncul jika ada uang kembali dari pelunasan ini */}
+            {currentChange > 0 && (
               <div className="footer-row">
                 <span className="label">KEMBALI</span>
-                <span className="value">
-                  {formatRupiah(data.change_amount)}
-                </span>
+                <span className="value">{formatRupiah(currentChange)}</span>
               </div>
             )}
           </div>
@@ -147,12 +180,9 @@ const ReceiptPrint = React.forwardRef(({ data }, ref) => {
             <p className="thanks-title">Terima Kasih Atas Kepercayaan Anda</p>
             {data.payment_status !== "PAID" && (
               <p className="thanks-subtitle bold">
-                SIMPAN NOTA INI SEBAGAI BUKTI PENGAMBILAN
+                SIMPAN NOTA INI SEBAGAI BUKTI
               </p>
             )}
-            <p className="thanks-notice">
-              Barang yang sudah diambil tidak dapat dikomplain.
-            </p>
           </div>
         </div>
       ) : (

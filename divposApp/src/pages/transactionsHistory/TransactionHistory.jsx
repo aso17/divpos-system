@@ -272,7 +272,7 @@ export default function TransactionHistory() {
     data: null,
   });
   const [paymentFilter, setPaymentFilter] = useState("ALL");
-
+  const [paymentMethods, setPaymentMethods] = useState([]);
   // ── state khusus cancel modal ─────────────────────────────────────────────
   const [cancelModal, setCancelModal] = useState({ isOpen: false, data: null });
 
@@ -300,6 +300,18 @@ export default function TransactionHistory() {
     },
     [pagination.pageIndex, pagination.pageSize, activeSearch, paymentFilter]
   );
+
+  useEffect(() => {
+    const fetchMethods = async () => {
+      try {
+        const res = await TransactionService.getPaymentMethods();
+        setPaymentMethods(res.data?.data || []);
+      } catch (err) {
+        console.error("Gagal load metode pembayaran:", err);
+      }
+    };
+    fetchMethods();
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -730,32 +742,40 @@ export default function TransactionHistory() {
       <ProcessPaymentHistory
         isOpen={paymentModal.isOpen}
         transaction={paymentModal.data}
+        paymentMethods={paymentMethods} // ← KIRIM PROPS INI
         onClose={() => setPaymentModal({ isOpen: false, data: null })}
         onSuccess={(updatedTransaction) => {
           setData((prev) =>
             prev.map((t) =>
-              t.id === updatedTransaction.id ? updatedTransaction : t
+              t.id === updatedTransaction.id
+                ? { ...t, ...updatedTransaction } // Gabung agar data UI tetap utuh
+                : t
             )
           );
-          setLastTransactionData(updatedTransaction);
+          setLastTransactionData({
+            ...paymentModal.data,
+            ...updatedTransaction,
+          });
           setPaymentModal({ isOpen: false, data: null });
           setShowSuccessModal(true);
         }}
       />
 
-      {/* ── Cancel Modal — form reason wajib ── */}
+      {/* ── Cancel Modal ── */}
       <CancelTransactionModal
         isOpen={cancelModal.isOpen}
         transaction={cancelModal.data}
         onClose={() => setCancelModal({ isOpen: false, data: null })}
-        onSuccess={(updatedTransaction) => {
-          // Update state lokal: ubah status → CANCELED tanpa reload
+        onSuccess={(updatedTrx) => {
           setData((prev) =>
             prev.map((t) =>
-              t.id === updatedTransaction.id ? updatedTransaction : t
+              t.id === updatedTrx.id
+                ? { ...t, ...updatedTrx, status: STATUS_CANCELED }
+                : t
             )
           );
           setCancelModal({ isOpen: false, data: null });
+          // Mas bisa tambahkan toast sukses di sini
         }}
       />
 

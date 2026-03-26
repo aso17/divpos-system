@@ -1,6 +1,4 @@
-// TransactionCartForm.jsx
-// Logic: TIDAK DIUBAH — hanya styling
-
+import React, { useEffect } from "react";
 import Box from "lucide-react/dist/esm/icons/box";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import PlusSquare from "lucide-react/dist/esm/icons/plus-square";
@@ -34,6 +32,15 @@ export default function TransactionCartForm({
   parseNumber,
 }) {
   const cartCount = cart.reduce((s, i) => s + toNum(i.qty), 0);
+
+  // --- Tambahan Logic: Auto-fill nominal PAS untuk Non-Tunai (QRIS/Transfer) ---
+  useEffect(() => {
+    if (!isCash && !allowZeroPay) {
+      // Jika DP aktif, nominal bayar otomatis sebesar DP. Jika tidak, sebesar subtotal.
+      const targetAmount = isDpEnabled_dp ? toNum(dpAmount) : toNum(subtotal);
+      setPayAmount(targetAmount);
+    }
+  }, [isCash, subtotal, dpAmount, isDpEnabled_dp, allowZeroPay, setPayAmount]);
 
   return (
     <div className="w-full lg:w-2/5 lg:sticky lg:top-5 lg:h-fit">
@@ -93,11 +100,11 @@ export default function TransactionCartForm({
                                   qty: Math.max(
                                     0.5,
                                     toNum(c.qty) -
-                                      (item.is_weight_based ? 0.5 : 1),
+                                      (item.is_weight_based ? 0.5 : 1)
                                   ),
                                 }
-                              : c,
-                          ),
+                              : c
+                          )
                         )
                       }
                       className="w-6 h-6 rounded-lg bg-white border border-gray-200 flex items-center justify-center hover:border-emerald-400 hover:bg-emerald-50 transition-colors flex-shrink-0"
@@ -118,10 +125,8 @@ export default function TransactionCartForm({
                       onChange={(e) =>
                         setCart(
                           cart.map((c) =>
-                            c.id === item.id
-                              ? { ...c, qty: e.target.value }
-                              : c,
-                          ),
+                            c.id === item.id ? { ...c, qty: e.target.value } : c
+                          )
                         )
                       }
                     />
@@ -138,8 +143,8 @@ export default function TransactionCartForm({
                                     toNum(c.qty) +
                                     (item.is_weight_based ? 0.5 : 1),
                                 }
-                              : c,
-                          ),
+                              : c
+                          )
                         )
                       }
                       className="w-6 h-6 rounded-lg bg-white border border-gray-200 flex items-center justify-center hover:border-emerald-400 hover:bg-emerald-50 transition-colors flex-shrink-0"
@@ -172,7 +177,7 @@ export default function TransactionCartForm({
                     {toNum(item.original_price) > toNum(item.final_price) && (
                       <p className="text-[9px] text-gray-400 line-through leading-none mb-0.5">
                         {formatRupiah(
-                          toNum(item.original_price) * toNum(item.qty),
+                          toNum(item.original_price) * toNum(item.qty)
                         )}
                       </p>
                     )}
@@ -269,12 +274,18 @@ export default function TransactionCartForm({
 
               <input
                 type="text"
-                onFocus={(e) => e.target.select()}
+                readOnly={!isCash} // Lock jika non-tunai
+                onFocus={(e) => isCash && e.target.select()}
                 value={payAmount === 0 ? "" : formatRupiah(payAmount)}
-                onChange={(e) => setPayAmount(parseNumber(e.target.value) || 0)}
-                className="w-full h-12 border-2 border-emerald-400 bg-white rounded-xl px-4
-                  font-black text-lg text-emerald-700 placeholder:text-gray-300
-                  outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600 transition-all"
+                onChange={(e) =>
+                  isCash && setPayAmount(parseNumber(e.target.value) || 0)
+                }
+                className={`w-full h-12 border-2 rounded-xl px-4 font-black text-lg outline-none transition-all
+                  ${
+                    !isCash
+                      ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-white border-emerald-400 text-emerald-700 focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600"
+                  }`}
                 placeholder="Rp 0"
               />
 
@@ -324,8 +335,8 @@ export default function TransactionCartForm({
                 isDisabled
                   ? "bg-gray-100 text-gray-300 cursor-not-allowed shadow-none"
                   : allowZeroPay
-                    ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200 active:scale-[0.98]"
-                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 active:scale-[0.98]"
+                  ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200 active:scale-[0.98]"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 active:scale-[0.98]"
               }`}
           >
             {loading ? (

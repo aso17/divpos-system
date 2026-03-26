@@ -37,6 +37,9 @@ const TransactionService = {
       },
     });
   },
+  getPaymentMethods() {
+    return api.get("/transactions/payment-methods");
+  },
   processPaymentHistory: async (payload) => {
     // console.log("Payload sebelum enkripsi:", payload);
 

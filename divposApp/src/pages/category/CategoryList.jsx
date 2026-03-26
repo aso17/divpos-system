@@ -1,27 +1,32 @@
-import { useMemo, useEffect, useState, useCallback } from "react";
+import {
+  useMemo,
+  useEffect,
+  useState,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import {
   useReactTable,
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
 
-// Import Lucide Icons satu per satu
+// Import Lucide Icons
 import Pencil from "lucide-react/dist/esm/icons/pencil";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
-import PlusSquare from "lucide-react/dist/esm/icons/plus-square";
 import Search from "lucide-react/dist/esm/icons/search";
 import X from "lucide-react/dist/esm/icons/x";
-import Clock from "lucide-react/dist/esm/icons/clock";
 import Zap from "lucide-react/dist/esm/icons/zap";
 
 // Import Components & Services
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import TablePagination from "../../components/TablePagination";
-import AppHead from "../../components/common/AppHead";
 import CategoryService from "../../services/CategoryService";
 import CategoryForm from "./CategoryForm";
 
-export default function CategoryList() {
+// 1. Tambahkan forwardRef
+const CategoryList = forwardRef((props, ref) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -33,7 +38,14 @@ export default function CategoryList() {
   const [openModal, setOpenModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
 
-  // 1. Fetch Data
+  // 2. EXPOSE: Agar Parent bisa manggil fungsi buka modal
+  useImperativeHandle(ref, () => ({
+    openForm: (category = null) => {
+      setSelectedCategory(category);
+      setOpenModal(true);
+    },
+  }));
+
   const fetchCategories = useCallback(
     async (isMounted = true) => {
       setLoading(true);
@@ -65,7 +77,6 @@ export default function CategoryList() {
     };
   }, [fetchCategories]);
 
-  // 2. Handlers
   const handleSearch = (e) => {
     e.preventDefault();
     setActiveSearch(searchTerm);
@@ -79,52 +90,38 @@ export default function CategoryList() {
   };
 
   const handleDelete = async (category) => {
-    const setuju = await showConfirm(
-      `Apakah anda yakin ingin menghapus kategori "${category.name}"?`,
-      "Konfirmasi Hapus",
-      "warning",
-      { confirmText: "Ya, Hapus", cancelText: "Batal" }
-    );
-
-    if (!setuju) return;
+    // Gunakan confirm sederhana jika showConfirm tidak diimport
+    if (!window.confirm(`Hapus kategori "${category.name}"?`)) return;
 
     try {
-      const res = await CategoryService.deleteCategory(category.id);
+      await CategoryService.deleteCategory(category.id);
       setData((prevData) => prevData.filter((item) => item.id !== category.id));
-      if (typeof setTotalCount === "function") {
-        setTotalCount((prev) => Math.max(0, prev - 1));
-      }
-
-      const successMsg =
-        res.data?.message || "Kategori telah berhasil dihapus.";
-
-      await showConfirm(successMsg, "Hapus Berhasil", "success");
+      setTotalCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
       console.error(err);
     }
   };
 
-  // 3. Columns Definition (Sesuai dengan UI yang Mas minta)
   const columns = useMemo(
     () => [
       {
         id: "no",
         header: "NO",
-        cell: ({ row, table }) => {
-          const { pageIndex, pageSize } = table.options.state.pagination;
-          return (
-            <span className="text-slate-400 font-medium text-[10px]">
-              {pageIndex * pageSize + row.index + 1}
-            </span>
-          );
-        },
+        cell: ({ row, table }) => (
+          <span className="text-slate-400 font-medium text-[10px]">
+            {table.getState().pagination.pageIndex *
+              table.getState().pagination.pageSize +
+              row.index +
+              1}
+          </span>
+        ),
       },
       {
         accessorKey: "name",
         header: "KATEGORI",
         cell: ({ row }) => (
           <div className="flex flex-col py-1">
-            <span className="text-slate-800 font-bold text-xxs uppercase tracking-tight">
+            <span className="text-slate-800 font-bold text-[10px] uppercase tracking-tight">
               {row.original.name}
             </span>
             <span className="text-[9px] font-mono text-slate-400 italic">
@@ -133,7 +130,6 @@ export default function CategoryList() {
           </div>
         ),
       },
-
       {
         accessorKey: "priority",
         header: "PRIORITAS",
@@ -160,17 +156,12 @@ export default function CategoryList() {
           const isActive = getValue();
           return (
             <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase border ${
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
                 isActive
                   ? "bg-emerald-50 text-emerald-600 border-emerald-100"
                   : "bg-rose-50 text-rose-600 border-rose-100"
               }`}
             >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
-                }`}
-              />
               {isActive ? "Aktif" : "Nonaktif"}
             </span>
           );
@@ -179,7 +170,7 @@ export default function CategoryList() {
       {
         id: "actions",
         header: () => (
-          <div className="text-center text-[10px] tracking-widest font-black text-slate-400">
+          <div className="text-center text-[10px] font-black text-slate-400 uppercase">
             AKSI
           </div>
         ),
@@ -196,7 +187,7 @@ export default function CategoryList() {
             </button>
             <button
               onClick={() => handleDelete(row.original)}
-              className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+              className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all"
             >
               <Trash2 size={14} />
             </button>
@@ -218,40 +209,10 @@ export default function CategoryList() {
   });
 
   return (
-    <div className="px-2 py-4 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-28 md:pb-6">
-      <AppHead title="Kategori & Durasi" />
-
-      {/* --- Header & Search --- */}
-      <div className="flex items-center justify-between gap-4 px-1">
-        <div className="flex items-center gap-3 px-1">
-          <div className="bg-white p-2.5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-center">
-            <Clock size={18} className="text-emerald-600" />
-          </div>
-
-          <div className="flex flex-col leading-tight">
-            <h1 className="text-[12px] md:text-sm font-black text-slate-800 uppercase tracking-tight">
-              Master Kategori
-            </h1>
-
-            <p className="hidden md:block text-[10px] text-slate-500 font-medium">
-              Kelola kategori layanan bisnis
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => {
-            setSelectedCategory(null);
-            setOpenModal(true);
-          }}
-          className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
-        >
-          <PlusSquare size={18} /> Tambah Kategori
-        </button>
-      </div>
-
+    <div className="space-y-4">
+      {/* Search area tetap ada di sini */}
       <div className="flex justify-start px-1">
-        <div className="bg-white p-2 rounded-2xl border border-slate-100 shadow-sm w-full md:w-auto md:min-w-[320px]">
+        <div className="bg-slate-50 p-1.5 rounded-2xl border border-slate-100 w-full md:w-auto md:min-w-[320px]">
           <form onSubmit={handleSearch} className="flex items-center gap-1.5">
             <div className="relative flex-1 group">
               <Search
@@ -259,7 +220,7 @@ export default function CategoryList() {
                 size={13}
               />
               <input
-                className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] outline-none"
+                className="w-full pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-[11px] outline-none"
                 placeholder="Cari kategori..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -276,16 +237,14 @@ export default function CategoryList() {
             </div>
             <button
               type="submit"
-              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
-                text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
+              className="h-9 px-4 bg-emerald-600 text-white text-[10px] font-black rounded-lg transition-colors uppercase"
             >
-              CARI
+              Cari
             </button>
           </form>
         </div>
       </div>
 
-      {/* --- Main View --- */}
       <ResponsiveDataView
         data={data}
         loading={loading}
@@ -293,34 +252,28 @@ export default function CategoryList() {
         renderMobileCard={(category) => (
           <div
             key={category.id}
-            className="bg-white rounded-[1.25rem] p-3 shadow-sm border border-slate-100 space-y-3 mx-1"
+            className="bg-white rounded-[1.25rem] p-3 shadow-sm border border-slate-100 space-y-3 mb-3 mx-1"
           >
-            {/* Header */}
             <div className="flex justify-between items-start gap-2">
               <div className="space-y-0.5 flex-1">
                 <h3 className="text-[11px] font-black text-slate-800 uppercase leading-tight">
                   {category.name}
                 </h3>
-
                 <span className="text-[7px] font-mono font-bold text-slate-400">
                   slug: {category.slug}
                 </span>
               </div>
-
               <div
-                className={`px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase border shrink-0
-        ${
-          category.is_active
-            ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-            : "bg-rose-50 text-rose-600 border-rose-100"
-        }`}
+                className={`px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase border ${
+                  category.is_active
+                    ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                    : "bg-rose-50 text-rose-600 border-rose-100"
+                }`}
               >
-                {category.is_active ? "Aktif" : "Nonaktif"}
+                {category.is_active ? "Aktif" : "Off"}
               </div>
             </div>
-
-            {/* Info */}
-            <div className="space-y-2 py-2 border-y border-slate-50">
+            <div className="py-2 border-y border-slate-50">
               <div className="flex items-center gap-2">
                 <Zap
                   size={10}
@@ -328,44 +281,37 @@ export default function CategoryList() {
                     category.priority > 0 ? "text-amber-500" : "text-slate-300"
                   }
                 />
-
-                <p className="text-[9px] text-slate-600 font-bold">
+                <p className="text-[9px] text-slate-600 font-bold uppercase">
                   Prioritas Level {category.priority}
                 </p>
               </div>
             </div>
-
-            {/* Actions */}
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => {
                   setSelectedCategory(category);
                   setOpenModal(true);
                 }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 transition-all"
+                className="flex-1 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
               >
-                <Pencil size={10} /> Edit
+                Edit
               </button>
-
               <button
                 onClick={() => handleDelete(category)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 transition-all"
+                className="flex-1 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
               >
-                <Trash2 size={10} /> Hapus
+                Hapus
               </button>
             </div>
           </div>
         )}
         renderDesktopTable={() => (
-          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead>
+                <thead className="bg-slate-50/50 border-b border-slate-100">
                   {table.getHeaderGroups().map((hg) => (
-                    <tr
-                      key={hg.id}
-                      className="bg-slate-50/50 border-b border-slate-100"
-                    >
+                    <tr key={hg.id}>
                       {hg.headers.map((header) => (
                         <th
                           key={header.id}
@@ -387,10 +333,7 @@ export default function CategoryList() {
                       className="hover:bg-emerald-50/30 transition-colors"
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <td
-                          key={cell.id}
-                          className="px-6 py-4 align-middle font-medium text-slate-600 text-[11px]"
-                        >
+                        <td key={cell.id} className="px-6 py-4 align-middle">
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext()
@@ -402,27 +345,19 @@ export default function CategoryList() {
                 </tbody>
               </table>
             </div>
-            <div className="p-4 bg-slate-50/50 border-t border-slate-100">
+            <div className="p-4 bg-white border-t border-slate-100">
               <TablePagination table={table} totalEntries={totalCount} />
             </div>
           </div>
         )}
       />
 
-      {/* Floating Button Mobile */}
-      <button
-        onClick={() => {
-          setSelectedCategory(null);
-          setOpenModal(true);
-        }}
-        className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 border-4 border-white"
-      >
-        <PlusSquare size={20} />
-      </button>
-
       <CategoryForm
         open={openModal}
-        onClose={() => setOpenModal(false)}
+        onClose={() => {
+          setOpenModal(false);
+          setSelectedCategory(null);
+        }}
         initialData={selectedCategory}
         onSuccess={(newCategory) => {
           if (selectedCategory) {
@@ -431,12 +366,14 @@ export default function CategoryList() {
             );
           } else {
             setData((prev) => [newCategory, ...prev]);
-            if (typeof setTotalCount === "function")
-              setTotalCount((prev) => prev + 1);
+            setTotalCount((prev) => prev + 1);
           }
           setOpenModal(false);
+          setSelectedCategory(null);
         }}
       />
     </div>
   );
-}
+});
+
+export default CategoryList;

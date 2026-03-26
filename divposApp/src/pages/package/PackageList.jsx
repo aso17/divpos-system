@@ -1,29 +1,35 @@
-// ============================================================
-// PackageList.jsx
-// ============================================================
-import { useMemo, useEffect, useState, useCallback } from "react";
+import {
+  useMemo,
+  useEffect,
+  useState,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import {
   useReactTable,
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import { Plus, Box } from "lucide-react";
-import Search from "lucide-react/dist/esm/icons/search";
-import Eye from "lucide-react/dist/esm/icons/eye";
-import Pencil from "lucide-react/dist/esm/icons/pencil";
-import Trash2 from "lucide-react/dist/esm/icons/trash-2";
-import X from "lucide-react/dist/esm/icons/x";
-import PlusSquare from "lucide-react/dist/esm/icons/plus-square";
+import {
+  Plus,
+  Box,
+  Search,
+  Eye,
+  Pencil,
+  Trash2,
+  X,
+  PlusSquare,
+} from "lucide-react";
 
 import TablePagination from "../../components/TablePagination";
-import AppHead from "../../components/common/AppHead";
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
 import PackageService from "../../services/PackageService";
 import { formatRupiah } from "../../utils/formatter";
 import PackageForm from "./PackageForm";
 import PackageDetail from "./PackageDetail";
 
-export function PackageList() {
+export const PackageList = forwardRef((props, ref) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -34,6 +40,13 @@ export function PackageList() {
   const [openDetail, setOpenDetail] = useState(false);
   const [openModal, setOpenModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState(null);
+
+  // EXPOSE: Agar Parent (CatalogList) bisa manggil fungsi ini
+  useImperativeHandle(ref, () => ({
+    openForm: (pkg = null) => {
+      handleOpenForm(pkg);
+    },
+  }));
 
   const fetchPackages = useCallback(
     async (isMounted = true) => {
@@ -87,42 +100,34 @@ export function PackageList() {
     setOpenModal(true);
   }, []);
 
-  // FIX: useCallback + rollback
   const handleDelete = useCallback(
     async (pkg) => {
-      const setuju = await showConfirm(
-        `Apakah anda yakin ingin menghapus paket "${pkg.name}"?`,
-        "Konfirmasi Hapus",
-        "warning",
-        { confirmText: "Ya, Hapus", cancelText: "Batal" }
-      );
-      if (!setuju) return;
+      if (typeof showConfirm !== "function") {
+        if (!window.confirm(`Hapus paket ${pkg.name}?`)) return;
+      } else {
+        const setuju = await showConfirm(
+          `Apakah anda yakin ingin menghapus paket "${pkg.name}"?`,
+          "Konfirmasi Hapus",
+          "warning",
+          { confirmText: "Ya, Hapus", cancelText: "Batal" }
+        );
+        if (!setuju) return;
+      }
 
       const snapshot = data;
       setData((prev) => prev.filter((item) => item.id !== pkg.id));
       setTotalCount((prev) => Math.max(0, prev - 1));
 
       try {
-        const res = await PackageService.deletePackage(pkg.id);
-        await showConfirm(
-          res.data?.message || "Data paket berhasil dihapus.",
-          "Hapus Berhasil",
-          "success"
-        );
+        await PackageService.deletePackage(pkg.id);
       } catch (err) {
         setData(snapshot);
         setTotalCount(snapshot.length);
-        showConfirm(
-          err.response?.data?.message || "Gagal menghapus paket",
-          "Gagal Hapus",
-          "error"
-        );
       }
     },
     [data]
   );
 
-  // FIX: deps columns lengkap
   const columns = useMemo(
     () => [
       {
@@ -164,7 +169,7 @@ export function PackageList() {
         cell: ({ row }) => (
           <div className="flex flex-col">
             <span className="text-slate-700 font-black text-xs">
-              Rp {Number(row.original.price).toLocaleString("id-ID")}
+              {formatRupiah(row.original.price)}
             </span>
             <span className="text-[9px] text-slate-400 font-medium italic">
               Per {row.original.unit?.name || "Unit"}
@@ -235,32 +240,9 @@ export function PackageList() {
   });
 
   return (
-    <div className="px-2 py-4 md:p-6 space-y-4 bg-slate-50/50 min-h-screen pb-28 md:pb-6">
-      <AppHead title="Paket & Harga" />
-      <div className="flex items-center justify-between gap-4 px-1">
-        <div className="flex items-center gap-2.5">
-          <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
-            <Box size={20} className="text-emerald-600" />
-          </div>
-          <div>
-            <h1 className="text-[11px] md:text-sm font-black text-slate-800 uppercase leading-none">
-              Paket & Harga
-            </h1>
-            <p className="hidden md:block text-[10px] text-slate-500 mt-1 font-medium">
-              Kelola tarif layanan, satuan, dan minimal order
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={() => handleOpenForm(null)}
-          className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
-        >
-          <PlusSquare size={18} /> Tambah Paket
-        </button>
-      </div>
-
+    <div className="space-y-4">
       <div className="flex justify-start px-1">
-        <div className="bg-white p-2 rounded-2xl border border-slate-100 shadow-sm w-full md:w-auto md:min-w-[320px]">
+        <div className="bg-slate-50 p-1.5 rounded-2xl border border-slate-100 w-full md:w-auto md:min-w-[320px]">
           <form onSubmit={handleSearch} className="flex items-center gap-1.5">
             <div className="relative flex-1 group">
               <Search
@@ -268,7 +250,7 @@ export function PackageList() {
                 size={13}
               />
               <input
-                className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] outline-none focus:bg-white focus:border-emerald-500/50 transition-all placeholder:text-slate-400"
+                className="w-full pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-[11px] outline-none focus:border-emerald-500/50 transition-all placeholder:text-slate-400"
                 placeholder="Cari paket..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -285,10 +267,9 @@ export function PackageList() {
             </div>
             <button
               type="submit"
-              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors"
             >
-              <span className="hidden md:block">CARI</span>
-              <Search size={14} className="md:hidden" />
+              CARI
             </button>
           </form>
         </div>
@@ -301,7 +282,7 @@ export function PackageList() {
         renderMobileCard={(pkg) => (
           <div
             key={pkg.id}
-            className="bg-white rounded-[1.25rem] p-3 shadow-sm border border-slate-100 space-y-3 mx-1"
+            className="bg-white rounded-[1.25rem] p-3 shadow-sm border border-slate-100 space-y-3 mb-3"
           >
             <div className="flex justify-between items-start gap-2">
               <div className="space-y-0.5 flex-1">
@@ -376,15 +357,12 @@ export function PackageList() {
           </div>
         )}
         renderDesktopTable={() => (
-          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead>
+                <thead className="bg-slate-50/50 border-b border-slate-100">
                   {table.getHeaderGroups().map((hg) => (
-                    <tr
-                      key={hg.id}
-                      className="bg-slate-50/50 border-b border-slate-100"
-                    >
+                    <tr key={hg.id}>
                       {hg.headers.map((h) => (
                         <th
                           key={h.id}
@@ -418,19 +396,12 @@ export function PackageList() {
                 </tbody>
               </table>
             </div>
-            <div className="p-4 bg-slate-50/50 border-t border-slate-100">
+            <div className="p-4 bg-white border-t border-slate-100">
               <TablePagination table={table} totalEntries={totalCount} />
             </div>
           </div>
         )}
       />
-
-      <button
-        onClick={() => handleOpenForm(null)}
-        className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 border-4 border-white transition-all"
-      >
-        <Plus size={24} />
-      </button>
 
       <PackageForm
         open={openModal}
@@ -459,6 +430,6 @@ export function PackageList() {
       />
     </div>
   );
-}
+});
 
 export default PackageList;
