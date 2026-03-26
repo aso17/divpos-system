@@ -1,25 +1,19 @@
-// Sidebar.jsx — Final
-// Perubahan: topbar mobile & tablet kini menampilkan notif + avatar/nama user
-// Logic: TIDAK DIUBAH
-
 import { useState, useEffect, useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { icons } from "../utils/Icons";
 import { GetWithExpiry } from "../utils/Storage";
-import {
-  ChevronLeft,
-  ChevronRight,
-  LayoutGrid,
-  Menu,
-  X,
-  Zap,
-  ChevronDown,
-  Bell,
-  LogOut,
-  User,
-  Settings,
-} from "lucide-react";
+import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
+import LayoutGrid from "lucide-react/dist/esm/icons/layout-grid";
+import Menu from "lucide-react/dist/esm/icons/menu";
+import X from "lucide-react/dist/esm/icons/x";
+import Zap from "lucide-react/dist/esm/icons/zap";
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
+import Bell from "lucide-react/dist/esm/icons/bell";
+import LogOut from "lucide-react/dist/esm/icons/log-out";
+import User from "lucide-react/dist/esm/icons/user";
+import Settings from "lucide-react/dist/esm/icons/settings";
 
 export default function Sidebar({ isCollapsed, setIsCollapsed }) {
   const { menus, logout, user } = useAuth();
@@ -35,7 +29,6 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
   const iconPath = GetWithExpiry("app")?.icon || null;
   const ChevronIcon = icons.chevron || ChevronDown;
 
-  // ── User data (sama dengan Topbar.jsx) ────────────────────────────────────
   const [avatar, setAvatar] = useState(null);
   const [roleName, setRoleName] = useState(null);
   const [fullName, setFullName] = useState(null);
@@ -56,10 +49,9 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
         .toUpperCase()
     : "U";
 
-  // ── Auto-expand active parent (TIDAK DIUBAH) ──────────────────────────────
   useEffect(() => {
     const parent = menus.find((m) =>
-      m.children?.some((c) => c.route === location.pathname),
+      m.children?.some((c) => c.route === location.pathname)
     );
     if (parent) setOpen(parent.id);
     setIsMobileOpen(false);
@@ -67,7 +59,6 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
     setNotifOpen(false);
   }, [location.pathname, menus]);
 
-  // ── Close dropdowns on outside click ─────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target))
@@ -89,41 +80,36 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
 
   return (
     <>
-      {/* ══════════════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════════
           TOPBAR — mobile & tablet (< lg)
-          Kiri : hamburger
-          Tengah: brand
-          Kanan : notif + user avatar/chip + dropdown
-      ══════════════════════════════════════════════════════════════════ */}
+
+          FIX 1: h-14 (56px) → h-[60px] — tap target lebih nyaman
+          FIX 2: burger w-9 h-9 (36px) → w-10 h-10 (40px)
+          FIX 3: Mobile — brand = teks saja, tanpa icon, absolute center
+          FIX 4: Tablet (sm+) — burger kiri, brand teks langsung sebelahnya
+                 (bukan absolute center), user chip kanan
+      ════════════════════════════════════════════════════════════════ */}
       <div
-        className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 shadow-sm
-        flex items-center px-4 gap-3 z-40"
+        className="lg:hidden fixed top-0 left-0 right-0 h-[60px] bg-white
+        border-b border-gray-100 shadow-sm flex items-center px-4 gap-3 z-40"
       >
-        {/* Hamburger */}
+        {/* Hamburger — FIX: 40×40px, semua breakpoint */}
         <button
           onClick={() => setIsMobileOpen(true)}
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
             text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
           aria-label="Buka menu"
         >
-          <Menu size={20} />
+          <Menu size={22} />
         </button>
 
-        {/* Brand — absolut center agar selalu tengah */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none">
-          <div className="p-1 rounded-xl bg-white border border-gray-100 shadow-inner">
-            <div className="p-1.5 rounded-lg bg-gradient-to-tr from-emerald-600 to-green-500 text-white shadow-sm shadow-emerald-500/20">
-              {iconPath ? (
-                <img
-                  src={iconPath}
-                  alt="App Icon"
-                  className="w-4 h-4 rounded-md object-cover"
-                />
-              ) : (
-                <Zap size={14} strokeWidth={2.5} />
-              )}
-            </div>
-          </div>
+        {/* ── Brand ──────────────────────────────────────────────────────
+            Mobile (< sm): absolute center, teks saja — tanpa icon
+            Tablet (sm–lg): inline kiri setelah burger, teks saja — tanpa icon
+        ────────────────────────────────────────────────────────────── */}
+
+        {/* Mobile: absolute center, teks saja */}
+        <div className="sm:hidden absolute left-1/2 -translate-x-1/2 pointer-events-none">
           <span
             className="font-extrabold text-[15px] tracking-tight
             bg-gradient-to-r from-emerald-700 to-green-500 bg-clip-text text-transparent"
@@ -132,7 +118,16 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
           </span>
         </div>
 
-        {/* Right: notif + user */}
+        {/* Tablet: inline kiri setelah burger — teks saja tanpa icon */}
+        <span
+          className="hidden sm:block font-extrabold text-[15px] tracking-tight
+          bg-gradient-to-r from-emerald-700 to-green-500 bg-clip-text text-transparent
+          flex-shrink-0"
+        >
+          {projectName}
+        </span>
+
+        {/* Right: notif + divider + user */}
         <div className="ml-auto flex items-center gap-2 flex-shrink-0">
           {/* Notification */}
           <div className="relative" ref={notifRef}>
@@ -141,20 +136,31 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
                 setNotifOpen(!notifOpen);
                 setUserMenuOpen(false);
               }}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center relative transition-colors
-                ${notifOpen ? "bg-emerald-50 text-emerald-600" : "text-gray-400 hover:bg-gray-50 hover:text-emerald-600"}`}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center relative transition-colors
+                ${
+                  notifOpen
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "text-gray-400 hover:bg-gray-50 hover:text-emerald-600"
+                }`}
               aria-label="Notifikasi"
             >
-              <Bell size={17} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white animate-pulse" />
+              <Bell size={18} />
+              <span
+                className="absolute top-2 right-2 w-2 h-2 bg-emerald-500
+                rounded-full border-2 border-white animate-pulse"
+              />
             </button>
 
             {/* Notif dropdown */}
             <div
-              className={`absolute right-0 top-[calc(100%+8px)] w-72 bg-white border border-gray-100
-              rounded-2xl shadow-xl z-50 overflow-hidden
+              className={`absolute right-0 top-[calc(100%+8px)] w-72 bg-white
+              border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden
               transform transition-all duration-200 origin-top-right
-              ${notifOpen ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"}`}
+              ${
+                notifOpen
+                  ? "opacity-100 scale-100 translate-y-0"
+                  : "opacity-0 scale-95 -translate-y-2 pointer-events-none"
+              }`}
             >
               <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
                 <p className="text-sm font-bold text-gray-800">Notifikasi</p>
@@ -185,7 +191,8 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
                 ].map((n, i) => (
                   <div
                     key={i}
-                    className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                    className="flex items-start gap-3 px-4 py-3
+                    hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <span
                       className={`w-2 h-2 ${n.dot} rounded-full flex-shrink-0 mt-1.5`}
@@ -213,7 +220,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
           {/* Divider */}
           <div className="w-px h-5 bg-gray-200" />
 
-          {/* User — avatar only on mobile, chip on tablet */}
+          {/* User */}
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => {
@@ -221,7 +228,11 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
                 setNotifOpen(false);
               }}
               className={`flex items-center gap-2 rounded-xl border transition-all duration-150
-                ${userMenuOpen ? "bg-emerald-50 border-emerald-200 px-2 py-1" : "border-transparent hover:bg-gray-50 px-1 py-1"}`}
+                ${
+                  userMenuOpen
+                    ? "bg-emerald-50 border-emerald-200 px-2 py-1"
+                    : "border-transparent hover:bg-gray-50 px-1 py-1"
+                }`}
               aria-label="Menu profil"
             >
               {/* Avatar */}
@@ -231,25 +242,38 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
                     src={avatar}
                     alt={fullName || "Avatar"}
                     className={`w-8 h-8 rounded-xl object-cover border-2 transition-colors
-                      ${userMenuOpen ? "border-emerald-400" : "border-gray-100"}`}
+                      ${
+                        userMenuOpen ? "border-emerald-400" : "border-gray-100"
+                      }`}
                   />
                 ) : (
                   <div
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-colors
-                    ${userMenuOpen ? "bg-emerald-600 text-white" : "bg-emerald-100 text-emerald-700"}`}
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center
+                    text-xs font-black transition-colors
+                    ${
+                      userMenuOpen
+                        ? "bg-emerald-600 text-white"
+                        : "bg-emerald-100 text-emerald-700"
+                    }`}
                   >
                     {initials}
                   </div>
                 )}
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
+                <span
+                  className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5
+                  bg-emerald-500 border-2 border-white rounded-full"
+                />
               </div>
 
-              {/* Name + role — hanya di tablet (sm+) */}
+              {/* Nama + role — hanya di tablet (sm+) */}
               <div className="hidden sm:block text-left">
                 <p className="text-xs font-bold text-gray-800 leading-tight max-w-[110px] truncate">
                   {fullName || "Admin"}
                 </p>
-                <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest leading-none mt-0.5">
+                <p
+                  className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest
+                  leading-none mt-0.5"
+                >
                   {roleName || "Owner"}
                 </p>
               </div>
@@ -257,21 +281,31 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
               <ChevronDown
                 size={12}
                 strokeWidth={2.5}
-                className={`hidden sm:block text-gray-400 flex-shrink-0 transition-transform duration-200
+                className={`hidden sm:block text-gray-400 flex-shrink-0
+                  transition-transform duration-200
                   ${userMenuOpen ? "rotate-180 text-emerald-600" : ""}`}
               />
             </button>
 
             {/* User dropdown */}
             <div
-              className={`absolute right-0 top-[calc(100%+8px)] w-52 bg-white border border-gray-100
-              rounded-2xl shadow-xl z-50 overflow-hidden
+              className={`absolute right-0 top-[calc(100%+8px)] w-52 bg-white
+              border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden
               transform transition-all duration-200 origin-top-right
-              ${userMenuOpen ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"}`}
+              ${
+                userMenuOpen
+                  ? "opacity-100 scale-100 translate-y-0"
+                  : "opacity-0 scale-95 -translate-y-2 pointer-events-none"
+              }`}
             >
-              {/* User header */}
-              <div className="px-4 py-3 border-b border-gray-50 bg-gray-50/50 flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center text-xs font-black text-white flex-shrink-0">
+              <div
+                className="px-4 py-3 border-b border-gray-50 bg-gray-50/50
+                flex items-center gap-2.5"
+              >
+                <div
+                  className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center
+                  justify-center text-xs font-black text-white flex-shrink-0"
+                >
                   {initials}
                 </div>
                 <div className="min-w-0">
@@ -283,32 +317,29 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
                   </p>
                 </div>
               </div>
-
               <div className="p-1.5">
                 <button
-                  className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-gray-600
-                  hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-colors font-medium"
+                  className="flex items-center gap-2.5 w-full px-3 py-2 text-sm
+                  text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl
+                  transition-colors font-medium"
                 >
-                  <User size={14} strokeWidth={2} />
-                  Profil Akun
+                  <User size={14} strokeWidth={2} /> Profil Akun
                 </button>
                 <button
-                  className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-gray-600
-                  hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-colors font-medium"
+                  className="flex items-center gap-2.5 w-full px-3 py-2 text-sm
+                  text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl
+                  transition-colors font-medium"
                 >
-                  <Settings size={14} strokeWidth={2} />
-                  Pengaturan
+                  <Settings size={14} strokeWidth={2} /> Pengaturan
                 </button>
               </div>
-
               <div className="p-1.5 border-t border-gray-50">
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-500
                     hover:bg-red-50 hover:text-red-600 rounded-xl transition-colors font-semibold"
                 >
-                  <LogOut size={14} strokeWidth={2} />
-                  Keluar
+                  <LogOut size={14} strokeWidth={2} /> Keluar
                 </button>
               </div>
             </div>
@@ -316,27 +347,38 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════════
           SIDEBAR PANEL (logic TIDAK DIUBAH)
-      ══════════════════════════════════════════════════════════════════ */}
+      ════════════════════════════════════════════════════════════════ */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50 flex flex-col
-          bg-white border-r border-gray-100
-          transition-all duration-300 ease-in-out
-          w-72
-          lg:sticky lg:top-0 lg:h-screen lg:flex-shrink-0
-          ${sidebarW}
-          ${isMobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"}
-        `}
+        fixed inset-y-0 left-0 z-50 flex flex-col
+        bg-white border-r border-gray-100
+        transition-all duration-300 ease-in-out
+        w-72
+        lg:sticky lg:top-0 lg:h-screen lg:flex-shrink-0
+        ${sidebarW}
+        ${
+          isMobileOpen
+            ? "translate-x-0 shadow-2xl"
+            : "-translate-x-full lg:translate-x-0"
+        }
+      `}
       >
-        {/* ── Logo ── */}
+        {/* Logo */}
         <div
           className={`flex items-center border-b border-gray-100 transition-all duration-300
-          ${isCollapsed ? "justify-center px-0 py-4 h-16" : "gap-3 px-4 py-4 h-16"}`}
+          ${
+            isCollapsed
+              ? "justify-center px-0 py-4 h-16"
+              : "gap-3 px-4 py-4 h-16"
+          }`}
         >
           <div className="p-1 rounded-xl bg-white border border-gray-100 shadow-inner flex-shrink-0">
-            <div className="p-1.5 rounded-lg bg-gradient-to-tr from-emerald-600 to-green-500 text-white shadow-sm shadow-emerald-500/20">
+            <div
+              className="p-1.5 rounded-lg bg-gradient-to-tr from-emerald-600 to-green-500
+              text-white shadow-sm shadow-emerald-500/20"
+            >
               {iconPath ? (
                 <img
                   src={iconPath}
@@ -364,7 +406,6 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
             </div>
           )}
 
-          {/* Close button dalam drawer */}
           <button
             onClick={() => setIsMobileOpen(false)}
             className="ml-auto lg:hidden w-7 h-7 rounded-lg flex items-center justify-center
@@ -375,11 +416,11 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
           </button>
         </div>
 
-        {/* ── Collapse toggle (lg+ only) ── */}
+        {/* Collapse toggle */}
         <button
           onClick={toggleCollapse}
-          className="hidden lg:flex absolute -right-3.5 top-[22px] w-7 h-7 bg-white border border-gray-200
-            rounded-full items-center justify-center text-gray-400
+          className="hidden lg:flex absolute -right-3.5 top-[22px] w-7 h-7 bg-white
+            border border-gray-200 rounded-full items-center justify-center text-gray-400
             hover:text-emerald-600 hover:border-emerald-300 shadow-sm transition-all z-10"
           aria-label={isCollapsed ? "Perluas" : "Ciutkan"}
         >
@@ -390,7 +431,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
           )}
         </button>
 
-        {/* ── Section label ── */}
+        {/* Section label */}
         {!isCollapsed && (
           <div className="px-5 pt-5 pb-1">
             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.12em]">
@@ -399,7 +440,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
           </div>
         )}
 
-        {/* ── Navigation ── */}
+        {/* Navigation */}
         <nav className="flex-1 px-2.5 py-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
           {menus.map((menu) => {
             const Icon = icons[menu.icon] || LayoutGrid;
@@ -416,8 +457,13 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
                     to={menu.route}
                     title={isCollapsed ? menu.name : undefined}
                     className={({ isActive }) =>
-                      `group flex items-center gap-3 rounded-xl text-sm font-semibold transition-all duration-150
-                      ${isCollapsed ? "justify-center px-0 py-3 mx-0.5" : "px-3 py-2.5"}
+                      `group flex items-center gap-3 rounded-xl text-sm font-semibold
+                      transition-all duration-150
+                      ${
+                        isCollapsed
+                          ? "justify-center px-0 py-3 mx-0.5"
+                          : "px-3 py-2.5"
+                      }
                       ${
                         isActive
                           ? "bg-emerald-600 text-white shadow-sm shadow-emerald-200"
@@ -445,8 +491,13 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
                         !isCollapsed && setOpen(isOpen ? null : menu.id)
                       }
                       title={isCollapsed ? menu.name : undefined}
-                      className={`w-full group flex items-center gap-3 rounded-xl text-sm font-semibold transition-all duration-150
-                        ${isCollapsed ? "justify-center px-0 py-3 mx-0.5" : "px-3 py-2.5 justify-between"}
+                      className={`w-full group flex items-center gap-3 rounded-xl text-sm
+                        font-semibold transition-all duration-150
+                        ${
+                          isCollapsed
+                            ? "justify-center px-0 py-3 mx-0.5"
+                            : "px-3 py-2.5 justify-between"
+                        }
                         ${
                           isActive
                             ? "bg-emerald-50 text-emerald-700"
@@ -454,12 +505,15 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
                         }`}
                     >
                       <div
-                        className={`flex items-center gap-3 min-w-0 ${isCollapsed ? "justify-center" : ""}`}
+                        className={`flex items-center gap-3 min-w-0
+                        ${isCollapsed ? "justify-center" : ""}`}
                       >
                         <Icon
                           size={18}
                           strokeWidth={isActive ? 2.5 : 2}
-                          className={`flex-shrink-0 ${isActive ? "text-emerald-600" : ""}`}
+                          className={`flex-shrink-0 ${
+                            isActive ? "text-emerald-600" : ""
+                          }`}
                         />
                         {!isCollapsed && (
                           <span className="truncate">{menu.name}</span>
@@ -482,7 +536,8 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
                             key={sub.id}
                             to={sub.route}
                             className={({ isActive }) =>
-                              `flex items-center gap-2 text-sm py-2 px-3 rounded-xl transition-all duration-150
+                              `flex items-center gap-2 text-sm py-2 px-3 rounded-xl
+                              transition-all duration-150
                               ${
                                 isActive
                                   ? "bg-emerald-600 text-white font-semibold shadow-sm shadow-emerald-200"
@@ -511,7 +566,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
         </nav>
       </aside>
 
-      {/* Backdrop (< lg) */}
+      {/* Backdrop */}
       {isMobileOpen && (
         <div
           onClick={() => setIsMobileOpen(false)}
@@ -520,8 +575,8 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
         />
       )}
 
-      {/* Spacer push konten di bawah topbar (< lg) */}
-      <div className="lg:hidden h-14 flex-shrink-0" />
+      {/* FIX: spacer juga naik jadi h-[60px] — konsisten dengan topbar */}
+      <div className="lg:hidden h-[60px] flex-shrink-0" />
     </>
   );
 }

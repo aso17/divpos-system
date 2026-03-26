@@ -1,16 +1,9 @@
-// Topbar.jsx
-// Perubahan: Topbar hanya muncul di desktop (lg+)
-// Di mobile & tablet digantikan oleh topbar dalam Sidebar.jsx
-// Logic: TIDAK DIUBAH
-
-import {
-  LogOut,
-  User,
-  Settings,
-  ChevronDown,
-  Bell,
-  Search,
-} from "lucide-react";
+import LogOut from "lucide-react/dist/esm/icons/log-out";
+import User from "lucide-react/dist/esm/icons/user";
+import Settings from "lucide-react/dist/esm/icons/settings";
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
+import Bell from "lucide-react/dist/esm/icons/bell";
+import Search from "lucide-react/dist/esm/icons/search";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { GetWithExpiry } from "../utils/Storage";
@@ -93,7 +86,11 @@ export default function Topbar({ isSidebarCollapsed }) {
           <button
             onClick={() => setNotifOpen(!notifOpen)}
             className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors
-              ${notifOpen ? "bg-emerald-50 text-emerald-600" : "text-gray-400 hover:bg-gray-50 hover:text-emerald-600"}`}
+              ${
+                notifOpen
+                  ? "bg-emerald-50 text-emerald-600"
+                  : "text-gray-400 hover:bg-gray-50 hover:text-emerald-600"
+              }`}
             aria-label="Notifikasi"
           >
             <Bell size={17} />
@@ -104,7 +101,11 @@ export default function Topbar({ isSidebarCollapsed }) {
           <div
             className={`absolute right-0 top-[calc(100%+8px)] w-72 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden
             transform transition-all duration-200 origin-top-right
-            ${notifOpen ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"}`}
+            ${
+              notifOpen
+                ? "opacity-100 scale-100 translate-y-0"
+                : "opacity-0 scale-95 -translate-y-2 pointer-events-none"
+            }`}
           >
             <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
               <p className="text-sm font-bold text-gray-800">Notifikasi</p>
@@ -188,7 +189,11 @@ export default function Topbar({ isSidebarCollapsed }) {
               ) : (
                 <div
                   className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-colors
-                  ${open ? "bg-emerald-600 text-white" : "bg-emerald-100 text-emerald-700"}`}
+                  ${
+                    open
+                      ? "bg-emerald-600 text-white"
+                      : "bg-emerald-100 text-emerald-700"
+                  }`}
                 >
                   {initials}
                 </div>
@@ -217,7 +222,11 @@ export default function Topbar({ isSidebarCollapsed }) {
           <div
             className={`absolute right-0 top-[calc(100%+8px)] w-56 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden
             transform transition-all duration-200 origin-top-right
-            ${open ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"}`}
+            ${
+              open
+                ? "opacity-100 scale-100 translate-y-0"
+                : "opacity-0 scale-95 -translate-y-2 pointer-events-none"
+            }`}
           >
             <div className="px-4 py-3 border-b border-gray-50 bg-gray-50/50">
               <div className="flex items-center gap-2.5">
