@@ -311,7 +311,7 @@ export default function OutletList() {
                 size={14}
               />
               <input
-                className="w-full pl-9 pr-8 py-2 md:py-1.5 bg-slate-50 border border-transparent rounded-xl md:rounded-lg text-[12px] md:text-[11px] outline-none focus:bg-white focus:border-emerald-500/20 transition-all placeholder:text-slate-400 font-bold text-slate-700"
+                className="w-full pl-9 pr-8 py-2 md:py-1.5 bg-slate-50 border border-transparent rounded-xl md:rounded-lg text-[12px] md:text-[11px] outline-none focus:bg-white focus:border-emerald-500/20 transition-all placeholder:text-slate-400  text-slate-700"
                 placeholder="Cari nama atau kode outlet..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

@@ -1,13 +1,13 @@
 import React, { useEffect } from "react";
-import Box from "lucide-react/dist/esm/icons/box";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
-import PlusSquare from "lucide-react/dist/esm/icons/plus-square";
-import ShoppingCart from "lucide-react/dist/esm/icons/shopping-cart";
+import ClipboardList from "lucide-react/dist/esm/icons/clipboard-list";
+import ReceiptText from "lucide-react/dist/esm/icons/receipt-text";
 import CreditCard from "lucide-react/dist/esm/icons/credit-card";
 import Printer from "lucide-react/dist/esm/icons/printer";
 import Clock from "lucide-react/dist/esm/icons/clock";
 import Minus from "lucide-react/dist/esm/icons/minus";
 import Plus from "lucide-react/dist/esm/icons/plus";
+import Box from "lucide-react/dist/esm/icons/box";
 
 export default function TransactionCartForm({
   cart,
@@ -33,10 +33,9 @@ export default function TransactionCartForm({
 }) {
   const cartCount = cart.reduce((s, i) => s + toNum(i.qty), 0);
 
-  // --- Tambahan Logic: Auto-fill nominal PAS untuk Non-Tunai (QRIS/Transfer) ---
+  // --- Auto-fill nominal untuk Non-Tunai (QRIS/Transfer) ---
   useEffect(() => {
     if (!isCash && !allowZeroPay) {
-      // Jika DP aktif, nominal bayar otomatis sebesar DP. Jika tidak, sebesar subtotal.
       const targetAmount = isDpEnabled_dp ? toNum(dpAmount) : toNum(subtotal);
       setPayAmount(targetAmount);
     }
@@ -49,18 +48,18 @@ export default function TransactionCartForm({
         <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-emerald-600 rounded-xl flex items-center justify-center shadow-sm shadow-emerald-200 flex-shrink-0">
-              <ShoppingCart
-                size={14}
+              <ClipboardList
+                size={16}
                 strokeWidth={2.5}
                 className="text-white"
               />
             </div>
             <div>
               <h2 className="text-sm font-bold text-gray-800 leading-tight">
-                Keranjang
+                Detail Order
               </h2>
               <p className="text-[10px] text-gray-400 mt-0.5">
-                Checkout &amp; pembayaran
+                Layanan &amp; Pembayaran
               </p>
             </div>
           </div>
@@ -72,7 +71,7 @@ export default function TransactionCartForm({
           )}
         </div>
 
-        {/* ── Cart Items ── */}
+        {/* ── Cart Items (Service List) ── */}
         <div className="max-h-[280px] overflow-y-auto px-4 py-3 space-y-2.5">
           {cart.length > 0 ? (
             cart.map((item) => (
@@ -81,7 +80,6 @@ export default function TransactionCartForm({
                 className="group flex items-start gap-3 p-3 bg-gray-50 border border-gray-100
                   rounded-xl hover:border-emerald-200 hover:bg-emerald-50/40 transition-all duration-150"
               >
-                {/* Item info */}
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] font-bold text-gray-700 uppercase leading-tight truncate mb-2.5">
                     {item.name}
@@ -107,7 +105,7 @@ export default function TransactionCartForm({
                           )
                         )
                       }
-                      className="w-6 h-6 rounded-lg bg-white border border-gray-200 flex items-center justify-center hover:border-emerald-400 hover:bg-emerald-50 transition-colors flex-shrink-0"
+                      className="w-6 h-6 rounded-lg bg-white border border-gray-200 flex items-center justify-center hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
                     >
                       <Minus
                         size={10}
@@ -119,8 +117,7 @@ export default function TransactionCartForm({
                     <input
                       type="number"
                       step="any"
-                      className="w-14 h-7 border border-emerald-300 bg-white rounded-lg text-center text-xs font-black text-emerald-700
-                        outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition-all"
+                      className="w-14 h-7 border border-emerald-300 bg-white rounded-lg text-center text-xs font-black text-emerald-700 outline-none"
                       value={item.qty || ""}
                       onChange={(e) =>
                         setCart(
@@ -147,7 +144,7 @@ export default function TransactionCartForm({
                           )
                         )
                       }
-                      className="w-6 h-6 rounded-lg bg-white border border-gray-200 flex items-center justify-center hover:border-emerald-400 hover:bg-emerald-50 transition-colors flex-shrink-0"
+                      className="w-6 h-6 rounded-lg bg-white border border-gray-200 flex items-center justify-center hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
                     >
                       <Plus
                         size={10}
@@ -162,13 +159,12 @@ export default function TransactionCartForm({
                   </div>
                 </div>
 
-                {/* Price + delete */}
                 <div className="flex flex-col items-end justify-between self-stretch gap-2">
                   <button
                     onClick={() =>
                       setCart(cart.filter((c) => c.id !== item.id))
                     }
-                    className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all duration-150"
+                    className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
                   >
                     <Trash2 size={12} strokeWidth={2} />
                   </button>
@@ -189,13 +185,12 @@ export default function TransactionCartForm({
               </div>
             ))
           ) : (
-            /* Empty cart */
             <div className="py-2 flex flex-col items-center text-center border-2 border-dashed border-gray-100 rounded-2xl">
               <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center mb-3">
                 <Box size={22} strokeWidth={1.5} className="text-gray-300" />
               </div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">
-                Keranjang kosong
+                List Order Kosong
               </p>
               <p className="text-[10px] text-gray-300 mt-1">
                 Pilih layanan di sebelah kiri
@@ -206,7 +201,7 @@ export default function TransactionCartForm({
 
         {/* ── Payment Area ── */}
         <div className="border-t border-gray-50 px-4 pb-4 pt-4 space-y-4">
-          {/* Payment Method Pills */}
+          {/* Payment Method */}
           <div>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
               <CreditCard size={11} className="text-emerald-500" />
@@ -217,7 +212,7 @@ export default function TransactionCartForm({
                 <button
                   key={m.id}
                   onClick={() => setSelectedPaymentMethod(m)}
-                  className={`py-2 px-1 rounded-xl text-[10px] font-bold uppercase border transition-all duration-150
+                  className={`py-2 px-1 rounded-xl text-[10px] font-bold uppercase border transition-all
                     ${
                       selectedPaymentMethod?.id === m.id
                         ? "bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-200"
@@ -234,14 +229,14 @@ export default function TransactionCartForm({
           <div className="bg-emerald-600 rounded-2xl p-4 flex items-center justify-between shadow-sm shadow-emerald-200">
             <div>
               <p className="text-emerald-200 text-[10px] font-semibold uppercase tracking-widest">
-                Grand Total
+                Total Bayar
               </p>
               <p className="text-2xl font-black text-white leading-tight mt-0.5">
                 {formatRupiah(subtotal)}
               </p>
             </div>
             <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
-              <ShoppingCart size={18} className="text-white" strokeWidth={2} />
+              <ReceiptText size={18} className="text-white" strokeWidth={2} />
             </div>
           </div>
 
@@ -256,25 +251,22 @@ export default function TransactionCartForm({
                 type="text"
                 value={dpAmount === 0 ? "" : formatRupiah(dpAmount)}
                 onChange={(e) => setDpAmount(parseNumber(e.target.value) || 0)}
-                className="w-full h-12 border-2 border-amber-300 bg-amber-50 rounded-xl px-4
-                  font-black text-lg text-amber-700 placeholder:text-amber-300
-                  outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-500 transition-all"
+                className="w-full h-12 border-2 border-amber-300 bg-amber-50 rounded-xl px-4 font-black text-lg text-amber-700 outline-none"
                 placeholder="Rp 0"
               />
             </div>
           )}
 
-          {/* Payment Input / Bayar Nanti */}
+          {/* Payment Input */}
           {!allowZeroPay ? (
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
                 {isCash ? "Nominal Tunai" : "Konfirmasi Pembayaran"}
               </label>
-
               <input
                 type="text"
-                readOnly={!isCash} // Lock jika non-tunai
+                readOnly={!isCash}
                 onFocus={(e) => isCash && e.target.select()}
                 value={payAmount === 0 ? "" : formatRupiah(payAmount)}
                 onChange={(e) =>
@@ -283,20 +275,18 @@ export default function TransactionCartForm({
                 className={`w-full h-12 border-2 rounded-xl px-4 font-black text-lg outline-none transition-all
                   ${
                     !isCash
-                      ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
-                      : "bg-white border-emerald-400 text-emerald-700 focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600"
+                      ? "bg-gray-100 border-gray-200 text-gray-400"
+                      : "bg-white border-emerald-400 text-emerald-700 focus:border-emerald-600"
                   }`}
                 placeholder="Rp 0"
               />
 
-              {/* Kembalian / Kurang bayar — Cash only */}
               {isCash && (
                 <div
-                  className={`flex items-center justify-between text-xs font-bold px-3 py-2 rounded-xl
-                  ${
+                  className={`flex items-center justify-between text-xs font-bold px-3 py-2 rounded-xl ${
                     change < 0
-                      ? "bg-red-50 border border-red-100 text-red-600"
-                      : "bg-emerald-50 border border-emerald-100 text-emerald-700"
+                      ? "bg-red-50 text-red-600"
+                      : "bg-emerald-50 text-emerald-700"
                   }`}
                 >
                   <span className="uppercase tracking-wide text-[10px]">
@@ -309,7 +299,6 @@ export default function TransactionCartForm({
               )}
             </div>
           ) : (
-            /* Bayar Nanti info box */
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
               <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
                 <Clock size={14} className="text-amber-600" strokeWidth={2} />
@@ -319,7 +308,8 @@ export default function TransactionCartForm({
                   Mode Bayar Nanti
                 </p>
                 <p className="text-[10px] text-amber-600 mt-0.5 leading-relaxed">
-                  Transaksi disimpan sebagai piutang, tanpa pembayaran sekarang.
+                  Masukkan jumlah DP jika pelanggan membayar di muka. Sisa
+                  pembayaran akan tercatat sebagai piutang.
                 </p>
               </div>
             </div>
@@ -329,39 +319,17 @@ export default function TransactionCartForm({
           <button
             onClick={handleSubmit}
             disabled={isDisabled}
-            className={`w-full h-12 rounded-xl font-black text-sm flex items-center justify-center gap-2.5
-              transition-all duration-200 shadow-sm
+            className={`w-full h-12 rounded-xl font-black text-sm flex items-center justify-center gap-2.5 transition-all
               ${
                 isDisabled
-                  ? "bg-gray-100 text-gray-300 cursor-not-allowed shadow-none"
+                  ? "bg-gray-100 text-gray-300"
                   : allowZeroPay
-                  ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200 active:scale-[0.98]"
-                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 active:scale-[0.98]"
+                  ? "bg-amber-500 text-white"
+                  : "bg-emerald-600 text-white"
               }`}
           >
             {loading ? (
-              <>
-                <svg
-                  className="animate-spin w-4 h-4 text-white/70"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                  />
-                </svg>
-                <span>Memproses...</span>
-              </>
+              <span className="animate-pulse">Memproses...</span>
             ) : (
               <>
                 <Printer size={15} strokeWidth={2.5} />

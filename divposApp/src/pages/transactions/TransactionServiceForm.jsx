@@ -1,10 +1,9 @@
-// TransactionServiceForm.jsx
-// Logic: TIDAK DIUBAH — hanya styling
-
+import React from "react";
 import Box from "lucide-react/dist/esm/icons/box";
 import Search from "lucide-react/dist/esm/icons/search";
 import X from "lucide-react/dist/esm/icons/x";
 import Tag from "lucide-react/dist/esm/icons/tag";
+import Hash from "lucide-react/dist/esm/icons/hash"; // Icon baru untuk Code
 
 export default function TransactionServiceForm({
   packages,
@@ -49,7 +48,7 @@ export default function TransactionServiceForm({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari layanan atau kategori..."
+            placeholder="Cari layanan, kategori, atau kode..."
             className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-9 text-sm font-medium text-gray-700 placeholder:text-gray-300
               transition-all duration-150 outline-none
               focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
@@ -75,7 +74,7 @@ export default function TransactionServiceForm({
               const hasDiscount = originalPrice > finalPrice;
               const discountPct = hasDiscount
                 ? Math.round(
-                    ((originalPrice - finalPrice) / originalPrice) * 100,
+                    ((originalPrice - finalPrice) / originalPrice) * 100
                   )
                 : 0;
 
@@ -87,24 +86,27 @@ export default function TransactionServiceForm({
                     bg-white border border-gray-100 rounded-2xl p-3.5
                     shadow-sm hover:shadow-md hover:border-emerald-300 hover:bg-emerald-50/50
                     hover:-translate-y-0.5 active:scale-[0.97]
-                    transition-all duration-200 min-h-[110px] overflow-hidden"
+                    transition-all duration-200 min-h-[125px] overflow-hidden"
                 >
                   {/* Discount badge */}
                   {hasDiscount && (
-                    <div className="absolute top-0 right-0 bg-red-500 text-white text-[8px] font-black px-2 py-1 rounded-bl-xl rounded-tr-2xl flex items-center gap-0.5 shadow-sm">
-                      <Tag size={7} />
+                    <div className="absolute top-0 right-0 bg-red-500 text-white text-[8px] font-black px-2 py-1 rounded-bl-xl shadow-sm">
                       {discountPct}% OFF
                     </div>
                   )}
 
-                  {/* Package name */}
-                  <p
-                    className="font-bold text-[11px] leading-snug text-gray-700
-                    group-hover:text-emerald-700 line-clamp-2 uppercase tracking-tight
-                    transition-colors duration-150 mt-1 pr-6"
-                  >
-                    {pkg.name}
-                  </p>
+                  {/* Header Area: Code + Name */}
+                  <div className="space-y-1">
+                    {/* Package Code */}
+                    <div className="flex items-center gap-0.5 text-[8px] font-black text-gray-400 uppercase tracking-tighter bg-gray-50 w-fit px-1.5 py-0.5 rounded-md border border-gray-100 group-hover:bg-emerald-100 group-hover:text-emerald-600 group-hover:border-emerald-200 transition-colors">
+                      <Hash size={7} />
+                      {pkg.code || "N/A"}
+                    </div>
+
+                    <p className="font-bold text-[11px] leading-snug text-gray-700 group-hover:text-emerald-700 line-clamp-2 uppercase tracking-tight transition-colors">
+                      {pkg.name}
+                    </p>
+                  </div>
 
                   {/* Price area */}
                   <div className="mt-auto pt-2">
@@ -123,19 +125,15 @@ export default function TransactionServiceForm({
                     </div>
                   </div>
 
-                  {/* Hover: add indicator */}
-                  <div
-                    className="absolute bottom-2.5 right-2.5 w-5 h-5 bg-emerald-600 rounded-full
-                    flex items-center justify-center opacity-0 group-hover:opacity-100
-                    transition-opacity duration-150 shadow-sm"
-                  >
+                  {/* Hover Indicator Icon */}
+                  <div className="absolute bottom-2.5 right-2.5 w-6 h-6 bg-emerald-600 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 shadow-sm translate-y-2 group-hover:translate-y-0">
                     <svg
-                      width="9"
-                      height="9"
+                      width="10"
+                      height="10"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="white"
-                      strokeWidth="3"
+                      strokeWidth="4"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     >
@@ -150,14 +148,14 @@ export default function TransactionServiceForm({
         ) : (
           /* Empty state */
           <div className="py-16 flex flex-col items-center text-center">
-            <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
-              <Search size={24} strokeWidth={1.5} className="text-gray-300" />
+            <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mb-4 text-gray-300">
+              <Search size={24} strokeWidth={1.5} />
             </div>
             <p className="text-sm font-bold text-gray-400">
               Layanan tidak ditemukan
             </p>
             <p className="text-xs text-gray-300 mt-1">
-              Coba kata kunci yang berbeda
+              Coba kata kunci atau kode yang berbeda
             </p>
           </div>
         )}

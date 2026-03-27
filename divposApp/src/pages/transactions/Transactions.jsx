@@ -47,7 +47,7 @@ const Transactions = () => {
         ],
         customer_phone: [(v) => rules.phoneID(v, "Format nomor tidak valid")],
         outlet_id: [(v) => rules.required(v, "Pilih outlet terlebih dahulu")],
-      },
+      }
     );
 
   // ── Data extraction (TIDAK DIUBAH) ──────────────────────────────────────────
@@ -62,17 +62,17 @@ const Transactions = () => {
     () =>
       cart.reduce(
         (acc, item) => acc + toNum(item.final_price) * toNum(item.qty),
-        0,
+        0
       ),
-    [cart],
+    [cart]
   );
 
   const filteredPackages = useMemo(
     () =>
       packages.filter((pkg) =>
-        pkg.name.toLowerCase().includes(search.toLowerCase()),
+        pkg.name.toLowerCase().includes(search.toLowerCase())
       ),
-    [packages, search],
+    [packages, search]
   );
 
   const dpAmountNum = toNum(dpAmount);
@@ -111,6 +111,7 @@ const Transactions = () => {
       const payData = data.payment_methods || [];
       setPaymentMethods(payData);
       if (payData.length > 0) setSelectedPaymentMethod(payData[0]);
+      // console.log(data.packages);
       if (data.outlets?.length > 0)
         handleChange("outlet_id", data.outlets[0].id);
     } catch (error) {
@@ -133,7 +134,7 @@ const Transactions = () => {
     try {
       const res = await TransactionService.searchCustomer(
         { phone: val },
-        { signal: controller.signal },
+        { signal: controller.signal }
       );
       const existing = res.data.data;
       setValues((prev) => ({
@@ -157,7 +158,7 @@ const Transactions = () => {
     if (!allow_zero_pay && totalDiterima < subtotal)
       return triggerToast(
         `Pembayaran kurang! Total wajib: ${formatRupiah(subtotal)}`,
-        "error",
+        "error"
       );
 
     issubmitting.current = true;
@@ -180,8 +181,8 @@ const Transactions = () => {
         payment_amount: allow_zero_pay
           ? 0
           : is_cash
-            ? payAmountNum
-            : sisaTagihan,
+          ? payAmountNum
+          : sisaTagihan,
       };
       const response = await TransactionService.createTransaction(payload);
       setCart([]);
@@ -206,7 +207,7 @@ const Transactions = () => {
 
   const triggerToast = (message, type) => {
     window.dispatchEvent(
-      new CustomEvent("global-toast", { detail: { message, type } }),
+      new CustomEvent("global-toast", { detail: { message, type } })
     );
   };
 

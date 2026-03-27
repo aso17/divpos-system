@@ -17,6 +17,7 @@ export default function RegisterForm({
         name: "",
         business_type_id: "",
         address: "",
+        city: "",
         // Step 2 — Owner / Account
         full_name: "", // → Ms_employees.full_name (NOT NULL)
         email: "",
@@ -29,7 +30,7 @@ export default function RegisterForm({
         name: [(v) => rules.required(v, "Nama bisnis wajib diisi")],
         business_type_id: [(v) => rules.required(v, "Pilih jenis bisnis")],
         address: [(v) => rules.required(v, "Alamat wajib diisi")],
-
+        city: [(v) => rules.required(v, "Kota wajib diisi")],
         full_name: [
           (v) => rules.required(v, "Nama lengkap wajib diisi"),
           (v) => rules.minLength(v, 3, "Min. 3 karakter"),
@@ -54,7 +55,7 @@ export default function RegisterForm({
     );
 
   const handleNext = () => {
-    const step1Fields = ["name", "business_type_id", "address"];
+    const step1Fields = ["name", "business_type_id", "address", "city"];
     const isValid = validate(step1Fields);
     if (isValid) setStep(2);
   };
@@ -170,6 +171,29 @@ export default function RegisterForm({
 
             <div className="space-y-1">
               <label
+                htmlFor="city"
+                className="text-[9px] font-black text-slate-500 uppercase ml-1"
+              >
+                Kota
+              </label>
+              <input
+                id="city"
+                type="text"
+                value={values.city}
+                onChange={(e) => handleChange("city", e.target.value)}
+                placeholder="Contoh: DKI Jakarta"
+                className={
+                  inputClasses({ error: !!errors.city }) +
+                  " rounded-xl px-4 py-2.5 text-sm"
+                }
+              />
+              {errors.city && (
+                <p className="text-[8px] text-rose-500 ml-1">{errors.city}</p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <label
                 htmlFor="address"
                 className="text-[9px] font-black text-slate-500 uppercase ml-1"
               >
@@ -179,7 +203,7 @@ export default function RegisterForm({
                 id="address"
                 value={values.address}
                 onChange={(e) => handleChange("address", e.target.value)}
-                placeholder="Alamat lengkap outlet..."
+                placeholder="Alamat lengkap ..."
                 rows="2"
                 className={
                   inputClasses({ error: !!errors.address }) +
