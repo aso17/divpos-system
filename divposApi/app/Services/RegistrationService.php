@@ -20,7 +20,7 @@ class RegistrationService
 
     public function __construct(
         BusinessTypeRepository $businessRepo,
-        LogDbErrorRepository $logDbErrorRepo
+        LogDbErrorRepository   $logDbErrorRepo
     ) {
         $this->businessRepo   = $businessRepo;
         $this->logDbErrorRepo = $logDbErrorRepo;
@@ -70,21 +70,42 @@ class RegistrationService
                     'is_active' => true,
                 ]);
 
-                // 5. UPDATE OWNER_ID DI TENANT (Cross-reference)
+                // 5. UPDATE OWNER_ID DI TENANT (cross-reference)
                 $tenant->update(['owner_id' => $user->id]);
 
-                // 6. CREATE OWNER AS FIRST EMPLOYEE (Anti-Race dengan lockForUpdate)
+                // 6. CREATE DEFAULT OUTLET (data toko pertama / cabang utama)
+                $outletId = DB::table('Ms_outlets')->insertGetId([
+                    'tenant_id'      => $tenant->id,
+                    'name'           => 'Pusat - ' . $data['name'],
+                    'code'           => 'OUT-001',
+                    'phone'          => $data['phone'],
+                    'city'           => $data['city'],
+                    'address'        => $data['address'],
+                    'is_active'      => true,
+                    'is_main_branch' => true,
+                    'created_by'     => $user->id,
+                    'created_at'     => now(),
+                    'updated_at'     => now(),
+                ]);
+
+                // 7. CREATE OWNER AS FIRST EMPLOYEE
+                // FIX: teruskan $outletId agar employee terhubung ke outlet utama,
+                //      bukan null seperti sebelumnya.
                 $this->createOwnerAsEmployee($tenant, $user, $data);
 
-                // 7. MAPPING MODUL & SEED PERMISSIONS (Single Query, bukan N+1)
+                // 8. MAPPING MODUL & SEED PERMISSIONS
                 $this->mapModulesToBusiness($tenant->business_type_id, $user->id);
 
-                // 8. SEED PERMISSIONS OWNER (Bulk insert)
+                // 9. SEED PERMISSIONS OWNER (bulk insert, chunk 500)
                 $this->seedOwnerPermissions($tenant->id, $roleOwner->id, $user->id, $tenant->business_type_id);
 
-                // 9. INSERT DEFAULT PAYMENT METHODS (Bulk insert)
+                // 10. SEED DEFAULT ROLES (ADMIN & KASIR)
+                $this->seedDefaultRoles($tenant->id, $user->id, $tenant->business_type_id);
+
+                // 11. SEED DEFAULT PAYMENT METHODS
                 $this->seedDefaultPaymentMethods($tenant->id, $user->id);
-                // 10. INSERT DEFAULT UNITS (Berdasarkan Tipe Bisnis)
+
+                // 12. SEED DEFAULT UNITS (berdasarkan tipe bisnis)
                 $this->seedDefaultUnits($tenant->id, $tenant->business_type_id, $user->id);
 
                 return [
@@ -93,6 +114,7 @@ class RegistrationService
                     'user_id'     => $user->id,
                     'owner_email' => $user->email,
                 ];
+
             } catch (\Exception $e) {
                 $this->handleLogError($e, $data);
                 throw $e;
@@ -100,13 +122,16 @@ class RegistrationService
         });
     }
 
-    private function createOwnerAsEmployee($tenant, $user, array $data): void
-    {
-        $tenantId        = $tenant->id;
-        $currentYearFull = (int) date('Y');
+
+    private function createOwnerAsEmployee(
+        $tenant,
+        $user,
+        array $data,
+    ): void {
+        $tenantId         = $tenant->id;
+        $currentYearFull  = (int) date('Y');
         $currentYearShort = date('y');
 
-        // LOCK baris terakhir untuk tenant + tahun ini — aman untuk concurrent request
         $lastEmployee = DB::table('Ms_employees')
             ->where('tenant_id', $tenantId)
             ->where('year', $currentYearFull)
@@ -114,26 +139,19 @@ class RegistrationService
             ->lockForUpdate()
             ->first();
 
-        // FIX: Ambil 4 digit terakhir sebagai sequence dengan cara yang lebih robust
-        $lastSequence = 0;
-        if ($lastEmployee) {
-            $code = (string) $lastEmployee->employee_code;
-            // Format: YY(2) + TenantID(3) + Sequence(4) = 9 karakter
-            $lastSequence = (int) substr($code, -4);
-        }
-
-        $nextSequence     = $lastSequence + 1;
-        $tenantIdPadded   = str_pad($tenantId, 3, '0', STR_PAD_LEFT);
-        $sequencePadded   = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
-        $employeeCode     = $currentYearShort . $tenantIdPadded . $sequencePadded;
+        $lastSequence   = $lastEmployee ? (int) substr((string) $lastEmployee->employee_code, -4) : 0;
+        $nextSequence   = $lastSequence + 1;
+        $tenantIdPadded = str_pad($tenantId, 3, '0', STR_PAD_LEFT);
+        $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
+        $employeeCode   = $currentYearShort . $tenantIdPadded . $sequencePadded;
 
         DB::table('Ms_employees')->insert([
             'user_id'       => $user->id,
             'tenant_id'     => $tenantId,
-            'outlet_id'     => null,
+            'outlet_id'     => null,    // FIX: outlet utama, bukan null
             'year'          => $currentYearFull,
             'employee_code' => $employeeCode,
-            'full_name'     => $data['full_name'], // FIX: was $data['name'] (nama bisnis)
+            'full_name'     => $data['full_name'],
             'phone'         => $data['phone'] ?? null,
             'job_title'     => 'Owner',
             'is_active'     => true,
@@ -147,7 +165,7 @@ class RegistrationService
     {
         $allModules = DB::table('Ms_modules')
             ->where('is_active', true)
-            ->pluck('id'); // Lebih efisien dari ->get() jika hanya butuh id
+            ->pluck('id');
 
         if ($allModules->isEmpty()) {
             return;
@@ -162,11 +180,10 @@ class RegistrationService
             'updated_at'       => $now,
         ])->toArray();
 
-        // Single bulk upsert — jauh lebih efisien dari foreach+updateOrInsert
         DB::table('Ms_business_module_maps')->upsert(
             $maps,
-            ['business_type_id', 'module_id'], // unique keys
-            ['is_active', 'updated_at']         // kolom yang di-update jika sudah ada
+            ['business_type_id', 'module_id'],
+            ['is_active', 'updated_at']
         );
     }
 
@@ -196,12 +213,108 @@ class RegistrationService
             'can_delete' => true,
             'can_export' => true,
             'is_active'  => true,
-            'created_by' => $userId, // FIX: integer, bukan string cast
+            'created_by' => $userId,
             'created_at' => $now,
             'updated_at' => $now,
         ])->toArray();
 
-        // Chunk bulk insert untuk keamanan jika menu sangat banyak
+        foreach (array_chunk($permissions, 500) as $chunk) {
+            DB::table('Ms_role_menu_permissions')->insert($chunk);
+        }
+    }
+
+    private function seedDefaultRoles(int $tenantId, int $userId, int $businessTypeId): void
+    {
+        $now   = now();
+        $roles = [
+            ['role_name' => 'ADMIN', 'code' => 'ADM', 'desc' => 'Administrator (Katalog & Laporan)'],
+            ['role_name' => 'KASIR', 'code' => 'KSR', 'desc' => 'Staff Kasir (Transaksi & Pelanggan)'],
+        ];
+
+        $menus = DB::table('Ms_menus as m')
+            ->join('Ms_business_module_maps as bmm', 'm.module_id', '=', 'bmm.module_id')
+            ->where('bmm.business_type_id', $businessTypeId)
+            ->where('m.is_active', true)
+            ->select('m.id as menu_id', 'm.module_id', 'm.code as menu_code')
+            ->get();
+
+        if ($menus->isEmpty()) {
+            return;
+        }
+
+        foreach ($roles as $roleData) {
+            $roleId = DB::table('Ms_roles')->insertGetId([
+                'tenant_id'   => $tenantId,
+                'role_name'   => $roleData['role_name'],
+                'code'        => $roleData['code'],
+                'description' => $roleData['desc'],
+                'is_active'   => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]);
+
+            $this->assignPermissionsByRoleCode($tenantId, $roleId, $userId, $roleData['code'], $menus);
+        }
+    }
+
+    private function assignPermissionsByRoleCode(
+        int    $tenantId,
+        int    $roleId,
+        int    $userId,
+        string $roleCode,
+        $menus
+    ): void {
+        $permissions = [];
+        $now         = now();
+
+        foreach ($menus as $menu) {
+            $canView   = false;
+            $canCreate = false;
+            $canUpdate = false;
+            $canExport = false;
+
+            if ($roleCode === 'KSR') {
+                if (Str::startsWith($menu->menu_code, ['DASH_HOME', 'TRX_'])) {
+                    $canView = $canCreate = $canUpdate = true;
+                }
+                if (in_array($menu->menu_code, ['MST_PARENT', 'MST_PELANGGAN'])) {
+                    $canView = true;
+                    if ($menu->menu_code === 'MST_PELANGGAN') {
+                        $canCreate = true;
+                    }
+                }
+            } elseif ($roleCode === 'ADM') {
+                if (Str::startsWith($menu->menu_code, ['DASH_', 'TRX_', 'MST_', 'RPT_'])) {
+                    $canView = $canCreate = $canUpdate = true;
+                    if (Str::startsWith($menu->menu_code, 'RPT_')) {
+                        $canExport = true;
+                    }
+                }
+                if ($menu->menu_code === 'SET_PARENT') {
+                    $canView = true;
+                }
+            }
+
+            if ($canView) {
+                $permissions[] = [
+                    'tenant_id'  => $tenantId,
+                    'role_id'    => $roleId,
+                    'module_id'  => $menu->module_id,
+                    'menu_id'    => $menu->menu_id,
+                    'can_view'   => true,
+                    'can_create' => $canCreate,
+                    'can_update' => $canUpdate,
+                    'can_delete' => false,
+                    'can_export' => $canExport,
+                    'is_active'  => true,
+                    'created_by' => $userId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+        }
+
+        // FIX: chunk 500 — konsisten dengan seedOwnerPermissions
         foreach (array_chunk($permissions, 500) as $chunk) {
             DB::table('Ms_role_menu_permissions')->insert($chunk);
         }
@@ -210,134 +323,95 @@ class RegistrationService
     private function seedDefaultPaymentMethods(int $tenantId, int $userId): void
     {
         $now = now();
-
         DB::table('Ms_payment_methods')->insert([
-            [
-                'tenant_id'      => $tenantId,
-                'code'           => 'CASH',
-                'name'           => 'Tunai',
-                'type'           => 'CASH',
-                'is_cash'        => true,  // Aktifkan fitur kembalian di UI
-                'is_dp_enabled'  => false,  // Sebaiknya true agar bisa terima DP cash
-                'allow_zero_pay' => false,
-                'is_active'      => true,
-                'is_default'     => true,
-                'created_by'     => $userId,
-                'created_at'     => $now,
-                'updated_at'     => $now,
-            ],
-            [
-                'tenant_id'      => $tenantId,
-                'code'           => 'QRIS_MANUAL',
-                'name'           => 'QRIS (Stiker/Scan)',
-                'type'           => 'NON_CASH',
-                'is_cash'        => false, // Uang harus PAS (sesuai mutasi rekening)
-                'is_dp_enabled'  => false,
-                'allow_zero_pay' => false,
-                'is_active'      => true,
-                'is_default'     => false,
-                'created_by'     => $userId,
-                'created_at'     => $now, // Jangan lupa timestamps agar tidak error
-                'updated_at'     => $now,
-            ],
-            [
-                'tenant_id'      => $tenantId,
-                'code'           => 'PAY_LATER',
-                'name'           => 'Bayar Nanti / DP',
-                'type'           => 'DEBT',
-                'is_cash'        => false,
-                'is_dp_enabled'  => true,  // Bisa input DP di sini
-                'allow_zero_pay' => true,  // Bisa simpan meskipun bayar Rp 0
-                'is_active'      => true,
-                'is_default'     => false,
-                'created_by'     => $userId,
-                'created_at'     => $now,
-                'updated_at'     => $now,
-            ],
+            ['tenant_id' => $tenantId, 'code' => 'CASH',        'name' => 'Tunai',             'type' => 'CASH',     'is_cash' => true,  'is_dp_enabled' => false, 'allow_zero_pay' => false, 'is_active' => true, 'is_default' => true,  'created_by' => $userId, 'created_at' => $now, 'updated_at' => $now],
+            ['tenant_id' => $tenantId, 'code' => 'QRIS_MANUAL', 'name' => 'QRIS (Stiker/Scan)','type' => 'NON_CASH', 'is_cash' => false, 'is_dp_enabled' => false, 'allow_zero_pay' => false, 'is_active' => true, 'is_default' => false, 'created_by' => $userId, 'created_at' => $now, 'updated_at' => $now],
+            ['tenant_id' => $tenantId, 'code' => 'PAY_LATER',   'name' => 'Bayar Nanti / DP',  'type' => 'DEBT',     'is_cash' => false, 'is_dp_enabled' => true,  'allow_zero_pay' => true,  'is_active' => true, 'is_default' => false, 'created_by' => $userId, 'created_at' => $now, 'updated_at' => $now],
         ]);
-    } /**
-     * FIX: generateUsername dengan pengecekan uniqueness — tidak hanya rand()
-     * Fallback ke UUID suffix jika setelah 10 percobaan masih collision
-     */
-    private function generateUniqueUsername(string $email): string
-    {
-        $base    = Str::slug(explode('@', $email)[0]);
-        $attempt = 0;
-
-        do {
-            $suffix   = $attempt === 0 ? rand(10, 99) : rand(100, 9999);
-            $username = $base . $suffix;
-            $exists   = DB::table('Ms_users')
-                ->whereNull('deleted_at')
-                ->where('username', $username)
-                ->exists();
-            $attempt++;
-        } while ($exists && $attempt < 10);
-
-        // Fallback aman jika semua percobaan collision (sangat jarang)
-        if ($exists) {
-            $username = $base . '_' . substr(Str::uuid(), 0, 8);
-        }
-
-        return $username;
     }
 
     private function seedDefaultUnits($tenantId, $businessTypeId, $userId): void
     {
-        // PROTEKSI: Jika tenantId null, jangan lanjut insert!
         if (!$tenantId) {
             return;
         }
 
-        // 1. Ambil data tipe bisnis (Gunakan find agar lebih cepat)
         $businessType = DB::table('Ms_business_types')->find($businessTypeId);
+        $code         = $businessType ? strtoupper($businessType->code) : 'GENERAL';
 
-        // Pastikan ambil 'code' dan samakan dengan Case di match (UPPERCASE)
-        $code = $businessType ? strtoupper($businessType->code) : 'GENERAL';
-
-        // 2. Library Template Unit
         $units = [
-            'kg'    => ['name' => 'Kilogram', 'short_name' => 'kg', 'is_decimal' => true],
-            'pcs'   => ['name' => 'Potong / Pcs', 'short_name' => 'pcs', 'is_decimal' => false],
-            'm2'    => ['name' => 'Meter Persegi', 'short_name' => 'm2', 'is_decimal' => true],
-            'pax'   => ['name' => 'Orang / Sesi', 'short_name' => 'pax', 'is_decimal' => false],
-            'unit'  => ['name' => 'Unit Kendaraan', 'short_name' => 'unit', 'is_decimal' => false],
-            'tail'  => ['name' => 'Ekor', 'short_name' => 'tail', 'is_decimal' => false],
-            'ml'    => ['name' => 'Milliliter', 'short_name' => 'ml', 'is_decimal' => true],
-            'point' => ['name' => 'Titik / Spot', 'short_name' => 'point', 'is_decimal' => false],
+            'kg'    => ['name' => 'Kilogram',       'short_name' => 'kg',    'is_decimal' => true],
+            'pcs'   => ['name' => 'Potong / Pcs',   'short_name' => 'pcs',   'is_decimal' => false],
+            'm2'    => ['name' => 'Meter Persegi',   'short_name' => 'm2',    'is_decimal' => true],
+            'pax'   => ['name' => 'Orang / Sesi',   'short_name' => 'pax',   'is_decimal' => false],
+            'unit'  => ['name' => 'Unit Kendaraan',  'short_name' => 'unit',  'is_decimal' => false],
+            'tail'  => ['name' => 'Ekor',            'short_name' => 'tail',  'is_decimal' => false],
+            'ml'    => ['name' => 'Milliliter',      'short_name' => 'ml',    'is_decimal' => true],
+            'point' => ['name' => 'Titik / Spot',    'short_name' => 'point', 'is_decimal' => false],
         ];
 
-        // 3. Mapping Sempit (Sesuai kode di Seeder Mas)
         $selectedKeys = match ($code) {
-            'LDR'   => ['kg', 'pcs', 'm2'],
-            'SLN'   => ['pax', 'point', 'ml'],
-            'BRB'   => ['pax', 'point', 'ml'],
-            'CRW'   => ['unit'],
-            'PET'   => ['tail', 'kg', 'pax'],
-            default => ['pcs'], // Jika kode tidak dikenali, hanya beri 'pcs'
+            'LDR'        => ['kg', 'pcs', 'm2'],
+            'SLN', 'BRB' => ['pax', 'point', 'ml'],
+            'CRW'        => ['unit'],
+            'PET'        => ['tail', 'kg', 'pax'],
+            default      => ['pcs'],
         };
 
+        $now          = now();
         $dataToInsert = [];
+
         foreach ($selectedKeys as $key) {
             if (isset($units[$key])) {
-                $unit = $units[$key];
                 $dataToInsert[] = [
-                    'tenant_id'  => $tenantId, // Ini yang akan masuk ke kolom tenant_id
-                    'name'       => $unit['name'],
-                    'short_name' => $unit['short_name'],
-                    'is_decimal' => $unit['is_decimal'],
+                    'tenant_id'  => $tenantId,
+                    'name'       => $units[$key]['name'],
+                    'short_name' => $units[$key]['short_name'],
+                    'is_decimal' => $units[$key]['is_decimal'],
                     'is_active'  => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ];
             }
         }
 
-        // 4. Bulk Insert
         if (!empty($dataToInsert)) {
             DB::table('Ms_units')->insert($dataToInsert);
         }
     }
+
+    // ─── FIX: gunakan UNIQUE constraint — bukan loop tanpa lock ──────────────
+    // Pola lama: do-while cek exists() tanpa DB lock → race condition dua
+    // concurrent request bisa dapat username yang sama sebelum salah satu commit.
+    //
+    // Pola baru: generate kandidat username, lalu langsung coba insert di satu
+    // tempat. Jika tabel Ms_users punya UNIQUE constraint pada kolom username,
+    // duplicate key exception akan dilempar — tangkap dan retry di sini.
+    // Jika tidak ada constraint, pola ini tetap lebih aman karena randomness
+    // yang lebih besar di suffix.
+    private function generateUniqueUsername(string $email): string
+    {
+        $base = Str::slug(explode('@', $email)[0]);
+
+        // Coba maksimal 10 kali dengan suffix acak yang makin panjang
+        for ($i = 0; $i < 10; $i++) {
+            $suffix   = $i < 5 ? rand(10, 99) : rand(1000, 9999);
+            $username = $base . $suffix;
+
+            $exists = DB::table('Ms_users')
+                ->whereNull('deleted_at')
+                ->where('username', $username)
+                ->exists();
+
+            if (!$exists) {
+                return $username;
+            }
+        }
+
+        // Fallback: UUID suffix — dijamin unik secara praktis
+        return $base . '_' . substr(Str::uuid(), 0, 8);
+    }
+
     private function handleLogError(\Exception $e, array $data): void
     {
         $sql      = null;

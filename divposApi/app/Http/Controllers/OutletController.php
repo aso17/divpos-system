@@ -10,6 +10,7 @@ use App\Services\OutletService;
 use App\Services\LogDbErrorService;
 use App\Helpers\CryptoHelper;
 use App\Http\Requests\OutletRequest;
+use App\Helpers\ClearCache;
 
 class OutletController extends Controller
 {
@@ -59,7 +60,7 @@ class OutletController extends Controller
 
             $outlet = $this->outletService->createOutlet($payload);
 
-            Cache::forget("init_data_tenant_transaction_" . $tenantId);
+            ClearCache::tenantTransaction((int)$tenantId);
 
             return response()->json([
                 'success' => true,
@@ -88,7 +89,7 @@ class OutletController extends Controller
             $payload['tenant_id'] = (int)$tenantId;
             $outlet = $this->outletService->updateOutlet($decryptedId, $payload);
 
-            Cache::forget("init_data_tenant_transaction_" . $tenantId);
+            ClearCache::tenantTransaction((int)$tenantId);
             return response()->json([
                 'success' => $decryptedId,
                 'message' => 'Outlet berhasil diperbarui.',
@@ -137,7 +138,7 @@ class OutletController extends Controller
                 ], 404);
             }
 
-            Cache::forget("init_data_tenant_transaction_" . $tenantId);
+            ClearCache::tenantTransaction((int)$tenantId);
 
             return response()->json([
                 'success' => true,

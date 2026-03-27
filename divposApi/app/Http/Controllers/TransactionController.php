@@ -47,46 +47,52 @@ class TransactionController extends Controller
     public function getInitData()
     {
         $user = Auth::user();
-        // Ambil tenantId dengan fallback ke employee
+
+        // Ambil tenantId & outletId dengan fallback yang aman
         $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
+        $outletId = $user->employee?->outlet_id ?? null; // NULL jika Owner
 
         if (!$tenantId) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 403);
         }
 
-        $cacheKey = "init_data_tenant_transaction_{$tenantId}";
+        /**
+         * Suffix Cache Key:
+         * Agar data 'outlets' tidak tertukar antara Owner (global) dan Kasir (spesifik).
+         */
+        $suffix = $outletId ? "outlet_{$outletId}" : "owner_global";
+        $cacheKey = "init_data_tenant_{$tenantId}_{$suffix}";
 
         // 1. Ambil data dari cache
-        $data = Cache::remember($cacheKey, now()->addHours(24), function () use ($tenantId) {
+        $data = Cache::remember($cacheKey, now()->addHours(24), function () use ($tenantId, $outletId) {
             return [
                 'packages'        => $this->packageService->getAllPackagesTransaction($tenantId),
-                'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId),
+                'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId, $outletId),
                 'payment_methods' => $this->paymentMethodService->getAllPaymentMethodsTransaction($tenantId),
             ];
         });
 
         /**
-         * 2. VALIDASI CACHE (Anti Error Undefined Key)
-         * Jika data cache tidak lengkap (korup), hapus cache dan ambil ulang dari DB secara real-time
+         * 2. VALIDASI CACHE & FALLBACK
+         * Jika cache korup atau key tidak lengkap, ambil data fresh
          */
-        if (!isset($data['packages']) || !isset($data['outlets']) || !isset($data['payment_methods'])) {
+        if (empty($data['packages']) || empty($data['outlets']) || empty($data['payment_methods'])) {
             Cache::forget($cacheKey);
 
-            // Ambil data fresh tanpa cache untuk request saat ini saja
             $data = [
                 'packages'        => $this->packageService->getAllPackagesTransaction($tenantId),
-                'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId),
+                'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId, $outletId),
                 'payment_methods' => $this->paymentMethodService->getAllPaymentMethodsTransaction($tenantId),
             ];
         }
 
-        // 3. Return response dengan Resource Collection & Fallback Empty Array
+        // 3. Return response dengan Resource Collection
         return response()->json([
             'status' => 'success',
             'data' => [
-                'packages'        => TransactionPackageResource::collection($data['packages'] ?? []),
-                'outlets'         => TransactionOutletResource::collection($data['outlets'] ?? []),
-                'payment_methods' => TransactionPaymentMethodResource::collection($data['payment_methods'] ?? []),
+                'packages'        => TransactionPackageResource::collection($data['packages']),
+                'outlets'         => TransactionOutletResource::collection($data['outlets']),
+                'payment_methods' => TransactionPaymentMethodResource::collection($data['payment_methods']),
             ]
         ]);
     }

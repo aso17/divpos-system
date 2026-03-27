@@ -29,6 +29,7 @@ class RegistrationRequest extends FormRequest
         $this->merge([
             'name'      => $this->name ? trim($this->name) : $this->name,
             'full_name' => $this->full_name ? trim($this->full_name) : $this->full_name,
+            'city'      => $this->city ? trim($this->city) : $this->city,
             'address'   => $this->address ? trim($this->address) : $this->address,
             'email'     => $this->email ? strtolower(trim($this->email)) : $this->email,
         ]);
@@ -56,6 +57,10 @@ class RegistrationRequest extends FormRequest
                     'required',
                     'integer',
                     Rule::exists('Ms_business_types', 'id')->where('is_active', true),
+                    ],
+                    'city' => [
+                    'required', 'string', 'min:2', 'max:100',
+                    'regex:/^[a-zA-Z\s.\-]+$/', // Kota biasanya hanya huruf dan titik/strip
                     ],
                     'address' => [
                         'required',
@@ -106,6 +111,9 @@ class RegistrationRequest extends FormRequest
             'name.regex'                => 'Nama bisnis hanya boleh huruf, angka, titik, atau strip.',
             'business_type_id.required' => 'Silakan pilih jenis bisnis Anda.',
             'business_type_id.exists'   => 'Jenis bisnis tidak terdaftar atau tidak aktif.',
+            'city.required'             => 'Kota wajib diisi.',
+            'city.min'                  => 'Nama kota minimal 2 karakter.',
+            'city.regex'                => 'Nama kota hanya boleh huruf, spasi, titik, atau strip.',
             'address.required'          => 'Alamat outlet wajib diisi lengkap.',
             'address.min'               => 'Alamat terlalu singkat, minimal 10 karakter.',
 

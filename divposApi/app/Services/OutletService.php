@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Repositories\OutletRepository;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class OutletService
 {
@@ -16,15 +15,18 @@ class OutletService
     }
 
 
-    public function getAllOutletsTransaction(int $tenantId)
+    public function getAllOutletsTransaction(int $tenantId, ?int $outletId)
     {
-        return $this->outletRepo->getForTransaction($tenantId);
+        return $this->outletRepo->getForTransaction($tenantId, $outletId);
     }
+
     public function getAllOutlets(array $params)
     {
         $tenantId = $params['tenant_id'] ?? null;
 
-        if (!$tenantId) return null;
+        if (!$tenantId) {
+            return null;
+        }
 
         return $this->outletRepo->getQueryOutlet($tenantId, $params);
     }
@@ -36,7 +38,7 @@ class OutletService
         if (!$latestOutlet) {
             $nextNumber = 1;
         } else {
-           
+
             $lastCode = $latestOutlet->code;
             $lastNumber = (int) substr($lastCode, -4);
             $nextNumber = $lastNumber + 1;
@@ -68,7 +70,7 @@ class OutletService
                 'city'           => $data['city'] ?? null,
                 'is_active'      => $data['is_active'] ?? true,
                 'is_main_branch' => $data['is_main_branch'] ?? false,
-               
+
             ];
 
             return $this->outletRepo->create($payload);
@@ -96,7 +98,7 @@ class OutletService
             ];
 
             $updated = $this->outletRepo->update($id, $tenantId, $payload);
-            
+
             if (!$updated) {
                 throw new \Exception("Gagal mengupdate: Data tidak ditemukan atau akses ditolak.");
             }

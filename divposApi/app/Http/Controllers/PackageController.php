@@ -6,14 +6,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use App\Http\Resources\PackageResource;
 use App\Http\Requests\PackageRequest;
-use App\Services\PackageService; 
-use App\Helpers\CryptoHelper; 
+use App\Services\PackageService;
+use App\Helpers\CryptoHelper;
 use Illuminate\Support\Facades\Auth;
+use App\Helpers\ClearCache;
 
 class PackageController extends Controller
 {
     protected $packageService;
-    
+
     public function __construct(PackageService $packageService)
     {
         $this->packageService = $packageService;
@@ -21,7 +22,7 @@ class PackageController extends Controller
 
     public function index(Request $request)
     {
-        
+
         $user = Auth::user();
         $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
 
@@ -31,13 +32,13 @@ class PackageController extends Controller
             ], 403);
         }
 
-        
+
         $params = [
             'tenant_id' => (int) $tenantId,
             'keyword'   => $request->query('keyword'),
         ];
 
-        
+
         $query = $this->packageService->getAllPackages($params);
         $perPage = $request->integer('per_page', 10);
         $packages = $query->paginate($perPage);
@@ -47,11 +48,11 @@ class PackageController extends Controller
             'message' => 'Data paket berhasil dimuat.'
         ]);
     }
-      
-    public function store(PackageRequest $request) 
+
+    public function store(PackageRequest $request)
     {
-         $user = Auth::user();
-         $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
+        $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
 
         $data = $this->packageService->createPackage($request->validated());
 
@@ -61,7 +62,7 @@ class PackageController extends Controller
             ], 400);
         }
 
-        Cache::forget("init_data_tenant_transaction_" . $tenantId);
+        ClearCache::tenantTransaction((int)$tenantId);
 
         return response()->json([
             'message' => 'Paket berhasil dibuat',
@@ -69,13 +70,13 @@ class PackageController extends Controller
         ], 201);
     }
 
-   public function update(PackageRequest $request)
+    public function update(PackageRequest $request)
     {
         $user = Auth::user();
         $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
-        $validatedData = $request->validated();   
-        $payload = array_merge($validatedData, [      
-            'final_price' => $request->final_price, 
+        $validatedData = $request->validated();
+        $payload = array_merge($validatedData, [
+            'final_price' => $request->final_price,
         ]);
 
         $updated = $this->packageService->updatePackage($request->id, $payload);
@@ -86,7 +87,7 @@ class PackageController extends Controller
             ], 400);
         }
 
-        Cache::forget("init_data_tenant_transaction_" . $tenantId);
+        ClearCache::tenantTransaction((int)$tenantId);
         return response()->json([
             'message' => 'Paket berhasil diupdate',
             'data'    => new PackageResource($updated)
@@ -94,24 +95,24 @@ class PackageController extends Controller
     }
     public function destroy($id)
     {
-         $user = Auth::user();
-         $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
+        $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
 
         if (!$tenantId) {
             return response()->json([
                 'message' => 'Access denied. You do not have permission to perform this action.'
             ], 403);
-            }
+        }
 
         $decryptedId = CryptoHelper::decrypt($id) ?? $id;
-      
+
         $deleted = $this->packageService->deletePackage($decryptedId, $tenantId);
 
         if (!$deleted) {
             return response()->json(['message' => 'Data tidak ditemukan atau sudah dihapus'], 404);
         }
 
-          Cache::forget("init_data_tenant_transaction_" . $tenantId);
+        ClearCache::tenantTransaction((int)$tenantId);
         return response()->json(['message' => 'Paket berhasil dihapus']);
     }
 }

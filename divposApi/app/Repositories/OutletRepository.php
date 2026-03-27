@@ -14,63 +14,69 @@ class OutletRepository
     }
 
 
-  public function getForTransaction(int $tenantId)
+    public function getForTransaction(int $tenantId, ?int $outlet_id = null)
     {
         return Ms_outlet::select([
-                'id', 
-                'name', 
-                'code', 
-                'address', 
+                'id',
+                'name',
+                'code',
+                'address',
                 'is_main_branch'
             ])
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->orderBy('is_main_branch', 'desc') 
+            ->where('tenant_id', $tenantId) // Wajib tenant yang sama
+            ->where('is_active', true)      // Wajib aktif
+            ->where(function ($query) use ($outlet_id) {
+                // Jika $outlet_id ada isinya (Karyawan), filter berdasarkan ID tersebut.
+                // Jika $outlet_id NULL (Owner), maka tidak perlu filter outlet (ambil semua).
+                if (!is_null($outlet_id)) {
+                    $query->where('id', $outlet_id);
+                }
+            })
+            ->orderBy('is_main_branch', 'desc')
             ->orderBy('name', 'asc')
             ->get();
     }
+    public function getQueryOutlet($tenantId, $params)
+    {
+        $keyword = $params['keyword'] ?? null;
+        $isActive = $params['is_active'] ?? null;
 
-  public function getQueryOutlet($tenantId, $params)
-{
-    $keyword = $params['keyword'] ?? null;
-    $isActive = $params['is_active'] ?? null;
+        return $this->model
 
-    return $this->model
-       
-        ->select([
-            'id', 
-            'tenant_id', 
-            'name', 
-            'code', 
-            'phone', 
-            'address',
-            'description',
-            'city', 
-            'is_active', 
-            'is_main_branch', 
-            'created_at'
-        ])
-        
-       
-        ->where('tenant_id', $tenantId)
-        
-        // Filter status aktif
-        ->when($isActive !== null, function ($query) use ($isActive) {
-            $query->where('is_active', filter_var($isActive, FILTER_VALIDATE_BOOLEAN));
-        })
+            ->select([
+                'id',
+                'tenant_id',
+                'name',
+                'code',
+                'phone',
+                'address',
+                'description',
+                'city',
+                'is_active',
+                'is_main_branch',
+                'created_at'
+            ])
 
-        ->when($keyword, function ($query) use ($keyword) {
-            $query->where(function ($q) use ($keyword) {
-                $search = "%{$keyword}%";
-                $q->where('name', 'ILIKE', $search)
-                  ->orWhere('code', 'ILIKE', $search)
-                  ->orWhere('city', 'ILIKE', $search);
-            });
-        })
 
-        ->orderByDesc('is_main_branch') 
-        ->orderByDesc('created_at');
-}
+            ->where('tenant_id', $tenantId)
+
+            // Filter status aktif
+            ->when($isActive !== null, function ($query) use ($isActive) {
+                $query->where('is_active', filter_var($isActive, FILTER_VALIDATE_BOOLEAN));
+            })
+
+            ->when($keyword, function ($query) use ($keyword) {
+                $query->where(function ($q) use ($keyword) {
+                    $search = "%{$keyword}%";
+                    $q->where('name', 'ILIKE', $search)
+                      ->orWhere('code', 'ILIKE', $search)
+                      ->orWhere('city', 'ILIKE', $search);
+                });
+            })
+
+            ->orderByDesc('is_main_branch')
+            ->orderByDesc('created_at');
+    }
 
 
 

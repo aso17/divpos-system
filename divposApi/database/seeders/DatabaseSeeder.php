@@ -17,15 +17,16 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             BusinessTypeSeeder::class,
+            ModuleSeeder::class,
+            MenuSeeder::class,
+            SystemConfigurationSeeder::class,
+
             // TenantSeeder::class,
             // PaymentMethodSeeder::class,
             // RoleSeeder::class,
-            ModuleSeeder::class,
-            MenuSeeder::class,
             // BusinessModuleMapSeeder::class,
             // RoleMenuPermissionSeeder::class,
             // UnitSeeder::class,
-            SystemConfigurationSeeder::class,
             // UsersSeederv2::class,
             //  EmployeeSeederv2::class,
         ]);
