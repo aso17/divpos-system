@@ -113,6 +113,7 @@ class PackageController extends Controller
         }
 
         ClearCache::tenantTransaction((int)$tenantId);
+
         return response()->json(['message' => 'Paket berhasil dihapus']);
     }
 }
