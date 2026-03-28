@@ -52,6 +52,37 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const updateUser = useCallback((newUserData) => {
+    // 1. Ambil data user lama yang "Paling Lengkap" dari Storage
+    const currentUser = GetWithExpiry("user") || {};
+
+    // 2. Mapping Data dari UserResource (Update) ke struktur AuthResource (Login)
+    const mappedData = {
+      ...currentUser, // Pertahankan data lama (Tenant, Role Code, dll)
+      full_name: newUserData.full_name || currentUser.full_name,
+      email: newUserData.email || currentUser.email,
+      username: newUserData.username || currentUser.username,
+      avatar: newUserData.avatar || currentUser.avatar,
+
+      // Sesuaikan is_owner karena di UserResource ada di dalam 'meta'
+      is_owner: newUserData.meta?.is_owner ?? currentUser.is_owner,
+
+      // Merge Role (agar name & code tetap ada)
+      role: {
+        ...currentUser.role,
+        name: newUserData.role?.name || currentUser.role?.name,
+        code: newUserData.role?.code || currentUser.role?.code,
+      },
+
+      // Jangan sentuh Tenant karena UserResource (Update) datanya kosong/tidak lengkap
+      tenant: currentUser.tenant,
+    };
+
+    // 3. Simpan hasil mapping yang sudah "Rapi" kembali ke Storage & State
+    SetWithExpiry("user", mappedData, 1440);
+    setUser(mappedData);
+  }, []);
+
   // 🔥 Load user + menu + permission paralel
   const loadInitialData = useCallback(async () => {
     try {
@@ -134,6 +165,7 @@ export const AuthProvider = ({ children }) => {
         businessType: user?.tenant?.business_type,
         login,
         logout,
+        updateUser,
       }}
     >
       {children}

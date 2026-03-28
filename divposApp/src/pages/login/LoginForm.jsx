@@ -15,7 +15,7 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
         (v) => rules.email(v, "Please enter a valid email address"),
       ],
       password: [(v) => rules.required(v, "Password is required")],
-    },
+    }
   );
 
   const handleSubmit = (e) => {
@@ -46,6 +46,7 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
             value={values.email}
             onChange={(e) => handleChange("email", e.target.value)}
             placeholder="nama@email.com"
+            autoComplete="email"
             className={`
             w-full pl-9 pr-3 py-2.5
             rounded-xl text-xs sm:text-sm
@@ -96,6 +97,7 @@ export default function LoginForm({ project, isSubmitting, onSubmit }) {
             value={values.password}
             onChange={(e) => handleChange("password", e.target.value)}
             placeholder="••••••••"
+            autoComplete="current-password"
             className={`
             w-full pl-9 pr-10 py-2.5
             rounded-xl text-xs sm:text-sm

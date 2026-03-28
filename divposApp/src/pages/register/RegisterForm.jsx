@@ -203,7 +203,7 @@ export default function RegisterForm({
                 id="address"
                 value={values.address}
                 onChange={(e) => handleChange("address", e.target.value)}
-                placeholder="Alamat lengkap ..."
+                placeholder="Alamat lengkap -..."
                 rows="2"
                 className={
                   inputClasses({ error: !!errors.address }) +

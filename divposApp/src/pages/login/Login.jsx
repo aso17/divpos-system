@@ -127,12 +127,13 @@ export default function Login() {
             </div>
 
             <h2 className="text-2xl font-black uppercase mb-3">
-              {isRegister ? "Welcome Back!" : "Hello, Friend!"}
+              {isRegister ? "Selamat Datang Kembali" : "Selamat Datang"}
             </h2>
+
             <p className="text-xs opacity-90 mb-8 uppercase tracking-widest font-medium">
               {isRegister
-                ? "Login to continue managing your business"
-                : "Start your business journey with us today"}
+                ? "Silakan masuk untuk melanjutkan aktivitas bisnis Anda"
+                : "Mulai kelola bisnis Anda dengan lebih mudah bersama kami"}
             </p>
             <button
               onClick={() => setIsRegister(!isRegister)}
