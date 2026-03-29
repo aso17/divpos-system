@@ -42,7 +42,6 @@ class RegistrationController extends Controller
     {
         try {
 
-
             $validated = $request->validated();
             $result = $this->registrationService->registerNewTenant($validated);
 

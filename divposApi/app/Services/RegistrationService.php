@@ -323,11 +323,32 @@ class RegistrationService
     private function seedDefaultPaymentMethods(int $tenantId, int $userId): void
     {
         $now = now();
-        DB::table('Ms_payment_methods')->insert([
-            ['tenant_id' => $tenantId, 'code' => 'CASH',        'name' => 'Tunai',             'type' => 'CASH',     'is_cash' => true,  'is_dp_enabled' => false, 'allow_zero_pay' => false, 'is_active' => true, 'is_default' => true,  'created_by' => $userId, 'created_at' => $now, 'updated_at' => $now],
-            ['tenant_id' => $tenantId, 'code' => 'QRIS_MANUAL', 'name' => 'QRIS (Stiker/Scan)','type' => 'NON_CASH', 'is_cash' => false, 'is_dp_enabled' => false, 'allow_zero_pay' => false, 'is_active' => true, 'is_default' => false, 'created_by' => $userId, 'created_at' => $now, 'updated_at' => $now],
-            ['tenant_id' => $tenantId, 'code' => 'PAY_LATER',   'name' => 'Bayar Nanti / DP',  'type' => 'DEBT',     'is_cash' => false, 'is_dp_enabled' => true,  'allow_zero_pay' => true,  'is_active' => true, 'is_default' => false, 'created_by' => $userId, 'created_at' => $now, 'updated_at' => $now],
-        ]);
+        $methods = [
+            // 1. CASH
+            ['tenant_id' => $tenantId, 'code' => 'CASH', 'name' => 'Tunai', 'type' => 'CASH', 'is_cash' => true, 'is_dp_enabled' => false, 'allow_zero_pay' => false, 'is_active' => true, 'is_default' => true],
+
+            // 2. QRIS (Sudah ada di kode Mas)
+            ['tenant_id' => $tenantId, 'code' => 'QRIS_MANUAL', 'name' => 'QRIS (Stiker/Scan)', 'type' => 'NON_CASH', 'is_cash' => false, 'is_dp_enabled' => false, 'allow_zero_pay' => false, 'is_active' => true, 'is_default' => false],
+
+            // 3. TRANSFER BANK (Penting untuk salon)
+            ['tenant_id' => $tenantId, 'code' => 'TRANSFER', 'name' => 'Transfer Bank', 'type' => 'NON_CASH', 'is_cash' => false, 'is_dp_enabled' => false, 'allow_zero_pay' => false, 'is_active' => true, 'is_default' => false],
+
+            // 4. KARTU DEBET/KREDIT (EDC)
+            ['tenant_id' => $tenantId, 'code' => 'EDC', 'name' => 'Kartu Debet / Kredit', 'type' => 'NON_CASH', 'is_cash' => false, 'is_dp_enabled' => false, 'allow_zero_pay' => false, 'is_active' => true, 'is_default' => false],
+
+            // 5. PAY LATER / DP (Sudah ada di kode Mas)
+            ['tenant_id' => $tenantId, 'code' => 'PAY_LATER', 'name' => 'Bayar Nanti / DP', 'type' => 'DEBT', 'is_cash' => false, 'is_dp_enabled' => true, 'allow_zero_pay' => true, 'is_active' => true, 'is_default' => false],
+        ];
+
+        $dataToInsert = array_map(function ($item) use ($userId, $now) {
+            return array_merge($item, [
+                'created_by' => $userId,
+                'created_at' => $now,
+                'updated_at' => $now
+            ]);
+        }, $methods);
+
+        DB::table('Ms_payment_methods')->insert($dataToInsert);
     }
 
     private function seedDefaultUnits($tenantId, $businessTypeId, $userId): void

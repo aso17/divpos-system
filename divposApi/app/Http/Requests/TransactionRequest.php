@@ -40,6 +40,12 @@ class TransactionRequest extends FormRequest
                 if (isset($item['package_id'])) {
                     $item['package_id'] = CryptoHelper::decrypt($item['package_id']);
                 }
+
+                if (!empty($item['employee_id'])) {
+                    $item['employee_id'] = CryptoHelper::decrypt($item['employee_id']);
+                } else {
+                    $item['employee_id'] = null;
+                }
                 return $item;
             }, $this->items);
 
@@ -72,6 +78,11 @@ class TransactionRequest extends FormRequest
                 'required', 'integer',
                 Rule::exists('Ms_packages', 'id')->where('tenant_id', $tenantId)
             ],
+            'items.*.employee_id' => [
+            'nullable', // Ubah jadi 'nullable' jika petugas tidak wajib dipilih
+            'integer',
+            Rule::exists('Ms_employees', 'id')->where('tenant_id', $tenantId)
+        ],
             'items.*.qty'    => 'required|numeric|min:0.01',
             'payment_amount' => 'required|numeric|min:0',
             'dp_amount'      => 'nullable|numeric|min:0',
@@ -117,6 +128,8 @@ class TransactionRequest extends FormRequest
             'outlet_id.exists'          => 'Outlet tidak valid atau bukan milik Anda.',
             'items.*.package_id.exists' => 'Salah satu layanan tidak ditemukan di bisnis Anda.',
             'items.*.qty.min'           => 'Jumlah/berat tidak boleh nol.',
+            'items.*.employee_id.required' => 'Petugas pengerjaan wajib dipilih untuk setiap layanan.',
+            'items.*.employee_id.exists'   => 'Petugas yang dipilih tidak valid atau sudah tidak aktif.',
             'customer.id.integer'       => 'ID Pelanggan tidak valid.',
             'customer.name.regex'       => 'Nama pelanggan mengandung karakter ilegal.',
             'customer.phone.regex'      => 'Nomor telepon hanya boleh angka.',

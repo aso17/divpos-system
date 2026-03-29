@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use App\Services\PackageService;
 use App\Services\CustomerService;
 use App\Services\OutletService;
+use App\Services\EmployeeService;
 use App\Services\TransactionService;
 use App\Services\PaymentMethodService;
 use App\Http\Resources\TransactionResource;
@@ -17,6 +18,7 @@ use App\Http\Resources\TransactionPaymentMethodResource;
 use App\Http\Resources\CustomerResource;
 use App\Http\Resources\TransactionPackageResource;
 use App\Http\Resources\TransactionOutletResource;
+use App\Http\Resources\TransactionEmployeeResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -27,19 +29,22 @@ class TransactionController extends Controller
     protected $transactionService;
     protected $outletService;
     protected $paymentMethodService;
+    protected $employeeService;
 
     public function __construct(
         PackageService $packageService,
         CustomerService $customerService,
         OutletService $outletService,
         PaymentMethodService $paymentMethodService,
-        TransactionService $transactionService
+        TransactionService $transactionService,
+        EmployeeService $employeeService
     ) {
         $this->packageService = $packageService;
         $this->customerService = $customerService;
         $this->outletService = $outletService;
         $this->paymentMethodService = $paymentMethodService;
         $this->transactionService = $transactionService;
+        $this->employeeService = $employeeService;
 
     }
 
@@ -47,7 +52,6 @@ class TransactionController extends Controller
     public function getInitData()
     {
         $user = Auth::user();
-
         // Ambil tenantId & outletId dengan fallback yang aman
         $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
         $outletId = $user->employee?->outlet_id ?? null; // NULL jika Owner
@@ -94,6 +98,33 @@ class TransactionController extends Controller
                 'outlets'         => TransactionOutletResource::collection($data['outlets']),
                 'payment_methods' => TransactionPaymentMethodResource::collection($data['payment_methods']),
             ]
+        ]);
+    }
+
+    public function searchEmployeTransaction(Request $request)
+    {
+        $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
+
+        // 🔥 Jika Owner, ambil outlet_id dari request. Jika bukan, ambil dari profile employee-nya.
+        $outletId = $request->query('outlet_id');
+
+        if (!$tenantId) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 403);
+        }
+
+        $params = [
+            'tenant_id' => $tenantId,
+            'outlet_id' => $outletId,
+            'keyword'   => $request->query('q'), // 🔥 Kita gunakan 'q' agar standar search
+        ];
+
+        $employees = $this->employeeService->SearchActiveEmployeesByTenant($params);
+
+        return response()->json([
+            'status' => 'success',
+            // 'm' => $params,
+            'data'   => TransactionEmployeeResource::collection($employees)
         ]);
     }
     public function getPaymentMethods()

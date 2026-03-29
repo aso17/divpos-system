@@ -17,27 +17,29 @@ class Tr_TransactionDetail extends Model
      * Kita masukkan semua kolom sesuai migrasi agar logic Service bisa
      * menyimpan array data secara kolektif.
      */
-   protected $fillable = [
-    'tenant_id',
-    'transaction_id',
-    'package_id',
-    'package_name',
-    'original_price', // Tambahkan ini
-    'qty',
-    'unit',
-    'price_per_unit',
-    'discount_per_unit',
-    'subtotal',
-    'notes',
+    protected $fillable = [
+     'tenant_id',
+     'transaction_id',
+     'package_id',
+     'employee_id',
+     'employee_name',
+     'package_name',
+     'original_price', // Tambahkan ini
+     'qty',
+     'unit',
+     'price_per_unit',
+     'discount_per_unit',
+     'subtotal',
+     'notes',
 ];
 
-protected $casts = [
-    'qty' => 'decimal:2',
-    'original_price' => 'decimal:2', // Tambahkan ini agar akurat
-    'price_per_unit' => 'decimal:2',
-    'discount_per_unit' => 'decimal:2',
-    'subtotal' => 'decimal:2',
-];
+    protected $casts = [
+        'qty' => 'decimal:2',
+        'original_price' => 'decimal:2', // Tambahkan ini agar akurat
+        'price_per_unit' => 'decimal:2',
+        'discount_per_unit' => 'decimal:2',
+        'subtotal' => 'decimal:2',
+    ];
     // --- RELASI ---
 
     /**
@@ -59,6 +61,12 @@ protected $casts = [
     /**
      * Menghubungkan ke Tenant.
      */
+
+    public function employee()
+    {
+        // Relasi ke Ms_employees
+        return $this->belongsTo(Ms_Employee::class, 'employee_id');
+    }
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Ms_Tenant::class, 'tenant_id');

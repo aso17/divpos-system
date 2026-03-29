@@ -17,6 +17,11 @@ class EmployeeService
         $this->employeeRepository = $employeeRepository;
     }
 
+    public function SearchActiveEmployeesByTenant($params)
+    {
+        // Menggunakan repository, sesuai standar Mas A_so
+        return $this->employeeRepository->SearchActiveForTransaction($params);
+    }
     public function getAllEmployees($params)
     {
         return $this->employeeRepository->getAll(
@@ -26,6 +31,8 @@ class EmployeeService
             $params['outlet_id'] ?? null
         );
     }
+
+
     public function createEmployee(array $data)
     {
         return DB::transaction(function () use ($data) {

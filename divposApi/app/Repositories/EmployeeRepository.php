@@ -4,9 +4,43 @@ namespace App\Repositories;
 
 use App\Models\Ms_employee;
 use Illuminate\Support\Facades\DB;
+use App\Helpers\CryptoHelper;
 
 class EmployeeRepository
 {
+    public function SearchActiveForTransaction($params)
+    {
+        $decryptedOutletId = CryptoHelper::decrypt($params['outlet_id']);
+        $outletId = $decryptedOutletId ? (int) $decryptedOutletId : null;
+        $tenantId = $params['tenant_id'];
+        $keyword  = $params['keyword'] ?? null;
+
+        return Ms_employee::select(['id', 'tenant_id', 'outlet_id', 'employee_code', 'full_name', 'job_title'])
+                ->with(['outlet:id,name'])
+                ->where('tenant_id', $tenantId)
+                ->where('is_active', true)
+                // 1. Logika Outlet: Ambil yang pusat (NULL) ATAU yang sesuai outlet pilihan
+                ->where(function ($q) use ($outletId) {
+                    $q->whereNull('outlet_id');
+                    if ($outletId) {
+                        $q->orWhere('outlet_id', $outletId);
+                    }
+                })
+                // 2. Pencarian Keyword: Dibuat Case-Insensitive menggunakan LOWER
+                ->when($keyword, function ($q) use ($keyword) {
+                    // Kecilkan semua huruf di keyword
+                    $loweredKeyword = strtolower($keyword);
+
+                    $q->where(function ($sq) use ($loweredKeyword) {
+                        $sq->whereRaw('LOWER(full_name) LIKE ?', ["%{$loweredKeyword}%"])
+                        ->orWhereRaw('LOWER(employee_code) LIKE ?', ["%{$loweredKeyword}%"]);
+                    });
+                })
+                ->orderBy('full_name', 'asc')
+                ->limit(5)
+                ->get();
+    }
+
     public function getAll($tenantId, $keyword = null, $isActive = null, $outletId = null)
     {
         $query = Ms_employee::query()

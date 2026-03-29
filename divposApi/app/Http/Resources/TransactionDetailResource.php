@@ -18,6 +18,11 @@ class TransactionDetailResource extends JsonResource
             'qty'            => (float) $this->qty,
             'price_per_unit' => (float) $this->price_per_unit,
             'subtotal'       => (float) $this->subtotal,
+
+            // --- TAMBAHKAN DUA BARIS INI ---
+            'employee_id'    => $this->employee_id ? CryptoHelper::encrypt($this->employee_id) : null,
+            'employee_name'  => $this->employee_name ?? null,
+
             'notes'          => $this->notes,
         ];
     }
