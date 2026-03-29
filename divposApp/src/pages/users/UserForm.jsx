@@ -199,9 +199,17 @@ export default function UserForm({
 
       const newUserData = response.data?.data;
 
-      // FIX: gunakan ID untuk deteksi edit diri sendiri — bukan email comparison
-      // isEditingSelf sudah dihitung dengan ID di atas komponen, tinggal pakai.
-      if (isEditingSelf && newUserData && updateUser) {
+      const currentEmail = authUser?.email?.trim().toLowerCase();
+      const editingEmail = initialData?.email?.trim().toLowerCase();
+
+      if (
+        currentEmail &&
+        editingEmail &&
+        currentEmail === editingEmail &&
+        newUserData
+      ) {
+        // Sinkronkan ke AuthContext & Topbar
+        // console.log(newUserData);
         updateUser(newUserData);
       }
 
@@ -421,6 +429,7 @@ export default function UserForm({
             </label>
             <input
               type="password"
+              autoComplete=""
               value={values.password}
               onChange={(e) => handleChange("password", e.target.value)}
               placeholder={

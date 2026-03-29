@@ -12,6 +12,7 @@ import TransactionServiceForm from "./TransactionServiceForm";
 import TransactionCustomerForm from "./TransactionCustomerForm";
 import TransactionCartForm from "./TransactionCartForm";
 import { formatRupiah, parseNumber, toNum } from "../../utils/formatter";
+import { GetWithExpiry } from "../../utils/Storage";
 
 import ReceiptText from "lucide-react/dist/esm/icons/receipt-text";
 
@@ -21,6 +22,7 @@ const Transactions = () => {
   const abortControllerRef = useRef(null);
 
   const [cart, setCart] = useState([]);
+  const [businessType, setBusinessType] = useState("");
   const [search, setSearch] = useState("");
   const [packages, setPackages] = useState([]);
   const [outlets, setOutlets] = useState([]);
@@ -88,6 +90,13 @@ const Transactions = () => {
 
   // ── Effects (TIDAK DIUBAH) ───────────────────────────────────────────────────
   useEffect(() => {
+    const storedUser = GetWithExpiry("user");
+    if (storedUser?.tenant?.business_type) {
+      setBusinessType(storedUser.tenant.business_type);
+    }
+  }, []);
+  // console.log(businessType);
+  useEffect(() => {
     if (hasFetched.current) return;
     fetchData();
     hasFetched.current = true;
@@ -105,15 +114,18 @@ const Transactions = () => {
   const fetchData = async () => {
     try {
       const res = await TransactionService.getInitData();
+      // console.log(res);
+
       const data = res.data.data;
       setPackages(data.packages || []);
       setOutlets(data.outlets || []);
       const payData = data.payment_methods || [];
       setPaymentMethods(payData);
       if (payData.length > 0) setSelectedPaymentMethod(payData[0]);
+
       // console.log(data.packages);
-      if (data.outlets?.length > 0)
-        handleChange("outlet_id", data.outlets[0].id);
+      // if (data.outlets?.length > 0)
+      // handleChange("outlet_id", data.outlets[0].id);
     } catch (error) {
       triggerToast("Gagal ambil data", "error");
     }
@@ -155,6 +167,13 @@ const Transactions = () => {
   const handleSubmit = async () => {
     if (issubmitting.current || !validate()) return;
     if (cart.length === 0) return triggerToast("Keranjang kosong!", "warning");
+
+    if (["SLN", "BRB"].includes(businessType)) {
+      const isMissingEmployee = cart.some((item) => !item.employee_id);
+      if (isMissingEmployee) {
+        return triggerToast("Pilih petugas untuk setiap layanan!", "error");
+      }
+    }
     if (!allow_zero_pay && totalDiterima < subtotal)
       return triggerToast(
         `Pembayaran kurang! Total wajib: ${formatRupiah(subtotal)}`,
@@ -176,6 +195,7 @@ const Transactions = () => {
         items: cart.map((item) => ({
           package_id: item.id,
           qty: toNum(item.qty),
+          employee_id: item.employee_id || null,
         })),
         dp_amount: dpAmountNum,
         payment_amount: allow_zero_pay
@@ -290,6 +310,14 @@ const Transactions = () => {
             handleSubmit={handleSubmit}
             isDisabled={isDisabled}
             loading={loading}
+            isServiceDirect={["SLN", "BRB"].includes(businessType)}
+            onSearchEmployee={(keyword) =>
+              TransactionService.searchEmployeTransaction({
+                outlet_id: values.outlet_id,
+                q: keyword,
+              })
+            }
+            outletId={values.outlet_id}
           />
         </div>
       </div>

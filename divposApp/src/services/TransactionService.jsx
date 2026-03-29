@@ -13,6 +13,15 @@ const TransactionService = {
       ...config,
     });
   },
+  searchEmployeTransaction: (params = {}, config = {}) => {
+    // console.log(params);
+    return api.get("/transactions/searchemployee", {
+      params: {
+        ...params,
+      },
+      ...config,
+    });
+  },
 
   // Simpan transaksi baru
   createTransaction: async (payload) => {

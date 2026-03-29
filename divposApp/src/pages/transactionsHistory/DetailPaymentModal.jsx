@@ -1,7 +1,8 @@
 import React from "react";
 import X from "lucide-react/dist/esm/icons/x";
 import Receipt from "lucide-react/dist/esm/icons/receipt";
-import AlertCircle from "lucide-react/dist/esm/icons/alert-circle"; // Tambah icon alert
+import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
+import User from "lucide-react/dist/esm/icons/user";
 import { formatRupiah } from "../../utils/formatter";
 
 export default function DetailPaymentModal({ isOpen, onClose, transaction }) {
@@ -9,14 +10,26 @@ export default function DetailPaymentModal({ isOpen, onClose, transaction }) {
 
   const isCanceled = transaction.status === "CANCELED";
 
+  // Kumpulkan semua stylist unik dari seluruh details
+  const allStylists = [
+    ...new Set(
+      (transaction.details || []).map((d) => d.employee_name).filter(Boolean)
+    ),
+  ];
+
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-        {/* Header - Berubah warna jika Canceled */}
+    <div
+      className="fixed inset-0 z-[999] flex items-center justify-center p-4
+      bg-slate-900/60 backdrop-blur-sm"
+    >
+      <div
+        className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden
+        animate-in fade-in zoom-in duration-200"
+      >
+        {/* Header */}
         <div
-          className={`${
-            isCanceled ? "bg-red-50" : "bg-slate-50"
-          } px-6 py-5 border-b border-slate-100 flex justify-between items-center`}
+          className={`${isCanceled ? "bg-red-50" : "bg-slate-50"}
+          px-6 py-5 border-b border-slate-100 flex justify-between items-center`}
         >
           <div className="flex items-center gap-3">
             <div
@@ -47,10 +60,10 @@ export default function DetailPaymentModal({ isOpen, onClose, transaction }) {
           </button>
         </div>
 
-        <div className="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-          {/* Section: Catatan Pembatalan (HANYA MUNCUL JIKA CANCELED) */}
+        <div className="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar space-y-6">
+          {/* Catatan pembatalan */}
           {isCanceled && transaction.notes && (
-            <div className="mb-6 bg-red-50 border border-red-100 rounded-2xl p-4 flex gap-3">
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex gap-3">
               <AlertCircle
                 size={16}
                 className="text-red-500 flex-shrink-0 mt-0.5"
@@ -66,8 +79,8 @@ export default function DetailPaymentModal({ isOpen, onClose, transaction }) {
             </div>
           )}
 
-          {/* Section: Customer & Info */}
-          <div className="flex justify-between items-start mb-6">
+          {/* Customer & Info */}
+          <div className="flex justify-between items-start">
             <div>
               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
                 Customer
@@ -93,15 +106,44 @@ export default function DetailPaymentModal({ isOpen, onClose, transaction }) {
             </div>
           </div>
 
-          {/* Section: Item Layanan */}
-          <div className="space-y-3 mb-8">
+          {/* ── TAMBAHAN: Stylist summary — tampil jika ada ── */}
+          {allStylists.length > 0 && (
+            <div
+              className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3
+              flex items-start gap-3"
+            >
+              <User size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest block mb-1.5">
+                  Stylist / Penanggung Jawab
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {allStylists.map((name, i) => (
+                    <span
+                      key={i}
+                      className="text-[10px] font-bold bg-white text-blue-700
+                        border border-blue-200 px-2.5 py-1 rounded-full"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Item Layanan */}
+          <div className="space-y-3">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">
               Item Layanan
             </span>
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3">
               {transaction.details?.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-start">
-                  <div className="max-w-[70%]">
+                <div
+                  key={idx}
+                  className="flex justify-between items-start gap-3"
+                >
+                  <div className="min-w-0 flex-1">
                     <p
                       className={`text-[11px] font-bold leading-tight ${
                         isCanceled
@@ -111,13 +153,25 @@ export default function DetailPaymentModal({ isOpen, onClose, transaction }) {
                     >
                       {item.package_name}
                     </p>
-                    <p className="text-[9px] text-slate-400 font-bold">
-                      {item.qty} {item.unit} x{" "}
+                    <p className="text-[9px] text-slate-400 font-bold mt-0.5">
+                      {item.qty} {item.unit} ×{" "}
                       {formatRupiah(item.price_per_unit)}
                     </p>
+                    {/* ── Stylist per item — hanya jika tidak null ── */}
+                    {item.employee_name && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <User
+                          size={9}
+                          className="text-blue-400 flex-shrink-0"
+                        />
+                        <span className="text-[9px] text-blue-600 font-bold">
+                          {item.employee_name}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <p
-                    className={`text-[11px] font-black ${
+                    className={`text-[11px] font-black flex-shrink-0 ${
                       isCanceled ? "text-slate-400" : "text-slate-800"
                     }`}
                   >
@@ -126,7 +180,7 @@ export default function DetailPaymentModal({ isOpen, onClose, transaction }) {
                 </div>
               ))}
 
-              {/* Grand Total Row */}
+              {/* Grand Total */}
               <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
                 <span className="text-[10px] font-black text-slate-500 uppercase">
                   Grand Total
@@ -144,8 +198,8 @@ export default function DetailPaymentModal({ isOpen, onClose, transaction }) {
             </div>
           </div>
 
-          {/* Section: Ringkasan Pembayaran */}
-          <div className="space-y-4">
+          {/* Ringkasan Pembayaran */}
+          <div className="space-y-3">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">
               Ringkasan Pembayaran
             </span>
@@ -164,7 +218,7 @@ export default function DetailPaymentModal({ isOpen, onClose, transaction }) {
                 </p>
                 <p className="text-xs font-black text-rose-600">
                   {isCanceled
-                    ? "-"
+                    ? "—"
                     : transaction.remaining_bill > 0
                     ? formatRupiah(transaction.remaining_bill)
                     : "LUNAS"}
@@ -174,7 +228,7 @@ export default function DetailPaymentModal({ isOpen, onClose, transaction }) {
           </div>
 
           {/* Status Badges */}
-          <div className="mt-6 flex gap-2">
+          <div className="flex gap-2">
             <span
               className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${
                 transaction.payment_status === "PAID"
@@ -196,11 +250,13 @@ export default function DetailPaymentModal({ isOpen, onClose, transaction }) {
           </div>
         </div>
 
-        {/* Footer Action */}
+        {/* Footer */}
         <div className="p-6 bg-slate-50 border-t border-slate-100">
           <button
             onClick={onClose}
-            className="w-full py-3 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+            className="w-full py-3 bg-white border border-slate-200 hover:bg-slate-100
+              text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest
+              transition-all"
           >
             Tutup Detail
           </button>
