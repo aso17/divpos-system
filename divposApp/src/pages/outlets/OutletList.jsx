@@ -21,7 +21,10 @@ import AppHead from "../../components/common/AppHead";
 import OutletService from "../../services/OutletService";
 import OutletForm from "./OutletForm";
 
+import { useHasAccess } from "../../guards/useHasAccess";
+
 export default function OutletList() {
+  const can = useHasAccess(); // 🚩 Inisialisasi Hook Guard
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -30,7 +33,6 @@ export default function OutletList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
 
-  // FIX: filterStatus tidak langsung trigger fetch — dikontrol via handleSearch & handleReset
   const [filterStatus, setFilterStatus] = useState("");
   const [activeFilterStatus, setActiveFilterStatus] = useState("");
 
@@ -52,9 +54,7 @@ export default function OutletList() {
           setTotalCount(Number(res.data?.meta?.total || 0));
         }
       } catch (error) {
-        console.error(
-          error.response?.data?.message || "Gagal mengambil data outlet"
-        );
+        console.error(error.response?.data?.message || "Gagal mengambil data");
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -75,7 +75,6 @@ export default function OutletList() {
     };
   }, [fetchOutlets]);
 
-  // FIX: Search juga apply filterStatus sekaligus
   const handleSearch = (e) => {
     e.preventDefault();
     setActiveSearch(searchTerm);
@@ -91,9 +90,9 @@ export default function OutletList() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   }, []);
 
-  // FIX: useCallback + rollback
   const handleDelete = useCallback(
     async (outlet) => {
+      // Note: Pastikan showConfirm sudah tersedia secara global/import
       const setuju = await showConfirm(
         `Apakah anda yakin ingin menghapus outlet ${outlet.name}?`,
         "Konfirmasi Hapus",
@@ -112,19 +111,21 @@ export default function OutletList() {
 
       try {
         const res = await OutletService.deleteOutlet(outlet.id);
-        const successMsg =
-          res.data?.message || "Outlet telah berhasil dihapus.";
-        await showConfirm(successMsg, "Hapus Berhasil", "success");
-
-        if (isLastOnPage) {
+        await showConfirm(
+          res.data?.message || "Berhasil dihapus",
+          "Hapus Berhasil",
+          "success"
+        );
+        if (isLastOnPage)
           setPagination((prev) => ({ ...prev, pageIndex: prev.pageIndex - 1 }));
-        }
       } catch (err) {
-        // Rollback
         setData(snapshot);
         setTotalCount(snapshot.length);
-        const errorMsg = err.response?.data?.message || "Gagal menghapus data";
-        showConfirm(errorMsg, "Gagal Hapus", "error");
+        showConfirm(
+          err.response?.data?.message || "Gagal menghapus",
+          "Gagal Hapus",
+          "error"
+        );
       }
     },
     [data, pagination.pageIndex]
@@ -135,9 +136,9 @@ export default function OutletList() {
     setOpenModal(true);
   }, []);
 
-  // FIX: deps columns lengkap
-  const columns = useMemo(
-    () => [
+  // 🚩 REFACTOR: Columns dibuat dinamis berdasarkan izin
+  const columns = useMemo(() => {
+    const baseColumns = [
       {
         id: "no",
         header: "NO",
@@ -210,33 +211,42 @@ export default function OutletList() {
           );
         },
       },
-      {
+    ];
+
+    // 🚩 Hanya tambahkan kolom AKSI jika punya izin update atau delete
+    if (can(["update", "delete"])) {
+      baseColumns.push({
         id: "actions",
         header: () => (
-          <div className="text-center text-[10px] tracking-widest font-black">
+          <div className="text-center text-[10px] tracking-widest font-black uppercase">
             AKSI
           </div>
         ),
         cell: ({ row }) => (
           <div className="flex gap-2 justify-center">
-            <button
-              onClick={() => handleOpenForm(row.original)}
-              className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-            >
-              <Pencil size={14} />
-            </button>
-            <button
-              onClick={() => handleDelete(row.original)}
-              className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm"
-            >
-              <Trash2 size={14} />
-            </button>
+            {can("update") && (
+              <button
+                onClick={() => handleOpenForm(row.original)}
+                className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+            {can("delete") && (
+              <button
+                onClick={() => handleDelete(row.original)}
+                className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         ),
-      },
-    ],
-    [handleDelete, handleOpenForm]
-  );
+      });
+    }
+
+    return baseColumns;
+  }, [can, handleDelete, handleOpenForm]);
 
   const table = useReactTable({
     data,
@@ -268,32 +278,34 @@ export default function OutletList() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => handleOpenForm(null)}
-          className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
-        >
-          <PlusSquare size={18} /> Tambah Cabang
-        </button>
+        {/* 🚩 Create Button Protection (Desktop) */}
+        {can("create") && (
+          <button
+            onClick={() => handleOpenForm(null)}
+            className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
+          >
+            <PlusSquare size={18} /> Tambah Cabang
+          </button>
+        )}
       </div>
 
-      {/* FIX: Filter + Search dalam satu form agar filterStatus apply saat submit */}
+      {/* Form Search Section ... (Sama seperti sebelumnya) */}
       <form
         onSubmit={handleSearch}
         className="flex flex-col md:flex-row items-stretch md:items-center gap-3 p-2 md:p-3"
       >
-        {/* Filter Status */}
         <div className="bg-white px-3 rounded-2xl border border-slate-100 shadow-sm flex items-center group focus-within:border-emerald-500/50 transition-all w-fit self-start h-[52px] md:h-[46px]">
           <div className="pr-2 text-slate-400 group-focus-within:text-emerald-600 border-r border-slate-50 mr-2 shrink-0">
-            <Filter size={15} className="md:w-3.5 md:h-3.5" />
+            <Filter size={15} />
           </div>
           <div className="flex flex-col pr-1">
-            <label className="text-[9px] md:text-[7px] font-black text-slate-400 uppercase leading-none mb-1">
+            <label className="text-[9px] md:text-[7px] font-black text-slate-400 uppercase mb-1">
               Status
             </label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-transparent text-[11px] md:text-[10px] font-black text-slate-700 outline-none cursor-pointer w-auto min-w-[100px] md:min-w-[90px]"
+              className="bg-transparent text-[11px] md:text-[10px] font-black text-slate-700 outline-none w-auto min-w-[100px]"
             >
               <option value="">All</option>
               <option value="true">Operasional</option>
@@ -301,17 +313,15 @@ export default function OutletList() {
             </select>
           </div>
         </div>
-
-        {/* Search Input */}
         <div className="bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm flex-1 md:max-w-[450px] flex items-center h-[52px] md:h-[46px]">
           <div className="flex items-center gap-1.5 w-full">
             <div className="relative flex-1 group">
               <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                 size={14}
               />
               <input
-                className="w-full pl-9 pr-8 py-2 md:py-1.5 bg-slate-50 border border-transparent rounded-xl md:rounded-lg text-[12px] md:text-[11px] outline-none focus:bg-white focus:border-emerald-500/20 transition-all placeholder:text-slate-400  text-slate-700"
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-transparent rounded-xl text-[12px] outline-none focus:bg-white focus:border-emerald-500/20 transition-all"
                 placeholder="Cari nama atau kode outlet..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -320,15 +330,15 @@ export default function OutletList() {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300"
                 >
-                  <X size={16} className="md:w-3.5 md:h-3.5" />
+                  <X size={16} />
                 </button>
               )}
             </div>
             <button
               type="submit"
-              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
+              className="h-9 px-4 bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors"
             >
               CARI
             </button>
@@ -339,7 +349,6 @@ export default function OutletList() {
       <ResponsiveDataView
         data={data}
         loading={loading}
-        emptyMessage="Belum ada data outlet tersedia"
         renderMobileCard={(outlet) => (
           <div
             key={outlet.id}
@@ -373,31 +382,36 @@ export default function OutletList() {
             </div>
             <div className="space-y-2 py-2 border-y border-slate-50">
               <div className="flex items-center gap-2">
-                <MapPin size={10} className="text-slate-300 shrink-0" />
+                <MapPin size={10} className="text-slate-300" />
                 <p className="text-[9px] text-slate-500 italic truncate">
-                  {outlet.city || outlet.address || "Alamat tidak tersedia"}
+                  {outlet.city || outlet.address || "-"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Phone size={10} className="text-slate-300 shrink-0" />
+                <Phone size={10} className="text-slate-300" />
                 <p className="text-[9px] text-slate-600 font-bold">
                   {outlet.phone || "-"}
                 </p>
               </div>
             </div>
             <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => handleOpenForm(outlet)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 transition-all"
-              >
-                <Pencil size={10} /> Edit
-              </button>
-              <button
-                onClick={() => handleDelete(outlet)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 transition-all"
-              >
-                <Trash2 size={10} /> Hapus
-              </button>
+              {/* 🚩 Mobile Edit & Delete - Pakai can() */}
+              {can("update") && (
+                <button
+                  onClick={() => handleOpenForm(outlet)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100"
+                >
+                  <Pencil size={10} /> Edit
+                </button>
+              )}
+              {can("delete") && (
+                <button
+                  onClick={() => handleDelete(outlet)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100"
+                >
+                  <Trash2 size={10} /> Hapus
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -451,12 +465,15 @@ export default function OutletList() {
         )}
       />
 
-      <button
-        onClick={() => handleOpenForm(null)}
-        className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 border-4 border-white transition-all active:scale-90"
-      >
-        <PlusSquare size={20} />
-      </button>
+      {/* 🚩 Floating Create Button (Mobile) - Pakai can() */}
+      {can("create") && (
+        <button
+          onClick={() => handleOpenForm(null)}
+          className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 border-4 border-white transition-all active:scale-90"
+        >
+          <PlusSquare size={20} />
+        </button>
+      )}
 
       <OutletForm
         open={openModal}

@@ -25,8 +25,13 @@ import TablePagination from "../../components/TablePagination";
 import CategoryService from "../../services/CategoryService";
 import CategoryForm from "./CategoryForm";
 
+// 🚩 Import Hook Guard
+import { useHasAccess } from "../../guards/useHasAccess";
+
 // 1. Tambahkan forwardRef
 const CategoryList = forwardRef((props, ref) => {
+  const can = useHasAccess(); // 🚩 Inisialisasi hook guard
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -90,7 +95,6 @@ const CategoryList = forwardRef((props, ref) => {
   };
 
   const handleDelete = async (category) => {
-    // Gunakan confirm sederhana jika showConfirm tidak diimport
     if (!window.confirm(`Hapus kategori "${category.name}"?`)) return;
 
     try {
@@ -102,8 +106,9 @@ const CategoryList = forwardRef((props, ref) => {
     }
   };
 
-  const columns = useMemo(
-    () => [
+  // 🚩 REFACTOR: Columns dinamis berdasarkan permission
+  const columns = useMemo(() => {
+    const baseColumns = [
       {
         id: "no",
         header: "NO",
@@ -167,7 +172,11 @@ const CategoryList = forwardRef((props, ref) => {
           );
         },
       },
-      {
+    ];
+
+    // 🚩 Tambahkan kolom AKSI jika user memiliki izin update atau delete
+    if (can(["update", "delete"])) {
+      baseColumns.push({
         id: "actions",
         header: () => (
           <div className="text-center text-[10px] font-black text-slate-400 uppercase">
@@ -176,27 +185,32 @@ const CategoryList = forwardRef((props, ref) => {
         ),
         cell: ({ row }) => (
           <div className="flex gap-2 justify-center">
-            <button
-              onClick={() => {
-                setSelectedCategory(row.original);
-                setOpenModal(true);
-              }}
-              className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-            >
-              <Pencil size={14} />
-            </button>
-            <button
-              onClick={() => handleDelete(row.original)}
-              className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all"
-            >
-              <Trash2 size={14} />
-            </button>
+            {can("update") && (
+              <button
+                onClick={() => {
+                  setSelectedCategory(row.original);
+                  setOpenModal(true);
+                }}
+                className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+            {can("delete") && (
+              <button
+                onClick={() => handleDelete(row.original)}
+                className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         ),
-      },
-    ],
-    []
-  );
+      });
+    }
+
+    return baseColumns;
+  }, [can, handleDelete]);
 
   const table = useReactTable({
     data,
@@ -210,7 +224,6 @@ const CategoryList = forwardRef((props, ref) => {
 
   return (
     <div className="space-y-4">
-      {/* Search area tetap ada di sini */}
       <div className="flex justify-start px-1">
         <div className="bg-slate-50 p-1.5 rounded-2xl border border-slate-100 w-full md:w-auto md:min-w-[320px]">
           <form onSubmit={handleSearch} className="flex items-center gap-1.5">
@@ -287,21 +300,26 @@ const CategoryList = forwardRef((props, ref) => {
               </div>
             </div>
             <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => {
-                  setSelectedCategory(category);
-                  setOpenModal(true);
-                }}
-                className="flex-1 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleDelete(category)}
-                className="flex-1 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
-              >
-                Hapus
-              </button>
+              {/* 🚩 Mobile Action Protections */}
+              {can("update") && (
+                <button
+                  onClick={() => {
+                    setSelectedCategory(category);
+                    setOpenModal(true);
+                  }}
+                  className="flex-1 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
+                >
+                  Edit
+                </button>
+              )}
+              {can("delete") && (
+                <button
+                  onClick={() => handleDelete(category)}
+                  className="flex-1 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
+                >
+                  Hapus
+                </button>
+              )}
             </div>
           </div>
         )}

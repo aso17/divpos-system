@@ -20,7 +20,12 @@ import AppHead from "../../components/common/AppHead";
 import RolesService from "../../services/RoleService";
 import RoleForm from "./RoleForm";
 
+// 🚩 Import Hook Guard
+import { useHasAccess } from "../../guards/useHasAccess";
+
 export function RolesList() {
+  const can = useHasAccess(); // 🚩 Inisialisasi Hook Guard
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -87,7 +92,6 @@ export function RolesList() {
     [navigate]
   );
 
-  // FIX: useCallback + rollback
   const handleDelete = useCallback(
     async (role) => {
       const setuju = await showConfirm(
@@ -129,7 +133,6 @@ export function RolesList() {
     [data, pagination.pageIndex]
   );
 
-  // FIX: deps columns lengkap
   const columns = useMemo(
     () => [
       {
@@ -193,35 +196,49 @@ export function RolesList() {
       {
         id: "actions",
         header: () => (
-          <div className="text-center text-[10px] tracking-widest font-black">
+          <div className="text-center text-[10px] tracking-widest font-black uppercase text-slate-400">
             AKSI
           </div>
         ),
         cell: ({ row }) => (
           <div className="flex gap-2 justify-center">
-            <button
-              onClick={() => handleNavigatePermission(row.original)}
-              className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm"
-            >
-              <Lock size={14} />
-            </button>
-            <button
-              onClick={() => handleOpenForm(row.original)}
-              className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-            >
-              <Pencil size={14} />
-            </button>
-            <button
-              onClick={() => handleDelete(row.original)}
-              className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm"
-            >
-              <Trash2 size={14} />
-            </button>
+            {/* 🚩 Proteksi Akses Permission */}
+            {can("update") && (
+              <button
+                title="Kelola Izin"
+                onClick={() => handleNavigatePermission(row.original)}
+                className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm"
+              >
+                <Lock size={14} />
+              </button>
+            )}
+
+            {/* 🚩 Proteksi Edit Desktop */}
+            {can("update") && (
+              <button
+                title="Edit"
+                onClick={() => handleOpenForm(row.original)}
+                className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+
+            {/* 🚩 Proteksi Delete Desktop */}
+            {can("delete") && (
+              <button
+                title="Hapus"
+                onClick={() => handleDelete(row.original)}
+                className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         ),
       },
     ],
-    [handleDelete, handleNavigatePermission, handleOpenForm]
+    [handleDelete, handleNavigatePermission, handleOpenForm, can] // 🚩 Tambahkan 'can' ke dependensi
   );
 
   return (
@@ -241,12 +258,16 @@ export function RolesList() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => handleOpenForm(null)}
-          className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
-        >
-          <PlusSquare size={18} /> Tambah Role
-        </button>
+
+        {/* 🚩 Proteksi Tambah Role (Desktop) */}
+        {can("create") && (
+          <button
+            onClick={() => handleOpenForm(null)}
+            className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
+          >
+            <PlusSquare size={18} /> Tambah Role
+          </button>
+        )}
       </div>
 
       <div className="flex justify-start px-1">
@@ -324,24 +345,35 @@ export function RolesList() {
               </div>
             </div>
             <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => handleNavigatePermission(role)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase active:scale-95 transition-all"
-              >
-                <Lock size={10} /> Permission
-              </button>
-              <button
-                onClick={() => handleOpenForm(role)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
-              >
-                <Pencil size={10} /> Edit
-              </button>
-              <button
-                onClick={() => handleDelete(role)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
-              >
-                <Trash2 size={10} /> Hapus
-              </button>
+              {/* 🚩 Proteksi Permission Mobile */}
+              {can("update") && (
+                <button
+                  onClick={() => handleNavigatePermission(role)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase active:scale-95 transition-all"
+                >
+                  <Lock size={10} /> Permission
+                </button>
+              )}
+
+              {/* 🚩 Proteksi Edit Mobile */}
+              {can("update") && (
+                <button
+                  onClick={() => handleOpenForm(role)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
+                >
+                  <Pencil size={10} /> Edit
+                </button>
+              )}
+
+              {/* 🚩 Proteksi Delete Mobile */}
+              {can("delete") && (
+                <button
+                  onClick={() => handleDelete(role)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
+                >
+                  <Trash2 size={10} /> Hapus
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -374,12 +406,15 @@ export function RolesList() {
         />
       </div>
 
-      <button
-        onClick={() => handleOpenForm(null)}
-        className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 border-4 border-white transition-all"
-      >
-        <PlusSquare size={20} />
-      </button>
+      {/* FAB mobile - 🚩 Proteksi Tambah Role */}
+      {can("create") && (
+        <button
+          onClick={() => handleOpenForm(null)}
+          className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 border-4 border-white transition-all"
+        >
+          <PlusSquare size={20} />
+        </button>
+      )}
 
       <RoleForm
         open={openModal}

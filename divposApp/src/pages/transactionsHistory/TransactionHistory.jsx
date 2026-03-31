@@ -5,6 +5,7 @@ import {
   flexRender,
 } from "@tanstack/react-table";
 import { useReactToPrint } from "react-to-print";
+
 import History from "lucide-react/dist/esm/icons/history";
 import Search from "lucide-react/dist/esm/icons/search";
 import X from "lucide-react/dist/esm/icons/x";
@@ -13,8 +14,6 @@ import Printer from "lucide-react/dist/esm/icons/printer";
 import Wallet from "lucide-react/dist/esm/icons/wallet";
 import Clock from "lucide-react/dist/esm/icons/clock";
 import CheckCircle2 from "lucide-react/dist/esm/icons/check-circle-2";
-import User from "lucide-react/dist/esm/icons/user";
-import Receipt from "lucide-react/dist/esm/icons/receipt";
 import LayoutList from "lucide-react/dist/esm/icons/layout-list";
 import XCircle from "lucide-react/dist/esm/icons/x-circle";
 
@@ -29,253 +28,24 @@ import DetailPaymentModal from "./DetailPaymentModal";
 import TransactionSuccessModal from "../../components/TransactionSuccessModal";
 import ReceiptPrint from "../../components/ReceiptPrint";
 
-// ─── Status konstanta ─────────────────────────────────────────────────────────
-const STATUS_PENDING = "PENDING";
-const STATUS_PROCESS = "PROCESS";
-const STATUS_READY = "READY";
-const STATUS_TAKEN = "TAKEN";
-const STATUS_CANCELED = "CANCELED";
-const STATUS_COMPLETED = "COMPLETED";
+// ─── Import dari file terpisah ────────────────────────────────────────────────
+import {
+  STATUS_CANCELED,
+  hasEmployeeData,
+  canCancel,
+} from "./TransactionConstanta";
+import {
+  PayBadge,
+  TxStatusBadge,
+  ActionBtn,
+  TxCard,
+} from "./TransactionHistoryComponent";
 
-const canCancel = (trx) =>
-  trx.payment_status !== "PAID" &&
-  [STATUS_PENDING, STATUS_PROCESS].includes(trx.status);
-
-// ─── Helper Petugas ───────────────────────────────────────────────────────────
-const hasEmployeeData = (data) => {
-  return data.some((trx) =>
-    trx.details?.some((detail) => detail.employee_name)
-  );
-};
-
-// ─── Payment badge ────────────────────────────────────────────────────────────
-function PayBadge({ status }) {
-  const paid = status === "PAID";
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
-      text-[10px] font-bold border flex-shrink-0
-      ${
-        paid
-          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-          : "bg-red-50 text-red-600 border-red-200"
-      }`}
-    >
-      <span
-        className={`w-1.5 h-1.5 rounded-full flex-shrink-0
-        ${paid ? "bg-emerald-500" : "bg-red-400"}`}
-      />
-      {paid ? "Lunas" : "Belum Lunas"}
-    </span>
-  );
-}
-
-const TX_STATUS_MAP = {
-  [STATUS_PENDING]: {
-    label: "Pending",
-    cls: "bg-amber-50 text-amber-600 border-amber-200",
-  },
-  [STATUS_PROCESS]: {
-    label: "Proses",
-    cls: "bg-blue-50 text-blue-600 border-blue-200",
-  },
-  [STATUS_READY]: {
-    label: "Siap",
-    cls: "bg-purple-50 text-purple-600 border-purple-200",
-  },
-  [STATUS_TAKEN]: {
-    label: "Diambil",
-    cls: "bg-gray-50 text-gray-600 border-gray-200",
-  },
-  [STATUS_CANCELED]: {
-    label: "Batal",
-    cls: "bg-red-50 text-red-600 border-red-200",
-  },
-  [STATUS_COMPLETED]: {
-    label: "Selesai",
-    cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  },
-};
-
-function TxStatusBadge({ status }) {
-  const s = TX_STATUS_MAP[status] ?? TX_STATUS_MAP[STATUS_PENDING];
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border flex-shrink-0 ${s.cls}`}
-    >
-      {s.label}
-    </span>
-  );
-}
-
-function ActionBtn({ onClick, title, variant = "gray", children }) {
-  const cls = {
-    amber:
-      "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-500 hover:text-white hover:border-amber-500",
-    gray: "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-800 hover:text-white hover:border-gray-800",
-    green:
-      "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600",
-    red: "bg-red-50 text-red-500 border-red-200 hover:bg-red-500 hover:text-white hover:border-red-500",
-  };
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all duration-150 flex-shrink-0 ${cls[variant]}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PERUBAHAN 1: TxCard — tambah section stylist di mobile card
-// Letakkan di TransactionHistory.jsx, ganti fungsi TxCard yang ada
-// ═══════════════════════════════════════════════════════════════════════════
-
-function TxCard({ trx, onPay, onDetail, onPrint, onCancel }) {
-  const sisa = trx.grand_total - trx.total_paid;
-  const isPaid = trx.payment_status === "PAID";
-  const isCanceled = trx.status === STATUS_CANCELED;
-  const showCancel = canCancel(trx);
-
-  // Kumpulkan nama stylist unik dari details — null di-filter
-  const stylists = [
-    ...new Set((trx.details || []).map((d) => d.employee_name).filter(Boolean)),
-  ];
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-      <div
-        className={`h-[3px] flex-shrink-0 ${
-          isCanceled ? "bg-red-400" : isPaid ? "bg-emerald-500" : "bg-amber-400"
-        }`}
-      />
-
-      <div className="p-4 flex flex-col gap-3 flex-1">
-        {/* Invoice + badges */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Receipt size={12} className="text-emerald-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-mono text-[11px] font-bold text-emerald-700 truncate leading-tight">
-                {trx.invoice_no}
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                {trx.order_date}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-1 flex-shrink-0">
-            <PayBadge status={trx.payment_status} />
-            <TxStatusBadge status={trx.status} />
-          </div>
-        </div>
-
-        {/* Customer + total */}
-        <div
-          className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5
-          flex items-center justify-between gap-3"
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-6 h-6 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              <User size={10} className="text-emerald-700" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-700 truncate leading-tight">
-                {trx.customer_name}
-              </p>
-              {trx.customer_phone && (
-                <p className="text-[10px] text-gray-400">
-                  {trx.customer_phone}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="text-right flex-shrink-0">
-            <p
-              className={`text-sm font-bold tabular-nums leading-tight ${
-                isCanceled ? "line-through text-gray-400" : "text-gray-800"
-              }`}
-            >
-              {formatRupiah(trx.grand_total)}
-            </p>
-            {sisa > 0 && !isCanceled && (
-              <p className="text-[10px] font-semibold text-red-500 tabular-nums mt-0.5">
-                Sisa {formatRupiah(sisa)}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* ── TAMBAHAN: Stylist badges — hanya tampil jika ada data ── */}
-        {stylists.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
-              Stylist:
-            </span>
-            {stylists.map((name, i) => (
-              <span
-                key={i}
-                className="text-[9px] font-bold bg-blue-50 text-blue-600
-                  border border-blue-100 px-2 py-0.5 rounded-full whitespace-nowrap"
-              >
-                {name}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex gap-2 mt-auto">
-          {!isPaid && !isCanceled && (
-            <button
-              onClick={onPay}
-              className="flex-1 h-9 flex items-center justify-center gap-1.5
-                bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white
-                rounded-xl text-xs font-bold transition-colors shadow-sm shadow-amber-100"
-            >
-              <Wallet size={12} strokeWidth={2.5} /> Bayar
-            </button>
-          )}
-          <button
-            onClick={onDetail}
-            className="w-9 h-9 flex items-center justify-center flex-shrink-0
-              bg-white border border-emerald-200 text-emerald-600
-              hover:bg-emerald-600 hover:text-white hover:border-emerald-600
-              rounded-xl transition-all duration-150"
-          >
-            <Eye size={12} strokeWidth={2} />
-          </button>
-          <button
-            onClick={onPrint}
-            title="Cetak nota"
-            className="w-9 h-9 flex items-center justify-center flex-shrink-0
-              bg-white border border-emerald-200 text-emerald-600
-              hover:bg-emerald-600 hover:text-white hover:border-emerald-600
-              rounded-xl transition-all duration-150"
-          >
-            <Printer size={12} strokeWidth={2} />
-          </button>
-          {showCancel && (
-            <button
-              onClick={onCancel}
-              title="Batalkan transaksi"
-              className="w-9 h-9 flex items-center justify-center flex-shrink-0
-                bg-white border border-red-200 text-red-500
-                hover:bg-red-500 hover:text-white hover:border-red-500
-                rounded-xl transition-all duration-150"
-            >
-              <XCircle size={12} strokeWidth={2} />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+const TABS = [
+  { id: "ALL", label: "Semua", icon: <LayoutList size={13} /> },
+  { id: "UNPAID", label: "Belum Lunas", icon: <Clock size={13} /> },
+  { id: "PAID", label: "Lunas", icon: <CheckCircle2 size={13} /> },
+];
 
 export default function TransactionHistory() {
   const [data, setData] = useState([]);
@@ -298,6 +68,9 @@ export default function TransactionHistory() {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [cancelModal, setCancelModal] = useState({ isOpen: false, data: null });
 
+  const showEmployeeCol = useMemo(() => hasEmployeeData(data), [data]);
+
+  // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchHistory = useCallback(
     async (isMounted = true) => {
       setLoading(true);
@@ -323,18 +96,6 @@ export default function TransactionHistory() {
   );
 
   useEffect(() => {
-    const fetchMethods = async () => {
-      try {
-        const res = await TransactionService.getPaymentMethods();
-        setPaymentMethods(res.data?.data || []);
-      } catch (err) {
-        console.error("Gagal load metode pembayaran:", err);
-      }
-    };
-    fetchMethods();
-  }, []);
-
-  useEffect(() => {
     let isMounted = true;
     fetchHistory(isMounted);
     return () => {
@@ -342,18 +103,24 @@ export default function TransactionHistory() {
     };
   }, [fetchHistory]);
 
+  useEffect(() => {
+    TransactionService.getPaymentMethods()
+      .then((res) => setPaymentMethods(res.data?.data || []))
+      .catch((err) => console.error("Gagal load metode pembayaran:", err));
+  }, []);
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `Nota_${dataToPrint?.invoice_no || "Transaksi"}`,
   });
 
   const handleOpenPrintPayment = (trx) => {
-    const receiptData = {
+    setDataToPrint({
       ...trx,
       payment_amount: trx.payment_amount || 0,
       change_amount: trx.change_amount || 0,
-    };
-    setDataToPrint(receiptData);
+    });
     setTimeout(() => handlePrint(), 500);
   };
 
@@ -379,11 +146,17 @@ export default function TransactionHistory() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
-  // ── COLUMNS DINAMIS ──
-  const columns = useMemo(() => {
-    const showEmployeeCol = hasEmployeeData(data);
+  // ── Counts ────────────────────────────────────────────────────────────────
+  const { paidCount, unpaidCount } = useMemo(
+    () => ({
+      paidCount: data.filter((t) => t.payment_status === "PAID").length,
+      unpaidCount: data.filter((t) => t.payment_status !== "PAID").length,
+    }),
+    [data]
+  );
 
-    let baseCols = [
+  const columns = useMemo(() => {
+    const baseCols = [
       {
         id: "no",
         header: "No",
@@ -429,7 +202,6 @@ export default function TransactionHistory() {
       },
     ];
 
-    // Jika ada data petugas, sisipkan kolom di sini
     if (showEmployeeCol) {
       baseCols.push({
         id: "employees",
@@ -447,7 +219,8 @@ export default function TransactionHistory() {
               {names.map((name, i) => (
                 <span
                   key={i}
-                  className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-bold whitespace-nowrap"
+                  className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5
+                    rounded border border-blue-100 font-bold whitespace-nowrap"
                 >
                   {name}
                 </span>
@@ -548,7 +321,8 @@ export default function TransactionHistory() {
         },
       },
     ];
-  }, [data]);
+    // FIX: dep [showEmployeeCol] bukan [data]
+  }, [showEmployeeCol]);
 
   const table = useReactTable({
     data,
@@ -560,23 +334,26 @@ export default function TransactionHistory() {
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const paidCount = data.filter((t) => t.payment_status === "PAID").length;
-  const unpaidCount = data.filter((t) => t.payment_status !== "PAID").length;
-  const TABS = [
-    { id: "ALL", label: "Semua", icon: <LayoutList size={13} /> },
-    { id: "UNPAID", label: "Belum Lunas", icon: <Clock size={13} /> },
-    { id: "PAID", label: "Lunas", icon: <CheckCircle2 size={13} /> },
-  ];
+  const paginationEl = (
+    <TablePagination table={table} totalEntries={totalCount} />
+  );
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-6">
       <AppHead title="Riwayat Transaksi" />
 
-      {/* Header Sticky */}
+      {/* Sticky Header */}
       <div className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-20">
-        <div className="max-w-screen-xl mx-auto px-4 md:px-6 py-3.5 flex items-center justify-between gap-4 flex-wrap">
+        <div
+          className="max-w-screen-xl mx-auto px-4 md:px-6 py-3.5
+          flex items-center justify-between gap-4 flex-wrap"
+        >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center shadow-sm shadow-emerald-200 flex-shrink-0">
+            <div
+              className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center
+              shadow-sm shadow-emerald-200 flex-shrink-0"
+            >
               <History size={16} strokeWidth={2.5} className="text-white" />
             </div>
             <div>
@@ -609,7 +386,7 @@ export default function TransactionHistory() {
       </div>
 
       <div className="max-w-screen-xl mx-auto px-4 md:px-6 py-4 space-y-4">
-        {/* Toolbar Search & Filter */}
+        {/* Toolbar */}
         <div className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-center">
           <div className="flex bg-white border border-gray-200 rounded-xl p-1 gap-1 shadow-sm flex-shrink-0">
             {TABS.map((tab) => (
@@ -619,21 +396,24 @@ export default function TransactionHistory() {
                   setPaymentFilter(tab.id);
                   setPagination((p) => ({ ...p, pageIndex: 0 }));
                 }}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 whitespace-nowrap
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold
+                  transition-all duration-150 whitespace-nowrap
                   ${
                     paymentFilter === tab.id
                       ? "bg-emerald-600 text-white shadow-sm"
                       : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                   }`}
               >
-                {tab.icon} <span className="hidden sm:inline">{tab.label}</span>
+                {tab.icon}
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
           </div>
 
           <form
             onSubmit={handleSearch}
-            className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-1.5 shadow-sm flex-1 min-w-0 max-w-sm"
+            className="flex items-center gap-2 bg-white border border-gray-200
+              rounded-xl p-1.5 shadow-sm flex-1 min-w-0 max-w-sm"
           >
             <div className="relative flex-1 min-w-0">
               <Search
@@ -644,7 +424,9 @@ export default function TransactionHistory() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Cari invoice atau pelanggan..."
-                className="w-full h-9 pl-9 pr-8 rounded-lg bg-gray-50 border border-transparent text-sm text-gray-700 font-medium outline-none focus:bg-white focus:border-emerald-400 transition-all duration-150"
+                className="w-full h-9 pl-9 pr-8 rounded-lg bg-gray-50 border border-transparent
+                  text-sm text-gray-700 font-medium outline-none
+                  focus:bg-white focus:border-emerald-400 transition-all duration-150"
               />
               {searchTerm && (
                 <button
@@ -658,20 +440,19 @@ export default function TransactionHistory() {
             </div>
             <button
               type="submit"
-              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex-shrink-0"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white
+                text-xs font-bold rounded-lg transition-colors flex-shrink-0"
             >
               Cari
             </button>
           </form>
         </div>
 
-        {/* View Data */}
+        {/* Data view */}
         <ResponsiveDataView
           data={data}
           emptyMessage="Tidak ada riwayat transaksi ditemukan"
-          paginationNode={
-            <TablePagination table={table} totalEntries={totalCount} />
-          }
+          paginationNode={paginationEl}
           renderMobileCard={(trx) => (
             <TxCard
               key={trx.id}
@@ -713,9 +494,8 @@ export default function TransactionHistory() {
                             {columns.map((_, j) => (
                               <td key={j} className="px-5 py-4">
                                 <div
-                                  className={`h-4 bg-gray-100 animate-pulse rounded-lg ${
-                                    j === 0 ? "w-6" : "w-full"
-                                  }`}
+                                  className={`h-4 bg-gray-100 animate-pulse rounded-lg
+                                  ${j === 0 ? "w-6" : "w-full"}`}
                                 />
                               </td>
                             ))}
@@ -747,7 +527,7 @@ export default function TransactionHistory() {
                 </table>
               </div>
               <div className="border-t border-gray-100 bg-gray-50/50">
-                <TablePagination table={table} totalEntries={totalCount} />
+                {paginationEl}
               </div>
             </div>
           )}
@@ -798,11 +578,13 @@ export default function TransactionHistory() {
         onClose={() => setShowSuccessModal(false)}
         data={lastTransactionData}
       />
+
       <DetailPaymentModal
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
         transaction={selectedTrx}
       />
+
       {dataToPrint && (
         <div className="hidden">
           <ReceiptPrint ref={printRef} data={dataToPrint} />

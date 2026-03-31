@@ -11,16 +11,7 @@ import {
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import {
-  Plus,
-  Box,
-  Search,
-  Eye,
-  Pencil,
-  Trash2,
-  X,
-  PlusSquare,
-} from "lucide-react";
+import { Search, Eye, Pencil, Trash2, X } from "lucide-react";
 
 import TablePagination from "../../components/TablePagination";
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
@@ -29,7 +20,12 @@ import { formatRupiah } from "../../utils/formatter";
 import PackageForm from "./PackageForm";
 import PackageDetail from "./PackageDetail";
 
+// 🚩 Import Hook Guard
+import { useHasAccess } from "../../guards/useHasAccess";
+
 export const PackageList = forwardRef((props, ref) => {
+  const can = useHasAccess(); // 🚩 Inisialisasi Hook Guard
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -102,17 +98,8 @@ export const PackageList = forwardRef((props, ref) => {
 
   const handleDelete = useCallback(
     async (pkg) => {
-      if (typeof showConfirm !== "function") {
-        if (!window.confirm(`Hapus paket ${pkg.name}?`)) return;
-      } else {
-        const setuju = await showConfirm(
-          `Apakah anda yakin ingin menghapus paket "${pkg.name}"?`,
-          "Konfirmasi Hapus",
-          "warning",
-          { confirmText: "Ya, Hapus", cancelText: "Batal" }
-        );
-        if (!setuju) return;
-      }
+      // Gunakan confirm standar jika showConfirm tidak didefinisikan
+      if (!window.confirm(`Hapus paket ${pkg.name}?`)) return;
 
       const snapshot = data;
       setData((prev) => prev.filter((item) => item.id !== pkg.id));
@@ -128,8 +115,9 @@ export const PackageList = forwardRef((props, ref) => {
     [data]
   );
 
-  const columns = useMemo(
-    () => [
+  // 🚩 REFACTOR: Columns dinamis berdasarkan permission
+  const columns = useMemo(() => {
+    const baseColumns = [
       {
         id: "no",
         header: "NO",
@@ -195,39 +183,49 @@ export const PackageList = forwardRef((props, ref) => {
           );
         },
       },
-      {
-        id: "actions",
-        header: () => (
-          <div className="text-center text-[10px] font-black text-slate-400 uppercase">
-            AKSI
-          </div>
-        ),
-        cell: ({ row }) => (
-          <div className="flex gap-2 justify-center">
-            <button
-              onClick={() => handleOpenDetail(row.original)}
-              className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm"
-            >
-              <Eye size={14} />
-            </button>
+    ];
+
+    // 🚩 Tambahkan kolom AKSI jika user punya izin apa pun (read detail, update, atau delete)
+    baseColumns.push({
+      id: "actions",
+      header: () => (
+        <div className="text-center text-[10px] font-black text-slate-400 uppercase">
+          AKSI
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex gap-2 justify-center">
+          {/* Read Detail biasanya diizinkan untuk semua role yang bisa masuk ke list */}
+          <button
+            onClick={() => handleOpenDetail(row.original)}
+            className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm"
+          >
+            <Eye size={14} />
+          </button>
+
+          {can("update") && (
             <button
               onClick={() => handleOpenForm(row.original)}
               className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"
             >
               <Pencil size={14} />
             </button>
+          )}
+
+          {can("delete") && (
             <button
               onClick={() => handleDelete(row.original)}
               className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all"
             >
               <Trash2 size={14} />
             </button>
-          </div>
-        ),
-      },
-    ],
-    [handleDelete, handleOpenDetail, handleOpenForm]
-  );
+          )}
+        </div>
+      ),
+    });
+
+    return baseColumns;
+  }, [can, handleDelete, handleOpenDetail, handleOpenForm]);
 
   const table = useReactTable({
     data,
@@ -318,7 +316,7 @@ export const PackageList = forwardRef((props, ref) => {
                   {formatRupiah(pkg.price)}
                   <span className="text-[8px] font-normal text-slate-400">
                     {" "}
-                    /{pkg.unit.name}
+                    /{pkg.unit?.name}
                   </span>
                 </p>
               </div>
@@ -329,7 +327,7 @@ export const PackageList = forwardRef((props, ref) => {
                 <p className="text-[10px] font-black text-slate-700 uppercase">
                   {pkg.min_order}{" "}
                   <span className="text-[8px] font-normal text-slate-400">
-                    {pkg.unit.name}
+                    {pkg.unit?.name}
                   </span>
                 </p>
               </div>
@@ -341,18 +339,25 @@ export const PackageList = forwardRef((props, ref) => {
               >
                 <Eye size={10} /> Detail
               </button>
-              <button
-                onClick={() => handleOpenForm(pkg)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
-              >
-                <Pencil size={10} /> Edit
-              </button>
-              <button
-                onClick={() => handleDelete(pkg)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
-              >
-                <Trash2 size={10} /> Hapus
-              </button>
+
+              {/* 🚩 Proteksi tombol mobile */}
+              {can("update") && (
+                <button
+                  onClick={() => handleOpenForm(pkg)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
+                >
+                  <Pencil size={10} /> Edit
+                </button>
+              )}
+
+              {can("delete") && (
+                <button
+                  onClick={() => handleDelete(pkg)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
+                >
+                  <Trash2 size={10} /> Hapus
+                </button>
+              )}
             </div>
           </div>
         )}

@@ -20,6 +20,9 @@ import CustomerService from "../../services/CustomerService";
 import CustomerForm from "./CustomerForm";
 import CustomerDetail from "./CustomerDetail";
 
+// 🚩 Import Hook Guard
+import { useHasAccess } from "../../guards/useHasAccess";
+
 // ─── Helper ───────────────────────────────────────────────────────────────────
 const triggerToast = (message, type) =>
   window.dispatchEvent(
@@ -27,6 +30,8 @@ const triggerToast = (message, type) =>
   );
 
 export default function CustomerList() {
+  const can = useHasAccess(); // 🚩 Inisialisasi Hook Guard
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -240,35 +245,44 @@ export default function CustomerList() {
       {
         id: "actions",
         header: () => (
-          <div className="text-center text-[10px] tracking-widest font-black">
+          <div className="text-center text-[10px] tracking-widest font-black text-slate-400 uppercase">
             AKSI
           </div>
         ),
         cell: ({ row }) => (
           <div className="flex gap-2 justify-center">
+            {/* View Detail biasanya boleh untuk semua yang masuk list */}
             <button
               onClick={() => handleDetail(row.original)}
               className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm"
             >
               <Eye size={14} />
             </button>
-            <button
-              onClick={() => handleEdit(row.original)}
-              className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-            >
-              <Pencil size={14} />
-            </button>
-            <button
-              onClick={() => handleDelete(row.original)}
-              className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm"
-            >
-              <Trash2 size={14} />
-            </button>
+
+            {/* 🚩 Proteksi Edit Desktop */}
+            {can("update") && (
+              <button
+                onClick={() => handleEdit(row.original)}
+                className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+
+            {/* 🚩 Proteksi Delete Desktop */}
+            {can("delete") && (
+              <button
+                onClick={() => handleDelete(row.original)}
+                className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         ),
       },
     ],
-    []
+    [can] // 🚩 Masukkan 'can' ke dependensi useMemo
   );
 
   // ── Pagination node untuk mobile/tablet ──────────────────────────────────
@@ -304,16 +318,19 @@ export default function CustomerList() {
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            setSelectedCustomer(null);
-            setOpenModal(true);
-          }}
-          className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white
-            rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
-        >
-          <PlusSquare size={18} /> Tambah Pelanggan
-        </button>
+        {/* 🚩 Proteksi Tambah Pelanggan (Desktop Header) */}
+        {can("create") && (
+          <button
+            onClick={() => {
+              setSelectedCustomer(null);
+              setOpenModal(true);
+            }}
+            className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white
+              rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg uppercase"
+          >
+            <PlusSquare size={18} /> Tambah Pelanggan
+          </button>
+        )}
       </div>
 
       {/* ── Stats strip ── */}
@@ -509,7 +526,7 @@ export default function CustomerList() {
               </div>
             </div>
 
-            {/* Actions */}
+            {/* Actions Mobile */}
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => handleDetail(customer)}
@@ -519,22 +536,30 @@ export default function CustomerList() {
               >
                 <Eye size={10} /> Detail
               </button>
-              <button
-                onClick={() => handleEdit(customer)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5
-                  bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase
-                  border border-slate-100 active:scale-95 transition-all"
-              >
-                <Pencil size={10} /> Edit
-              </button>
-              <button
-                onClick={() => handleDelete(customer)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5
-                  bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase
-                  border border-rose-100 active:scale-95 transition-all"
-              >
-                <Trash2 size={10} /> Hapus
-              </button>
+
+              {/* 🚩 Proteksi Edit Mobile */}
+              {can("update") && (
+                <button
+                  onClick={() => handleEdit(customer)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5
+                    bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase
+                    border border-slate-100 active:scale-95 transition-all"
+                >
+                  <Pencil size={10} /> Edit
+                </button>
+              )}
+
+              {/* 🚩 Proteksi Delete Mobile */}
+              {can("delete") && (
+                <button
+                  onClick={() => handleDelete(customer)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5
+                    bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase
+                    border border-rose-100 active:scale-95 transition-all"
+                >
+                  <Trash2 size={10} /> Hapus
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -556,18 +581,20 @@ export default function CustomerList() {
         <TablePagination table={mobilePagination} totalEntries={totalCount} />
       </div>
 
-      {/* FAB mobile */}
-      <button
-        onClick={() => {
-          setSelectedCustomer(null);
-          setOpenModal(true);
-        }}
-        className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white
-          rounded-full shadow-2xl flex items-center justify-center z-40
-          active:scale-90 border-4 border-white transition-all"
-      >
-        <PlusSquare size={20} />
-      </button>
+      {/* FAB mobile - 🚩 Proteksi Tambah Pelanggan (Mobile) */}
+      {can("create") && (
+        <button
+          onClick={() => {
+            setSelectedCustomer(null);
+            setOpenModal(true);
+          }}
+          className="md:hidden fixed bottom-28 right-6 w-12 h-12 bg-emerald-600 text-white
+            rounded-full shadow-2xl flex items-center justify-center z-40
+            active:scale-90 border-4 border-white transition-all"
+        >
+          <PlusSquare size={20} />
+        </button>
+      )}
 
       {/* Form Modal */}
       <CustomerForm

@@ -140,7 +140,10 @@ export default function AppRoutes() {
             <Route
               path="/rolespermission/:roleId"
               element={
-                <RequirePermission permission="update" useRoute="/rolelist">
+                /* 1. Ganti useRoute menjadi route
+       2. Pastikan path-nya "/roles" (sesuai key di permissionMap Mas)
+    */
+                <RequirePermission permission="update" route="/roles">
                   <RolePermissionsPage />
                 </RequirePermission>
               }

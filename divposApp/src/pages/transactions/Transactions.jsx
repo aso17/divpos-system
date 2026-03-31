@@ -91,8 +91,12 @@ const Transactions = () => {
   // ── Effects (TIDAK DIUBAH) ───────────────────────────────────────────────────
   useEffect(() => {
     const storedUser = GetWithExpiry("user");
-    if (storedUser?.tenant?.business_type) {
-      setBusinessType(storedUser.tenant.business_type);
+    if (storedUser) {
+      setBusinessType(storedUser.tenant?.business_type || "");
+
+      if (storedUser.outlet?.id) {
+        handleChange("outlet_id", storedUser.outlet.id);
+      }
     }
   }, []);
   // console.log(businessType);

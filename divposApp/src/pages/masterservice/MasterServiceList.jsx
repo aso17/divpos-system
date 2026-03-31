@@ -14,13 +14,12 @@ import {
 import {
   Pencil,
   Trash2,
-  Layers,
-  FileText,
   X,
   Search,
   Info,
   Calendar,
   User,
+  FileText,
 } from "lucide-react";
 
 import ResponsiveDataView from "../../components/common/ResponsiveDataView";
@@ -28,8 +27,12 @@ import TablePagination from "../../components/TablePagination";
 import MasterService from "../../services/MasterService";
 import ServiceForm from "./MasterServiceForm";
 
-// 1. Bungkus dengan forwardRef
+// 🚩 Import Hook Guard
+import { useHasAccess } from "../../guards/useHasAccess";
+
 const MasterServiceList = forwardRef((props, ref) => {
+  const can = useHasAccess(); // 🚩 Inisialisasi hook
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -39,7 +42,6 @@ const MasterServiceList = forwardRef((props, ref) => {
   const [openModal, setOpenModal] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
 
-  // 2. EXPOSE: Fungsi untuk dibuka dari Parent (CatalogList)
   useImperativeHandle(ref, () => ({
     openForm: (service = null) => {
       setSelectedService(service);
@@ -91,7 +93,6 @@ const MasterServiceList = forwardRef((props, ref) => {
   };
 
   const handleDelete = async (service) => {
-    // Gunakan confirm standar jika showConfirm belum diimport
     if (!window.confirm(`Hapus layanan ${service.name}?`)) return;
 
     try {
@@ -103,8 +104,9 @@ const MasterServiceList = forwardRef((props, ref) => {
     }
   };
 
-  const columns = useMemo(
-    () => [
+  // 🚩 REFACTOR: Columns dinamis berdasarkan permission
+  const columns = useMemo(() => {
+    const baseColumns = [
       {
         id: "no",
         header: "NO",
@@ -166,7 +168,11 @@ const MasterServiceList = forwardRef((props, ref) => {
           );
         },
       },
-      {
+    ];
+
+    // 🚩 Tambahkan kolom AKSI hanya jika punya akses update atau delete
+    if (can(["update", "delete"])) {
+      baseColumns.push({
         id: "actions",
         header: () => (
           <div className="text-center text-[10px] font-black text-slate-400 uppercase">
@@ -175,27 +181,32 @@ const MasterServiceList = forwardRef((props, ref) => {
         ),
         cell: ({ row }) => (
           <div className="flex gap-2 justify-center">
-            <button
-              onClick={() => {
-                setSelectedService(row.original);
-                setOpenModal(true);
-              }}
-              className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-            >
-              <Pencil size={14} />
-            </button>
-            <button
-              onClick={() => handleDelete(row.original)}
-              className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"
-            >
-              <Trash2 size={14} />
-            </button>
+            {can("update") && (
+              <button
+                onClick={() => {
+                  setSelectedService(row.original);
+                  setOpenModal(true);
+                }}
+                className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+            {can("delete") && (
+              <button
+                onClick={() => handleDelete(row.original)}
+                className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         ),
-      },
-    ],
-    []
-  );
+      });
+    }
+
+    return baseColumns;
+  }, [can, handleDelete]);
 
   const table = useReactTable({
     data,
@@ -284,21 +295,26 @@ const MasterServiceList = forwardRef((props, ref) => {
               </div>
             </div>
             <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => {
-                  setSelectedService(service);
-                  setOpenModal(true);
-                }}
-                className="flex-1 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleDelete(service)}
-                className="flex-1 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
-              >
-                Hapus
-              </button>
+              {/* 🚩 Proteksi tombol mobile */}
+              {can("update") && (
+                <button
+                  onClick={() => {
+                    setSelectedService(service);
+                    setOpenModal(true);
+                  }}
+                  className="flex-1 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-100 active:scale-95 transition-all"
+                >
+                  Edit
+                </button>
+              )}
+              {can("delete") && (
+                <button
+                  onClick={() => handleDelete(service)}
+                  className="flex-1 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase border border-rose-100 active:scale-95 transition-all"
+                >
+                  Hapus
+                </button>
+              )}
             </div>
           </div>
         )}
