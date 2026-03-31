@@ -17,7 +17,7 @@ class AuthResource extends JsonResource
             'id'        => $this->id ? CryptoHelper::encrypt($this->id) : null,
             'email'     => $this->email,
             'username'  => $this->username,
-            'full_name' => $this->full_name ?? 'User', 
+            'full_name' => $this->full_name ?? 'User',
             'is_owner'  => $isOwner,
 
             'role' => [
@@ -25,31 +25,37 @@ class AuthResource extends JsonResource
                 'code' => $this->role_code, // Mengambil alias dari query join repository
             ],
 
-            'avatar' => $this->avatar 
-                ? asset('storage/' . $this->avatar) 
+            'avatar' => $this->avatar
+                ? asset('storage/' . $this->avatar)
                 : asset('assets/images/default-avatar.png'),
 
-            // 🎯 Data Tenant: Sekarang aman untuk Owner maupun Staff 
-            // karena tenant_id di sini adalah hasil join Ms_tenants.
-            
+            // 🎯 Data Tenant: Sekarang aman untuk Owner maupun Staff
+
             'tenant' => $this->tenant_id ? [
                     'id'            => CryptoHelper::encrypt($this->tenant_id),
                     'name'          => $this->tenant_name,
                     'slug'          => $this->tenant_slug,
                     'code'          => $this->tenant_code,
                     'business_type' => $this->business_type_code,
-                    'logo'          => $this->tenant_logo 
-                                        ? asset('storage/' . ltrim($this->tenant_logo, '/')) 
+                    'logo'          => $this->tenant_logo
+                                        ? asset('storage/' . ltrim($this->tenant_logo, '/'))
                                         : asset('assets/images/default-tenant-logo.png'),
                 ] : null,
 
-            // Data Outlet
-            'outlet' => $this->when(isset($this->outlet_id) || isset($this->employee_outlet_id), function() {
-                // Jika alias outlet_id hasil join ada, gunakan itu
-                $oid = $this->outlet_id ?? ($this->employee_outlet_id ?? null);
+          // Data Outlet
+            'outlet' => $this->when(true, function () { // Kita buat true agar selalu muncul
+                // Ambil ID (Owner biasanya null, Staff ada isinya)
+                $oid = $this->employee_outlet_id ?? ($this->outlet_id ?? null);
+
                 return [
-                    'id'   => CryptoHelper::encrypt($oid),
-                    'name' => $this->outlet_name ?? 'Pusat',
+                    // Jika $oid null (Owner), ID-nya null. Jika ada (Staff), di-encrypt.
+                    'id'   => $oid ? CryptoHelper::encrypt($oid) : null,
+
+                    // Jika $oid null (Owner), namanya jadi "Akses Semua Outlet"
+                    'name' => $oid ? ($this->outlet_name ?? 'Pusat') : 'Semua Outlet (Global)',
+
+                    // Tambahkan flag ini agar Frontend React Mas gampang ngeceknya
+                    'is_all_access' => $oid ? false : true,
                 ];
             }),
         ];

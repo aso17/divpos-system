@@ -235,7 +235,7 @@ class RegistrationService
             ->join('Ms_business_module_maps as bmm', 'm.module_id', '=', 'bmm.module_id')
             ->where('bmm.business_type_id', $businessTypeId)
             ->where('m.is_active', true)
-            ->select('m.id as menu_id', 'm.module_id', 'm.code as menu_code')
+            ->select('m.id as menu_id', 'm.module_id', 'm.code as menu_code', 'm.route_name', 'm.parent_id')
             ->get();
 
         if ($menus->isEmpty()) {
@@ -257,69 +257,97 @@ class RegistrationService
         }
     }
 
-    private function assignPermissionsByRoleCode(
-        int    $tenantId,
-        int    $roleId,
-        int    $userId,
-        string $roleCode,
-        $menus
-    ): void {
-        $permissions = [];
-        $now         = now();
+    private function assignPermissionsByRoleCode(int $tenantId, int $roleId, int $userId, string $roleCode, $menus): void
+    {
+        $now = now();
+        $menuAksesMap = [];
 
+        // --- LANGKAH A: Tentukan akses Dasar (Hanya untuk Menu ber-Route) ---
         foreach ($menus as $menu) {
-            $canView   = false;
+            $canView = false;
             $canCreate = false;
             $canUpdate = false;
             $canExport = false;
 
-            if ($roleCode === 'KSR') {
-                if (Str::startsWith($menu->menu_code, ['DASH_HOME', 'TRX_'])) {
-                    $canView = $canCreate = $canUpdate = true;
-                }
-                if (in_array($menu->menu_code, ['MST_PARENT', 'MST_PELANGGAN'])) {
-                    $canView = true;
+            if (!empty($menu->route_name)) {
+                // Logic KSR
+                if ($roleCode === 'KSR') {
+                    if (Str::startsWith($menu->menu_code, ['DASH_HOME', 'TRX_'])) {
+                        $canView = $canCreate = $canUpdate = true;
+                    }
                     if ($menu->menu_code === 'MST_PELANGGAN') {
-                        $canCreate = true;
+                        $canView = $canCreate = true;
                     }
                 }
-            } elseif ($roleCode === 'ADM') {
-                if (Str::startsWith($menu->menu_code, ['DASH_', 'TRX_', 'MST_', 'RPT_'])) {
-                    $canView = $canCreate = $canUpdate = true;
-                    if (Str::startsWith($menu->menu_code, 'RPT_')) {
-                        $canExport = true;
+                // Logic ADM
+                elseif ($roleCode === 'ADM') {
+                    if (Str::startsWith($menu->menu_code, ['DASH_', 'TRX_', 'MST_', 'RPT_'])) {
+                        $canView = $canCreate = $canUpdate = true;
+                        if (Str::startsWith($menu->menu_code, 'RPT_')) {
+                            $canExport = true;
+                        }
                     }
-                }
-                if ($menu->menu_code === 'SET_PARENT') {
-                    $canView = true;
                 }
             }
 
-            if ($canView) {
-                $permissions[] = [
-                    'tenant_id'  => $tenantId,
-                    'role_id'    => $roleId,
-                    'module_id'  => $menu->module_id,
-                    'menu_id'    => $menu->menu_id,
-                    'can_view'   => true,
-                    'can_create' => $canCreate,
-                    'can_update' => $canUpdate,
-                    'can_delete' => false,
-                    'can_export' => $canExport,
-                    'is_active'  => true,
-                    'created_by' => $userId,
-                    'created_at' => $now,
-                    'updated_at' => $now,
+            $menuAksesMap[$menu->menu_id] = [
+                'can_view'   => $canView,
+                'can_create' => $canCreate,
+                'can_update' => $canUpdate,
+                'can_export' => $canExport,
+                'parent_id'  => $menu->parent_id
+            ];
+        }
+
+        // --- LANGKAH B: Power Logic (Bottom-Up Visibility) ---
+        // Kita balik urutan menunya agar anak diproses duluan sebelum bapaknya.
+        // Dengan begini, folder bapak otomatis "nyala" jika ada anak yang "nyala".
+        $reversedMenus = collect($menus)->reverse();
+
+        foreach ($reversedMenus as $menu) {
+            $mId = $menu->menu_id;
+            $pId = $menu->parent_id;
+
+            // Jika menu ini aktif (can_view true) dan punya bapak (parent)
+            if ($menuAksesMap[$mId]['can_view'] && !empty($pId)) {
+                // Maka bapaknya WAJIB bisa di-view agar folder muncul di sidebar
+                if (isset($menuAksesMap[$pId])) {
+                    $menuAksesMap[$pId]['can_view'] = true;
+                }
+            }
+        }
+
+        // --- LANGKAH C: Mapping & Insert ---
+        $finalPermissions = [];
+        foreach ($menus as $menu) {
+            $akses = $menuAksesMap[$menu->menu_id];
+
+            if ($akses['can_view']) {
+                $finalPermissions[] = [
+                    'tenant_id'   => $tenantId,
+                    'role_id'     => $roleId,
+                    'module_id'   => $menu->module_id,
+                    'menu_id'     => $menu->menu_id,
+                    'can_view'    => true,
+                    'can_create'  => $akses['can_create'],
+                    'can_update'  => $akses['can_update'],
+                    'can_delete'  => false,
+                    'can_export'  => $akses['can_export'],
+                    'is_active'   => true,
+                    'created_by'  => $userId,
+                    'created_at'  => $now,
+                    'updated_at'  => $now,
                 ];
             }
         }
 
-        // FIX: chunk 500 — konsisten dengan seedOwnerPermissions
-        foreach (array_chunk($permissions, 500) as $chunk) {
-            DB::table('Ms_role_menu_permissions')->insert($chunk);
+        if (!empty($finalPermissions)) {
+            // Bulk insert 100 row per batch (Sangat cepat di PostgreSQL/MySQL)
+            foreach (array_chunk($finalPermissions, 100) as $chunk) {
+                DB::table('Ms_role_menu_permissions')->insert($chunk);
+            }
         }
     }
-
     private function seedDefaultPaymentMethods(int $tenantId, int $userId): void
     {
         $now = now();
