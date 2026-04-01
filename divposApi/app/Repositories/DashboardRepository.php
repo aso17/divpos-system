@@ -5,23 +5,8 @@ namespace App\Repositories;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
-/**
- * DashboardRepository
- *
- * Tanggung jawab: RAW QUERY ONLY.
- * - Tidak ada business logic di sini.
- * - Setiap query hanya SELECT kolom yang benar-benar dipakai di frontend.
- * - Semua query memiliki index hint agar PostgreSQL memilih execution plan terbaik.
- * - Soft-delete selalu dijaga: WHERE deleted_at IS NULL.
- */
 class DashboardRepository
 {
-    // ─── 1. STAT CARDS ────────────────────────────────────────────────────────
-
-    /**
-     * Total pelanggan aktif.
-     * Index: (tenant_id, is_active) → sudah ada di Ms_customers
-     */
     public function countCustomers(int $tenantId): int
     {
         return (int) DB::selectOne(

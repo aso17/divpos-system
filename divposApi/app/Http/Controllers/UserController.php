@@ -1,14 +1,15 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
-use App\Http\Resources\EmployeeDropdownResource; 
+use App\Http\Resources\EmployeeDropdownResource;
 use App\Http\Resources\UserResource;
 use App\Services\LogDbErrorService;
-use App\Services\UserService; 
-use App\Http\Requests\UserRequest; 
-use App\Helpers\CryptoHelper; 
+use App\Services\UserService;
+use App\Http\Requests\UserRequest;
+use App\Helpers\CryptoHelper;
 
 class UserController extends Controller
 {
@@ -17,16 +18,16 @@ class UserController extends Controller
     protected $logService;
 
 
-    public function __construct(UserService $userService,LogDbErrorService $logService)
+    public function __construct(UserService $userService, LogDbErrorService $logService)
     {
         $this->userService = $userService;
         $this->logService = $logService;
-       
+
     }
-    
-  public function index(Request $request)
+
+    public function index(Request $request)
     {
-       
+
         $request->validate([
             'keyword'  => 'nullable|string|max:50',
             'per_page' => 'nullable|integer|min:1|max:100',
@@ -61,20 +62,20 @@ class UserController extends Controller
 
     public function getAvailableEmployees()
     {
-       
-       try {
-        $user = Auth::user();      
-        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
-        if (!$tenantId) {
-            return response()->json(['message' => 'Tenant tidak ditemukan'], 403);
-        }
 
-        $employees = $this->userService->getEmployeesForDropdown($tenantId);
+        try {
+            $user = Auth::user();
+            $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
+            if (!$tenantId) {
+                return response()->json(['message' => 'Tenant tidak ditemukan'], 403);
+            }
 
-        return response()->json([
-            'status' => 'success',          
-            'data'   => EmployeeDropdownResource::collection($employees)
-        ]);
+            $employees = $this->userService->getEmployeesForDropdown($tenantId);
+
+            return response()->json([
+                'status' => 'success',
+                'data'   => EmployeeDropdownResource::collection($employees)
+            ]);
 
         } catch (\Exception $e) {
             $this->logService->log($e);
@@ -86,57 +87,57 @@ class UserController extends Controller
     }
 
     // POST /user
-public function store(UserRequest $request)
-{
-    try {
-      
-        $user = $this->userService->createUser(
-            $request->validated(), 
-            $request->file('avatar')
-        );
+    public function store(UserRequest $request)
+    {
+        try {
 
-        $user->load(['role', 'employee']);
+            $user = $this->userService->createUser(
+                $request->validated(),
+                $request->file('avatar')
+            );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'User berhasil dibuat',
-            'data' => new UserResource($user), 
-        ], 201);
+            $user->load(['role', 'employee']);
 
-    } catch (\Exception $e) {
+            return response()->json([
+                'success' => true,
+                'message' => 'User berhasil dibuat',
+                'data' => new UserResource($user),
+            ], 201);
 
-        $this->logService->log($e);
+        } catch (\Exception $e) {
 
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Gagal membuat user: ' . $e->getMessage()
-        ], 500);
+            $this->logService->log($e);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal membuat user: ' . $e->getMessage()
+            ], 500);
+        }
     }
-}
 
-// PUT /user/{id}
+
     public function update(UserRequest $request)
     {
         try {
-            // ID sudah didekripsi di UserRequest (prepareForValidation)
-            $decryptedId = $request->id;                 
-            // Eksekusi Service
+
+            $decryptedId = $request->id;
+
             $user = $this->userService->updateUserInfo(
-                (int)$decryptedId,       
-                $request->validated(), 
+                (int)$decryptedId,
+                $request->validated(),
                 $request->file('avatar')
             );
 
             if (!$user) {
                 return response()->json([
-                    'status' => 'error', 
+                    'status' => 'error',
                     'message' => 'User tidak ditemukan atau Anda tidak memiliki akses'
                 ], 404);
             }
 
-            // Load relasi untuk response yang lengkap
+
             $user->load(['role', 'employee.tenant', 'employee.outlet']);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'User berhasil diperbarui',
@@ -144,27 +145,27 @@ public function store(UserRequest $request)
             ]);
 
         } catch (\Exception $e) {
-            // Log error jika diperlukan: Log::error($e->getMessage());
-             $this->logService->log($e);
+
+            $this->logService->log($e);
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
             ], 500);
         }
     }
-   
+
     public function destroy($id)
     {
-        try {         
+        try {
             $decryptedId = CryptoHelper::decrypt($id);
-            $user = Auth::user();      
-            $tenantId =$user->employee?->tenant_id;
+            $user = Auth::user();
+            $tenantId = $user->employee?->tenant_id;
 
-            if (!$decryptedId ) {
+            if (!$decryptedId) {
                 return response()->json(['status' => 'error', 'message' => 'Parameter tidak valid'], 400);
             }
 
-            $result = $this->userService->revokeUserAccess((int)$decryptedId,$tenantId);
+            $result = $this->userService->revokeUserAccess((int)$decryptedId, $tenantId);
 
             if (!$result) {
                 return response()->json([
@@ -176,11 +177,11 @@ public function store(UserRequest $request)
             return response()->json([
                 'status' => 'success',
                 'message' => 'User ' . $result->username . ' berhasil dihapus',
-                
+
             ], 200);
 
         } catch (\Exception $e) {
-             $this->logService->log($e);
+            $this->logService->log($e);
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage()

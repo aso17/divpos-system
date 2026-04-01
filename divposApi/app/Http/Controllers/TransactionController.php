@@ -106,7 +106,7 @@ class TransactionController extends Controller
         $user = Auth::user();
         $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
 
-        // 🔥 Jika Owner, ambil outlet_id dari request. Jika bukan, ambil dari profile employee-nya.
+
         $outletId = $request->query('outlet_id');
 
         if (!$tenantId) {

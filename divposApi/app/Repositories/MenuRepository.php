@@ -13,7 +13,7 @@ class MenuRepository
     {
         return DB::table('Ms_role_menu_permissions as rp')
             ->join('Ms_menus as m', 'm.id', '=', 'rp.menu_id')
-            ->leftJoin('Ms_modules as mo', 'mo.id', '=', 'm.module_id') // pakai LEFT biar aman
+            ->leftJoin('Ms_modules as mo', 'mo.id', '=', 'm.module_id')
             ->where([
                 ['rp.role_id', '=', $roleId],
                 ['rp.tenant_id', '=', $tenantId],
@@ -33,7 +33,7 @@ class MenuRepository
                 'rp.can_delete',
                 'rp.can_export'
             ])
-            ->orderByRaw('COALESCE(mo.order_no, 0) ASC') // biar module null tidak error
+            ->orderByRaw('COALESCE(mo.order_no, 0) ASC')
             ->orderBy('m.order_no')
             ->get();
     }
@@ -52,8 +52,7 @@ class MenuRepository
                 ['bmm.is_active', '=', true],
                 ['m.is_active', '=', true]
             ])
-            // Note: Filter m.business_type_code dihapus karena kolom tidak ada di Ms_menus.
-            // Filter sudah ter-handle secara otomatis lewat bmm (Business Module Map).
+
             ->select([
                 'm.id as menu_id',
                 'm.menu_name',

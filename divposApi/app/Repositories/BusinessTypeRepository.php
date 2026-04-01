@@ -16,16 +16,14 @@ class BusinessTypeRepository
 
     public function getAll()
     {
-        // 1. Ambil data asli dari database
         $data = $this->model->select('id', 'name')
-                    ->where('is_active', true) // Pastikan hanya yang aktif
+                    ->where('is_active', true)
                     ->orderBy('name', 'asc')
                     ->get();
 
-        // 2. Transformasi data: Enkripsi ID sebelum dikirim ke FE
         return $data->map(function ($type) {
             return [
-                'id'   => CryptoHelper::encrypt($type->id), // Enkripsi di sini
+                'id'   => CryptoHelper::encrypt($type->id),
                 'name' => $type->name,
             ];
         });

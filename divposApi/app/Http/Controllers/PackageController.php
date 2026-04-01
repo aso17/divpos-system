@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use App\Http\Resources\PackageResource;
 use App\Http\Requests\PackageRequest;
 use App\Services\PackageService;

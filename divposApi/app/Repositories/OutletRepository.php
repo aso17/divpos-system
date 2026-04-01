@@ -23,11 +23,10 @@ class OutletRepository
                 'address',
                 'is_main_branch'
             ])
-            ->where('tenant_id', $tenantId) // Wajib tenant yang sama
-            ->where('is_active', true)      // Wajib aktif
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
             ->where(function ($query) use ($outlet_id) {
-                // Jika $outlet_id ada isinya (Karyawan), filter berdasarkan ID tersebut.
-                // Jika $outlet_id NULL (Owner), maka tidak perlu filter outlet (ambil semua).
+
                 if (!is_null($outlet_id)) {
                     $query->where('id', $outlet_id);
                 }

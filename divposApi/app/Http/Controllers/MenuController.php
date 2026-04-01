@@ -11,10 +11,8 @@ class MenuController extends Controller
     {
 
         $menuData = MenuService::getMenuByUser($request->user());
-        // 2. Response yang konsisten
         return response()->json([
             'menus'       => $menuData['tree'] ?? [],
-            'us' => $request->user(),
             'permissions' => $menuData['map'] ?? [],
 
 

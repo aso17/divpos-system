@@ -18,10 +18,7 @@ class MsPaymentMethodRepository
                 'is_dp_enabled',
                 'allow_zero_pay'
             ])
-            // ->where(function ($query) use ($tenantId) {
-            //     $query->where('tenant_id', $tenantId)
-            //       ->orWhereNull('tenant_id');
-            // })
+
             ->where('tenant_id', $tenantId)
             ->where('is_active', true)
             ->orderBy('is_default', 'desc')
@@ -49,7 +46,6 @@ class MsPaymentMethodRepository
             ->whereNull('pm.deleted_at')
             ->when($keyword, function ($query) use ($keyword) {
                 $query->where(function ($q) use ($keyword) {
-                    // Gunakan 'like' atau 'ilike' tergantung database yang Anda pakai
                     $q->where('pm.name', 'like', '%' . $keyword . '%')
                       ->orWhere('pm.type', 'like', '%' . $keyword . '%')
                       ->orWhere('pm.account_number', 'like', '%' . $keyword . '%');
@@ -71,7 +67,6 @@ class MsPaymentMethodRepository
      */
     public function update($id, array $data, $tenantId)
     {
-        // Pastikan record yang diupdate milik tenant yang bersangkutan
         $record = Ms_PaymentMethod::where('tenant_id', $tenantId)
             ->where('id', $id)
             ->firstOrFail();

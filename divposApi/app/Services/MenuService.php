@@ -63,7 +63,7 @@ class MenuService
                     'icon'         => $row->icon,
                     'route'        => $row->route_name,
                     'parent_id'    => $row->parent_id,
-                    'module_order' => $row->module_order ?? 0, // 🚩 Tambahkan ini dari query repository
+                    'module_order' => $row->module_order ?? 0,
                     'order_no'     => $row->order_no ?? 0,
                     'perms'        => $perms,
                     'children'     => []
@@ -101,13 +101,6 @@ class MenuService
                     }
                 }
 
-                // 🚩 SORTING FINAL: Urutkan Modul dulu, baru Order No menu
-                // usort($result, function ($a, $b) {
-                //     if ($a['module_order'] != $b['module_order']) {
-                //         return $a['module_order'] <=> $b['module_order'];
-                //     }
-                //     return $a['order_no'] <=> $b['order_no'];
-                // });
 
                 return $result;
             };

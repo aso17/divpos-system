@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\RolePermissionRepository;
+use App\Helpers\ClearCache;
 use Illuminate\Support\Facades\Auth;
 
 class RolePermissionService
@@ -27,16 +28,18 @@ class RolePermissionService
             'permissions' => $permissions // Data ini sudah include parent_id & is_parent
         ];
     }
+
     public function syncPermissions($roleId, array $rawPermissions)
     {
         $user = Auth::user();
-        $userId = Auth::id(); // Ambil ID di luar loop agar cepat
+        $userId = Auth::id();
         $now = now();
         $cleanRoleId = (int) $roleId;
+        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
 
-        $preparedData = collect($rawPermissions)->map(function ($p) use ($cleanRoleId, $user, $userId, $now) {
+        $preparedData = collect($rawPermissions)->map(function ($p) use ($cleanRoleId, $tenantId, $userId, $now) {
             return [
-                'tenant_id'  => $user->tenant_id,
+                'tenant_id'  => $tenantId,
                 'role_id'    => $cleanRoleId,
                 'module_id'  => $p['module_id'],
                 'menu_id'    => $p['menu_id'],
@@ -52,6 +55,13 @@ class RolePermissionService
             ];
         })->toArray();
 
-        return $this->repository->updateRolePermissions($cleanRoleId, $user->tenant_id, $preparedData);
+
+        $result = $this->repository->updateRolePermissions($cleanRoleId, $tenantId, $preparedData);
+        if ($result) {
+
+            ClearCache::roleMenu($tenantId, $cleanRoleId);
+        }
+
+        return $result;
     }
 }
