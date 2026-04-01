@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Services;
+
 use App\Repositories\ServiceRepository;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Ms_package;
@@ -16,19 +17,26 @@ class MasterService
     {
         $this->serviceRepo = $serviceRepo;
     }
-
+    public function getAllServicesTransaction(int $tenantId)
+    {
+        return $this->serviceRepo->getAllForTransaction($tenantId);
+    }
     public function getServicesForDropdown($encryptedTenantId)
     {
         $tenantId = CryptoHelper::decrypt($encryptedTenantId);
-        if (!$tenantId) return collect();
+        if (!$tenantId) {
+            return collect();
+        }
 
         return $this->serviceRepo->getActiveServices((int)$tenantId);
     }
 
     public function getPaginatedServices(array $params)
     {
-        $tenantId =$params['tenant_id'];
-        if (!$tenantId) return null;
+        $tenantId = $params['tenant_id'];
+        if (!$tenantId) {
+            return null;
+        }
 
         $query = $this->serviceRepo->getBaseQuery((int)$tenantId);
 
@@ -45,16 +53,16 @@ class MasterService
      */
     public function createMasterService(array $data)
     {
-        
+
         return $this->serviceRepo->create($data);
     }
 
-/**
- * Logika Bisnis Update Layanan
- */
+    /**
+     * Logika Bisnis Update Layanan
+     */
     public function updateMasterService($id, array $data)
     {
-        
+
         $tenantId = $data['tenant_id'] ?? Auth::user()->employee?->tenant_id;
 
         $service = $this->serviceRepo->update((int)$id, (int)$tenantId, $data);
@@ -65,7 +73,7 @@ class MasterService
 
         return $service;
     }
-   
+
     public function deleteMasterService(int $id, int $tenantId)
     {
         // 1. Cek apakah layanan digunakan di Master Paket
@@ -74,7 +82,7 @@ class MasterService
             ->exists();
 
         if ($hasPackages) {
-            
+
             throw new \Exception("Layanan tidak bisa dihapus karena masih digunakan dalam Master Paket.");
         }
 

@@ -8,37 +8,37 @@ use Illuminate\Support\Facades\DB;
 
 class MenuService
 {
-    public static function getMenuByUser($user)
+    public static function getMenuByUser($user): array
     {
-        $cacheKey = "nav_v2_{$user->id}";
+        $cacheKey = "nav_v3_{$user->id}";
 
-        return Cache::remember($cacheKey, 3600, function () use ($user) {
-            // 1. Definisikan Tenant ID secara aman
+        // Laravel 13: Menggunakan flexible cache (rekomendasi baru)
+        // 3600 detik (1 jam) untuk fresh, 7200 detik (2 jam) toleransi data lama (stale)
+        return Cache::flexible($cacheKey, [3600, 7200], function () use ($user) {
+
+            // 1. Null-safe Tenant Discovery (L13 Style)
             $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
 
             if (!$tenantId) {
                 return ['tree' => [], 'map' => []];
             }
 
-            // 2. Deteksi Admin vs Staff
+            // 2. Deteksi Admin vs Staff (Optimized Query)
             $isAdministrator = DB::table('Ms_tenants')
                 ->where('id', $tenantId)
                 ->where('owner_id', $user->id)
                 ->exists();
 
-            $rows = collect();
-            if ($isAdministrator) {
-                $bizCode = DB::table('Ms_tenants as t')
+            $rows = match(true) {
+                $isAdministrator => ($bizCode = DB::table('Ms_tenants as t')
                     ->join('Ms_business_types as bt', 'bt.id', '=', 't.business_type_id')
                     ->where('t.id', $tenantId)
-                    ->value('bt.code');
+                    ->value('bt.code')) ? MenuRepository::getByBusinessType($bizCode) : collect(),
 
-                $rows = $bizCode ? MenuRepository::getByBusinessType($bizCode) : collect();
-            } else {
-                if ($user->role_id) {
-                    $rows = MenuRepository::getByRole((int)$user->role_id, (int)$tenantId);
-                }
-            }
+                (bool)$user->role_id => MenuRepository::getByRole((int)$user->role_id, (int)$tenantId),
+
+                default => collect()
+            };
 
             if ($rows->isEmpty()) {
                 return ['tree' => [], 'map' => []];
@@ -47,7 +47,7 @@ class MenuService
             $menuMap = [];
             $permissions = [];
 
-            // 3. Mapping Awal (Sertakan Module Order)
+            // 3. Mapping & Flat Map
             foreach ($rows as $row) {
                 $perms = [
                     'view'   => (bool)($row->can_view ?? false),
@@ -74,7 +74,7 @@ class MenuService
                 }
             }
 
-            // 4. Build Tree Dasar (Reference Matching)
+            // 4. Build Tree
             $tree = [];
             foreach ($menuMap as $id => &$node) {
                 $parentId = $node['parent_id'];
@@ -86,20 +86,19 @@ class MenuService
             }
             unset($node);
 
-            // 5. 🔥 RECURSIVE FILTER & MULTI-LEVEL SORTING
+            // 5. 🔥 RECURSIVE FILTER & MULTI-LEVEL SORTING (L13 Optimized)
             $processTree = function ($nodes) use (&$processTree) {
                 $result = [];
 
                 foreach ($nodes as $node) {
                     $node['children'] = $processTree($node['children']);
 
-                    $hasVisibleChild = !empty($node['children']);
-                    $canView = $node['perms']['view'];
-
-                    if ($canView || $hasVisibleChild) {
+                    // Tampilkan jika punya akses view ATAU punya anak yang aktif
+                    if ($node['perms']['view'] || !empty($node['children'])) {
                         $result[] = $node;
                     }
                 }
+
 
 
                 return $result;

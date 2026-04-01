@@ -6,15 +6,23 @@ use App\Models\Ms_service;
 
 class ServiceRepository
 {
-   
+    public function getAllForTransaction(int $tenantId)
+    {
+        return Ms_service::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->orderBy('name', 'asc')
+            ->get(['id', 'name']);
+    }
+
     public function getBaseQuery(int $tenantId, $keyword = null)
     {
         return Ms_Service::select([
-                'id', 
-                'name', 
-                'description', 
-                'is_active', 
-                'created_at', 
+                'id',
+                'name',
+                'description',
+                'is_active',
+                'created_at',
                 'created_by'
             ])
             ->where('tenant_id', $tenantId)
@@ -67,8 +75,10 @@ class ServiceRepository
     public function update(int $id, int $tenantId, array $data)
     {
         $service = $this->findByIdAndTenant($id, $tenantId);
-        if (!$service) return null;
-        
+        if (!$service) {
+            return null;
+        }
+
         $service->update($data);
         return $service;
     }
@@ -79,8 +89,10 @@ class ServiceRepository
     public function delete(int $id, int $tenantId)
     {
         $service = $this->findByIdAndTenant($id, $tenantId);
-        if (!$service) return false;
-        
+        if (!$service) {
+            return false;
+        }
+
         return $service->delete();
     }
 

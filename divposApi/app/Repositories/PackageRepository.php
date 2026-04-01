@@ -11,6 +11,8 @@ class PackageRepository
     {
         return Ms_package::select([
                 'id',
+                'service_id',
+                'category_id',
                 'tenant_id',
                 'unit_id',
                 'code',

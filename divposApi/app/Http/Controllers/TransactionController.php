@@ -7,6 +7,8 @@ use App\Http\Requests\PaymentUpdateRequest;
 use App\Http\Requests\CancelTransactionRequest;
 use Illuminate\Support\Facades\Cache;
 use App\Services\PackageService;
+use App\Services\CategoryService;
+use App\Services\MasterService;
 use App\Services\CustomerService;
 use App\Services\OutletService;
 use App\Services\EmployeeService;
@@ -15,6 +17,8 @@ use App\Services\PaymentMethodService;
 use App\Http\Resources\TransactionResource;
 use App\Http\Resources\TransactionHistoryResource;
 use App\Http\Resources\TransactionPaymentMethodResource;
+use App\Http\Resources\TransactionCategoryResource;
+use App\Http\Resources\TransactionServiceResource;
 use App\Http\Resources\CustomerResource;
 use App\Http\Resources\TransactionPackageResource;
 use App\Http\Resources\TransactionOutletResource;
@@ -25,6 +29,8 @@ use Illuminate\Support\Facades\Auth;
 class TransactionController extends Controller
 {
     protected $packageService;
+    protected $categoryService;   // tambah
+    protected $masterService;     // tambah
     protected $customerService;
     protected $transactionService;
     protected $outletService;
@@ -33,18 +39,22 @@ class TransactionController extends Controller
 
     public function __construct(
         PackageService $packageService,
+        CategoryService $categoryService,    // tambah
+        MasterService $masterService,        // tambah
         CustomerService $customerService,
         OutletService $outletService,
         PaymentMethodService $paymentMethodService,
         TransactionService $transactionService,
         EmployeeService $employeeService
     ) {
-        $this->packageService = $packageService;
-        $this->customerService = $customerService;
-        $this->outletService = $outletService;
+        $this->packageService       = $packageService;
+        $this->categoryService      = $categoryService;    // tambah
+        $this->masterService        = $masterService;      // tambah
+        $this->customerService      = $customerService;
+        $this->outletService        = $outletService;
         $this->paymentMethodService = $paymentMethodService;
-        $this->transactionService = $transactionService;
-        $this->employeeService = $employeeService;
+        $this->transactionService   = $transactionService;
+        $this->employeeService      = $employeeService;
 
     }
 
@@ -52,55 +62,44 @@ class TransactionController extends Controller
     public function getInitData()
     {
         $user = Auth::user();
-        // Ambil tenantId & outletId dengan fallback yang aman
+
         $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
-        $outletId = $user->employee?->outlet_id ?? null; // NULL jika Owner
+        $outletId = $user->employee?->outlet_id;
 
         if (!$tenantId) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 403);
         }
 
-        /**
-         * Suffix Cache Key:
-         * Agar data 'outlets' tidak tertukar antara Owner (global) dan Kasir (spesifik).
-         */
-        $suffix = $outletId ? "outlet_{$outletId}" : "owner_global";
-        $cacheKey = "init_data_tenant_{$tenantId}_{$suffix}";
+        $suffix   = $outletId ? "outlet_{$outletId}" : "owner_global";
+        $cacheKey = "init_data_v3_{$tenantId}_{$suffix}";
 
-        // 1. Ambil data dari cache
-        $data = Cache::remember($cacheKey, now()->addHours(24), function () use ($tenantId, $outletId) {
-            return [
+        $data = Cache::flexible($cacheKey, [3600, 86400], function () use ($tenantId, $outletId) {
+            $initData = [
+                'services'        => $this->masterService->getAllServicesTransaction($tenantId),
+                'categories'      => $this->categoryService->getAllCategoriesTransaction($tenantId),
                 'packages'        => $this->packageService->getAllPackagesTransaction($tenantId),
                 'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId, $outletId),
                 'payment_methods' => $this->paymentMethodService->getAllPaymentMethodsTransaction($tenantId),
             ];
+
+            if (collect($initData)->contains(fn ($val) => empty($val))) {
+                throw new \Exception("Incomplete Init Data");
+            }
+
+            return $initData;
         });
 
-        /**
-         * 2. VALIDASI CACHE & FALLBACK
-         * Jika cache korup atau key tidak lengkap, ambil data fresh
-         */
-        if (empty($data['packages']) || empty($data['outlets']) || empty($data['payment_methods'])) {
-            Cache::forget($cacheKey);
-
-            $data = [
-                'packages'        => $this->packageService->getAllPackagesTransaction($tenantId),
-                'outlets'         => $this->outletService->getAllOutletsTransaction($tenantId, $outletId),
-                'payment_methods' => $this->paymentMethodService->getAllPaymentMethodsTransaction($tenantId),
-            ];
-        }
-
-        // 3. Return response dengan Resource Collection
         return response()->json([
             'status' => 'success',
-            'data' => [
+            'data'   => [
+                'services'        => TransactionServiceResource::collection($data['services']),
+                'categories'      => TransactionCategoryResource::collection($data['categories']),
                 'packages'        => TransactionPackageResource::collection($data['packages']),
                 'outlets'         => TransactionOutletResource::collection($data['outlets']),
                 'payment_methods' => TransactionPaymentMethodResource::collection($data['payment_methods']),
-            ]
+            ],
         ]);
     }
-
     public function searchEmployeTransaction(Request $request)
     {
         $user = Auth::user();

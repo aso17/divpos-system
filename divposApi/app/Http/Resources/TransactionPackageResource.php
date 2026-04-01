@@ -14,6 +14,8 @@ class TransactionPackageResource extends JsonResource
 
         return [
             'id'              => CryptoHelper::encrypt($this->id),
+            'service_id'     => CryptoHelper::encrypt($this->service_id),
+            'category_id'    => CryptoHelper::encrypt($this->category_id),
             'name'            => $this->name,
             'code'            => $this->code,
             'original_price'  => $original,

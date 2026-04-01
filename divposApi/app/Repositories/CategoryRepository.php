@@ -33,4 +33,14 @@ class CategoryRepository
     {
         return $category->delete();
     }
+
+    public function getAllForTransaction(int $tenantId)
+    {
+        return Ms_category::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->orderBy('priority', 'asc')
+            ->orderBy('name', 'asc')
+            ->get(['id', 'name', 'slug', 'priority']);
+    }
 }
