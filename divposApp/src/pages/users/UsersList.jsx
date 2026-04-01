@@ -346,7 +346,7 @@ export default function UsersList() {
               <div className="flex items-center gap-2">
                 <ShieldCheck size={10} className="text-slate-300 shrink-0" />
                 <p className="text-[9px] text-slate-600 font-bold">
-                  {user.role?.role_name || "GUEST"}
+                  {user.role?.name || "GUEST"}
                 </p>
               </div>
             </div>

@@ -1,7 +1,11 @@
 // Transactions.jsx
-// Logic: TIDAK DIUBAH — hanya styling layout wrapper
-
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import TransactionService from "../../services/TransactionService";
 import { useFormValidation } from "../../hooks/useFormValidation";
 import { rules } from "../../utils/validators/rules";
@@ -13,7 +17,6 @@ import TransactionCustomerForm from "./TransactionCustomerForm";
 import TransactionCartForm from "./TransactionCartForm";
 import { formatRupiah, parseNumber, toNum } from "../../utils/formatter";
 import { GetWithExpiry } from "../../utils/Storage";
-
 import ReceiptText from "lucide-react/dist/esm/icons/receipt-text";
 
 const Transactions = () => {
@@ -25,6 +28,8 @@ const Transactions = () => {
   const [businessType, setBusinessType] = useState("");
   const [search, setSearch] = useState("");
   const [packages, setPackages] = useState([]);
+  const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
@@ -33,6 +38,8 @@ const Transactions = () => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [lastTransactionData, setLastTransactionData] = useState(null);
+  const [activeServiceId, setActiveServiceId] = useState(null);
+  const [activeCategoryId, setActiveCategoryId] = useState(null);
 
   const { values, errors, handleChange, validate, setValues } =
     useFormValidation(
@@ -52,14 +59,14 @@ const Transactions = () => {
       }
     );
 
-  // ── Data extraction (TIDAK DIUBAH) ──────────────────────────────────────────
+  // ── Payment flags ────────────────────────────────────────────────────────────
   const {
     is_cash = false,
     is_dp_enabled = false,
     allow_zero_pay = false,
   } = selectedPaymentMethod || {};
 
-  // ── Computation (TIDAK DIUBAH) ───────────────────────────────────────────────
+  // ── Subtotal ─────────────────────────────────────────────────────────────────
   const subtotal = useMemo(
     () =>
       cart.reduce(
@@ -69,14 +76,38 @@ const Transactions = () => {
     [cart]
   );
 
-  const filteredPackages = useMemo(
-    () =>
-      packages.filter((pkg) =>
-        pkg.name.toLowerCase().includes(search.toLowerCase())
-      ),
-    [packages, search]
-  );
+  // ── Visible categories: hanya yang punya package di service aktif ─────────────
+  const visibleCategories = useMemo(() => {
+    if (!activeServiceId) return categories;
+    const relevantIds = new Set(
+      packages
+        .filter((p) => p.service_id === activeServiceId)
+        .map((p) => p.category_id)
+    );
+    return categories.filter((c) => relevantIds.has(c.id));
+  }, [activeServiceId, packages, categories]);
 
+  // ── Filtered packages: early-exit tiap kondisi gagal ─────────────────────────
+  const filteredPackages = useMemo(() => {
+    const q = search.toLowerCase();
+    return packages.filter((pkg) => {
+      if (activeServiceId && pkg.service_id !== activeServiceId) return false;
+      if (activeCategoryId && pkg.category_id !== activeCategoryId)
+        return false;
+      if (
+        q &&
+        !(
+          pkg.name.toLowerCase().includes(q) ||
+          (pkg.code || "").toLowerCase().includes(q) ||
+          (pkg.category_name || "").toLowerCase().includes(q)
+        )
+      )
+        return false;
+      return true;
+    });
+  }, [packages, activeServiceId, activeCategoryId, search]);
+
+  // ── Payment computation ───────────────────────────────────────────────────────
   const dpAmountNum = toNum(dpAmount);
   const payAmountNum = toNum(payAmount);
   const totalDiterima = dpAmountNum + payAmountNum;
@@ -88,18 +119,16 @@ const Transactions = () => {
   const isDisabled =
     loading || cart.length === 0 || !isPaymentEntered || isUnderpaid;
 
-  // ── Effects (TIDAK DIUBAH) ───────────────────────────────────────────────────
+  // ── Effects ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     const storedUser = GetWithExpiry("user");
     if (storedUser) {
       setBusinessType(storedUser.tenant?.business_type || "");
-
-      if (storedUser.outlet?.id) {
+      if (storedUser.outlet?.id)
         handleChange("outlet_id", storedUser.outlet.id);
-      }
     }
   }, []);
-  // console.log(businessType);
+
   useEffect(() => {
     if (hasFetched.current) return;
     fetchData();
@@ -114,70 +143,86 @@ const Transactions = () => {
     }
   }, [cart.length]);
 
-  // ── Handlers (TIDAK DIUBAH) ──────────────────────────────────────────────────
+  // ── Handlers ──────────────────────────────────────────────────────────────────
+  const triggerToast = useCallback((message, type) => {
+    window.dispatchEvent(
+      new CustomEvent("global-toast", { detail: { message, type } })
+    );
+  }, []);
+
   const fetchData = async () => {
     try {
       const res = await TransactionService.getInitData();
-      // console.log(res);
-
       const data = res.data.data;
+      setServices(data.services || []);
+      setCategories(data.categories || []);
       setPackages(data.packages || []);
       setOutlets(data.outlets || []);
       const payData = data.payment_methods || [];
       setPaymentMethods(payData);
       if (payData.length > 0) setSelectedPaymentMethod(payData[0]);
-
-      // console.log(data.packages);
-      // if (data.outlets?.length > 0)
-      // handleChange("outlet_id", data.outlets[0].id);
-    } catch (error) {
+    } catch {
       triggerToast("Gagal ambil data", "error");
     }
   };
 
-  const handlePhoneChange = async (val) => {
-    handleChange("customer_phone", val);
-    abortControllerRef.current?.abort();
-    if (val.length < 10)
-      return setValues((prev) => ({
-        ...prev,
-        customer_id: null,
-        is_new: true,
-      }));
+  // Gabungkan setActiveServiceId + reset category dalam 1 handler
+  // supaya React batch keduanya jadi 1 render, bukan 2
+  const handleServiceChange = useCallback((serviceId) => {
+    setActiveServiceId(serviceId);
+    setActiveCategoryId(null);
+  }, []);
 
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    try {
-      const res = await TransactionService.searchCustomer(
-        { phone: val },
-        { signal: controller.signal }
-      );
-      const existing = res.data.data;
-      setValues((prev) => ({
-        ...prev,
-        customer_id: existing?.id || null,
-        customer_name: existing?.name || "",
-        is_new: !existing,
-      }));
-    } catch (error) {}
-  };
+  const handlePhoneChange = useCallback(
+    async (val) => {
+      handleChange("customer_phone", val);
+      abortControllerRef.current?.abort();
+      if (val.length < 10)
+        return setValues((prev) => ({
+          ...prev,
+          customer_id: null,
+          is_new: true,
+        }));
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      try {
+        const res = await TransactionService.searchCustomer(
+          { phone: val },
+          { signal: controller.signal }
+        );
+        const existing = res.data.data;
+        setValues((prev) => ({
+          ...prev,
+          customer_id: existing?.id || null,
+          customer_name: existing?.name || "",
+          is_new: !existing,
+        }));
+      } catch {}
+    },
+    [handleChange, setValues]
+  );
 
-  const addToCart = (pkg) => {
-    if (cart.find((x) => x.id === pkg.id))
-      return triggerToast("Layanan sudah ada.", "warning");
-    setCart([...cart, { ...pkg, qty: 1 }]);
-  };
+  const addToCart = useCallback(
+    (pkg) => {
+      setCart((prev) => {
+        if (prev.find((x) => x.id === pkg.id)) {
+          triggerToast("Layanan sudah ada.", "warning");
+          return prev; // tidak ubah state jika sudah ada — cegah re-render
+        }
+        return [...prev, { ...pkg, qty: 1 }];
+      });
+    },
+    [triggerToast]
+  );
 
   const handleSubmit = async () => {
     if (issubmitting.current || !validate()) return;
     if (cart.length === 0) return triggerToast("Keranjang kosong!", "warning");
-
-    if (["SLN", "BRB"].includes(businessType)) {
-      const isMissingEmployee = cart.some((item) => !item.employee_id);
-      if (isMissingEmployee) {
-        return triggerToast("Pilih petugas untuk setiap layanan!", "error");
-      }
-    }
+    if (
+      ["SLN", "BRB"].includes(businessType) &&
+      cart.some((i) => !i.employee_id)
+    )
+      return triggerToast("Pilih petugas untuk setiap layanan!", "error");
     if (!allow_zero_pay && totalDiterima < subtotal)
       return triggerToast(
         `Pembayaran kurang! Total wajib: ${formatRupiah(subtotal)}`,
@@ -229,18 +274,11 @@ const Transactions = () => {
     }
   };
 
-  const triggerToast = (message, type) => {
-    window.dispatchEvent(
-      new CustomEvent("global-toast", { detail: { message, type } })
-    );
-  };
-
-  // ── Render ───────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHead title="Transaksi" />
 
-      {/* ── Page Header ── */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-4">
         <div className="max-w-screen-xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -256,8 +294,6 @@ const Transactions = () => {
               </p>
             </div>
           </div>
-
-          {/* Cart count badge — visible on mobile */}
           {cart.length > 0 && (
             <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full lg:hidden">
               <span className="text-xs font-bold text-emerald-700">
@@ -268,10 +304,8 @@ const Transactions = () => {
         </div>
       </div>
 
-      {/* ── Content ── */}
       <div className="max-w-screen-xl mx-auto px-4 md:px-6 py-5">
         <div className="flex flex-col lg:flex-row gap-5">
-          {/* ── LEFT COLUMN: Customer + Services ── */}
           <div className="w-full lg:w-3/5 flex flex-col gap-4">
             <TransactionCustomerForm
               values={values}
@@ -282,8 +316,13 @@ const Transactions = () => {
               inputClasses={inputClasses}
             />
             <TransactionServiceForm
-              packages={packages}
               filteredPackages={filteredPackages}
+              services={services}
+              visibleCategories={visibleCategories}
+              activeServiceId={activeServiceId}
+              activeCategoryId={activeCategoryId}
+              onServiceChange={handleServiceChange}
+              setActiveCategoryId={setActiveCategoryId}
               search={search}
               setSearch={setSearch}
               addToCart={addToCart}
@@ -292,7 +331,6 @@ const Transactions = () => {
             />
           </div>
 
-          {/* ── RIGHT COLUMN: Cart ── */}
           <TransactionCartForm
             cart={cart}
             setCart={setCart}

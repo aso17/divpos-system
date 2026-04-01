@@ -12,7 +12,7 @@ export default function RequirePermission({
 
   if (loading) return "";
   if (!user) return null;
-  console.log(permissionMap);
+  // console.log(permissionMap);
   const currentPath = route || location.pathname;
   const totalPermissions = Object.keys(permissionMap).length;
 
