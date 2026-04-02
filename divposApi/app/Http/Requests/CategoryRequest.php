@@ -14,15 +14,16 @@ class CategoryRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Pastikan user punya tenant_id
+
         return Auth::check() && !is_null(Auth::user()->employee?->tenant_id);
     }
 
     protected function prepareForValidation()
     {
-        $tenantId = Auth::user()->employee->tenant_id;
+        $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
         $routeId = $this->route('id') ?? $this->route('category');
-        
+
         $mergeData = [
             'tenant_id' => $tenantId,
         ];
@@ -36,14 +37,14 @@ class CategoryRequest extends FormRequest
         if ($this->has('name')) {
             $cleanName = preg_replace('/\s+/', ' ', strip_tags(trim($this->name)));
             $mergeData['name'] = $cleanName;
-            
-            // Generate slug otomatis hanya jika slug kosong
+
+
             if (empty($this->slug)) {
                 $mergeData['slug'] = Str::slug($cleanName);
             }
         }
 
-        // 3. Sanitasi Slug (jika diinput manual)
+
         if ($this->has('slug') && !empty($this->slug)) {
             $mergeData['slug'] = Str::slug($this->slug);
         }
@@ -58,8 +59,9 @@ class CategoryRequest extends FormRequest
 
     public function rules(): array
     {
-        $tenantId = Auth::user()->employee->tenant_id;
-        $id = $this->id; 
+        $user = Auth::user();
+        $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
+        $id = $this->id;
 
         return [
             'tenant_id' => 'required|integer',

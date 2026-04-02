@@ -8,74 +8,78 @@ use Illuminate\Http\Request;
 use App\Http\Requests\CategoryRequest;
 use App\Services\LogDbErrorService;
 use Illuminate\Support\Facades\Auth;
+use App\Helpers\ClearCache;
 
 class CategoryController extends Controller
 {
     protected $service;
     protected $logService;
 
-    public function __construct(CategoryService $service,LogDbErrorService $logService)
+    public function __construct(CategoryService $service, LogDbErrorService $logService)
     {
         $this->service = $service;
-         $this->logService = $logService;
+        $this->logService = $logService;
     }
 
     public function index(Request $request)
     {
         $user = Auth::user();
         $tenantId = $user->tenant_id ?? $user->employee->tenant_id;
-      if (!$tenantId) {
-        return response()->json([
-            'message' => 'Access denied. You do not have permission to perform this action.'
-        ], 403);
-         }
+        if (!$tenantId) {
+            return response()->json([
+                'message' => 'Access denied. You do not have permission to perform this action.'
+            ], 403);
+        }
 
         $params = [
             'tenant_id' => $tenantId,
             'keyword' => $request->query('keyword'),
         ];
-          
+
         $categories = $this->service->getPaginatedCategories($params);
         return CategoryResource::collection($categories);
     }
 
-  /**
- * STORE
- */
+
     public function store(CategoryRequest $request)
     {
         try {
-            
-            
-            $payload = $request->validated();      
+
+            $tenantId = $request->tenant_id;
+            $payload = $request->validated();
             $category = $this->service->storeCategory($payload);
+
+            ClearCache::tenantTransaction((int)$tenantId);
+
             return response()->json([
                 'status' => 'success',
                 // "pa"=>$payload,
                 'message' => 'Kategori baru berhasil ditambahkan',
                 'data' => new CategoryResource($category)
-            ], 201); 
+            ], 201);
 
         } catch (\Exception $e) {
             $this->logService->log($e);
             return response()->json([
-                'status' => 'error', 
+                'status' => 'error',
                 'message' => 'Gagal menyimpan data kategori'.$e->getMessage()
             ], 500);
         }
     }
 
-/**
- * UPDATE
- */
-        public function update(CategoryRequest $request, $id)
+    /**
+     * UPDATE
+     */
+    public function update(CategoryRequest $request)
     {
         try {
-           
-            $tenantId =$request->tenant_id;        
+
+            $tenantId = $request->tenant_id;
             $realId = $request->id;
             $payload = $request->validated();
-            $category = $this->service->updateCategory($realId, $tenantId,$payload);
+            $category = $this->service->updateCategory($realId, $tenantId, $payload);
+
+            ClearCache::tenantTransaction((int)$tenantId);
 
             return response()->json([
                 'status' => 'success',
@@ -87,19 +91,28 @@ class CategoryController extends Controller
         } catch (\Exception $e) {
             $this->logService->log($e);
             return response()->json([
-                'status' => 'error',   
+                'status' => 'error',
                 'message' => $e->getMessage()
             ], 400);
         }
     }
 
-   public function destroy($id)
+    public function destroy($id)
     {
         try {
-           
-            $tenantId = Auth::user()->employee->tenant_id;
+
+            $user = Auth::user();
+            $tenantId = $user->tenant_id ?? $user->employee?->tenant_id;
+
+            if (!$tenantId) {
+                return response()->json([
+                    'message' => 'Access denied. Profil bisnis tidak ditemukan.'
+                ], 403);
+            }
+
             $this->service->deleteCategory($id, $tenantId);
 
+            ClearCache::tenantTransaction((int)$tenantId);
             return response()->json([
                 'status' => 'success',
                 'message' => 'Kategori berhasil dihapus'
@@ -108,8 +121,8 @@ class CategoryController extends Controller
         } catch (\Exception $e) {
             $this->logService->log($e);
             return response()->json([
-                'status' => 'error', 
-                'message' => $e->getMessage() 
+                'status' => 'error',
+                'message' => $e->getMessage()
             ], 400);
         }
     }

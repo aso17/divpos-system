@@ -29,8 +29,8 @@ use Illuminate\Support\Facades\Auth;
 class TransactionController extends Controller
 {
     protected $packageService;
-    protected $categoryService;   // tambah
-    protected $masterService;     // tambah
+    protected $categoryService;
+    protected $masterService;
     protected $customerService;
     protected $transactionService;
     protected $outletService;
@@ -39,8 +39,8 @@ class TransactionController extends Controller
 
     public function __construct(
         PackageService $packageService,
-        CategoryService $categoryService,    // tambah
-        MasterService $masterService,        // tambah
+        CategoryService $categoryService,
+        MasterService $masterService,
         CustomerService $customerService,
         OutletService $outletService,
         PaymentMethodService $paymentMethodService,
@@ -48,8 +48,8 @@ class TransactionController extends Controller
         EmployeeService $employeeService
     ) {
         $this->packageService       = $packageService;
-        $this->categoryService      = $categoryService;    // tambah
-        $this->masterService        = $masterService;      // tambah
+        $this->categoryService      = $categoryService;
+        $this->masterService        = $masterService;
         $this->customerService      = $customerService;
         $this->outletService        = $outletService;
         $this->paymentMethodService = $paymentMethodService;

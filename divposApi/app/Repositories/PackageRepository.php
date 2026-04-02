@@ -17,10 +17,10 @@ class PackageRepository
                 'unit_id',
                 'code',
                 'name',
-                'price',          // WAJIB: Untuk original_price
-                'final_price',    // WAJIB: Untuk harga setelah diskon
-                'discount_value', // WAJIB: Untuk nominal diskon
-                'discount_type',  // WAJIB: Untuk label (fixed/percentage)
+                'price',
+                'final_price',
+                'discount_value',
+                'discount_type',
                 'description',
                 'is_weight_based'
             ])

@@ -19,7 +19,9 @@ use App\Http\Controllers\{
     CustomerController,
     TransactionController,
     PaymentMethodController,
-    DashboardController
+    DashboardController,
+    PaymentRecapController,
+    RevenueReportController
 };
 
 /*
@@ -119,5 +121,28 @@ Route::middleware(['api', 'auth:sanctum'])->group(function () {
 
         Route::apiResource('role-permissions', RolePermissionController::class)
             ->only(['index', 'store']);
+    });
+
+
+    Route::prefix('reports')->group(function () {
+
+        // ── Rekap Pembayaran ─────────────────────────────────────────
+        Route::controller(PaymentRecapController::class)->group(function () {
+            Route::get('payments', 'index');   // List + summary
+            Route::get('payments/export', 'export');  // Export CSV/Excel
+        });
+
+        // ── Rekap Pembayaran ─────────────────────────────────────────
+        Route::controller(RevenueReportController::class)->group(function () {
+            Route::get('revenue', 'index');   // List + summary
+            Route::get('payments/export', 'export');  // Export CSV/Excel
+        });
+
+        // ── Analisa Pendapatan (tambah controller baru jika sudah siap) ──
+        // Route::controller(RevenueAnalysisController::class)->group(function () {
+        //     Route::get('revenue',        'index');
+        //     Route::get('revenue/export', 'export');
+        // });
+
     });
 });

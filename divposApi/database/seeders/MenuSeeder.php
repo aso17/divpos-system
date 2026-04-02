@@ -36,9 +36,9 @@ class MenuSeeder extends Seeder
             ['module' => 'REPORT','menu_name' => 'Laporan','code' => 'RPT_PARENT','route_name' => null,'icon' => 'bar-chart-2','order_no' => 1,'parent' => null],
 
             ['module' => 'REPORT','menu_name' => 'Analisa Pendapatan','code' => 'RPT_REVENUE','route_name' => '/reports/revenue','icon' => 'dollar-sign','order_no' => 1,'parent' => 'RPT_PARENT'],
+            ['module' => 'REPORT','menu_name' => 'Rekap Pembayaran','code' => 'RPT_PAYMENT_RECAP','route_name' => '/reports/payments','icon' => 'credit-card','order_no' => 4,'parent' => 'RPT_PARENT'],
             ['module' => 'REPORT','menu_name' => 'Status Layanan','code' => 'RPT_SERVICE_STATUS','route_name' => '/reports/service-status','icon' => 'refresh-cw','order_no' => 2,'parent' => 'RPT_PARENT'],
             ['module' => 'REPORT','menu_name' => 'Produk Terlaris','code' => 'RPT_BEST_SELLER','route_name' => '/reports/best-seller','icon' => 'package','order_no' => 3,'parent' => 'RPT_PARENT'],
-            ['module' => 'REPORT','menu_name' => 'Rekap Pembayaran','code' => 'RPT_PAYMENT_RECAP','route_name' => '/reports/payments','icon' => 'credit-card','order_no' => 4,'parent' => 'RPT_PARENT'],
             ['module' => 'REPORT','menu_name' => 'Performa Karyawan','code' => 'RPT_STAFF_PERF','route_name' => '/reports/staff-performance','icon' => 'award','order_no' => 5,'parent' => 'RPT_PARENT'],
 
            // --- 5. PENGATURAN (PARENT) ---
