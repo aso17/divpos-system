@@ -13,6 +13,8 @@ import TransactionPage from "../pages/transactions/Transactions";
 import CatalogPage from "../pages/catalog/CatalogList";
 import TrxHistoryPage from "../pages/transactionsHistory/TransactionHistory";
 import RolePermissionsPage from "../pages/RolePermission/RolePermissionList";
+import ReportPaymentRecapPage from "../pages/report/ReportPaymentRecap";
+import ReportRevenuePage from "../pages/report/ReportRevenue";
 import LoginPage from "../pages/login/Login";
 import ProtectedRoute from "./ProtectedRoute";
 import PublicRoute from "./PublicRoute";
@@ -142,6 +144,22 @@ export default function AppRoutes() {
               element={
                 <RequirePermission permission="update" route="/roles">
                   <RolePermissionsPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/reports/payments"
+              element={
+                <RequirePermission permission="view">
+                  <ReportPaymentRecapPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/reports/revenue"
+              element={
+                <RequirePermission permission="view">
+                  <ReportRevenuePage />
                 </RequirePermission>
               }
             />
